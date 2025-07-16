@@ -1,0 +1,80 @@
+{
+  "name": "veogen-frontend",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "@emotion/react": "^11.11.1",
+    "@emotion/styled": "^11.11.0",
+    "@headlessui/react": "^1.7.17",
+    "@heroicons/react": "^2.0.18",
+    "@hookform/resolvers": "^3.3.2",
+    "@mui/icons-material": "^5.14.19",
+    "@mui/material": "^5.14.20",
+    "@tailwindcss/forms": "^0.5.10",
+    "@tanstack/react-query": "^4.36.1",
+    "@testing-library/jest-dom": "^5.17.0",
+    "@testing-library/react": "^14.0.0",
+    "@testing-library/user-event": "^14.4.3",
+    "ajv": "^6.12.6",
+    "ajv-keywords": "^3.5.2",
+    "autoprefixer": "^10.4.16",
+    "axios": "^1.6.0",
+    "clsx": "^2.0.0",
+    "date-fns": "^2.30.0",
+    "framer-motion": "^10.16.4",
+    "lottie-react": "^2.4.0",
+    "lucide-react": "^0.294.0",
+    "postcss": "^8.4.32",
+    "react": "^18.2.0",
+    "react-beautiful-dnd": "^13.1.1",
+    "react-dom": "^18.2.0",
+    "react-dropzone": "^14.2.3",
+    "react-hook-form": "^7.47.0",
+    "react-hot-toast": "^2.4.1",
+    "react-player": "^2.13.0",
+    "react-query": "^3.39.3",
+    "react-router-dom": "^6.8.0",
+    "react-scripts": "^5.0.1",
+    "react-use": "^17.4.0",
+    "sonner": "^1.2.0",
+    "tailwindcss": "^3.3.6",
+    "vaul": "^0.7.9",
+    "web-vitals": "^3.0.0",
+    "zod": "^3.22.4",
+    "zustand": "^4.4.7"
+  },
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject",
+    "lint": "eslint src --ext .js,.jsx,.ts,.tsx",
+    "lint:fix": "eslint src --ext .js,.jsx,.ts,.tsx --fix",
+    "type-check": "tsc --noEmit"
+  },
+  "eslintConfig": {
+    "extends": [
+      "react-app",
+      "react-app/jest"
+    ]
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+      "proxy": "http://localhost:4700",
+  "devDependencies": {
+    "@types/react": "^18.2.37",
+    "@types/react-beautiful-dnd": "^13.1.6",
+    "@types/react-dom": "^18.2.15",
+    "typescript": "^4.9.5"
+  }
+}

@@ -1,112 +1,168 @@
 # FastSearch MCP Server
 
-Lightning-fast file search using NTFS Master File Table access. Built for Claude Desktop integration.
+Lightning-fast file search using NTFS Master File Table access. Built for use with MCP clients like Claude, Windsurf, Cline, and other AI development tools.
 
-## 🚀 Performance
+## 🚀 Features
 
-- **2M+ files indexed in <3 seconds**
-- **Sub-100ms search responses**
-- **Real-time filesystem monitoring**
-- **Minimal memory footprint**
+- **Direct NTFS MFT Access**: Reads Master File Table directly for instant results
+- **Background Indexing**: Non-blocking file indexing with thread safety
+- **Pattern Matching**: Supports wildcards (*.js, README*, etc.) and filters
+- **MCP Protocol**: Full JSON-RPC implementation for MCP clients
+- **Graceful Fallbacks**: Falls back to filesystem walk if MFT access fails
+- **Real-time Status**: Index monitoring and manual reindexing controls
 
 ## 🎯 Why FastSearch?
 
-Current file search tools are painfully slow:
-- Windows Explorer search: 😴
-- Basic filesystem MCP tools: 30+ seconds for large directories
-- Node.js-based solutions: Memory hogs that choke on large datasets
+Current file search tools are painfully slow for AI development workflows:
+- Windows Explorer search: Terrible performance
+- Basic filesystem MCPs: 30+ seconds for large directories  
+- Node.js solutions: Memory inefficient, poor performance
 
-FastSearch reads the NTFS Master File Table directly for instant results.
+FastSearch reads the NTFS Master File Table directly using the proven `ntfs-reader` crate.
+
+## 🔧 Architecture
+
+### Core Components
+- **NTFS Reader**: Direct MFT access using `ntfs-reader` crate
+- **MCP Server**: Full JSON-RPC protocol implementation
+- **Background Indexer**: Thread-safe concurrent file indexing
+- **Search Engine**: Pattern matching with filters and performance reporting
+
+### MCP Tools
+- `fast_search` - Pattern-based file search with filters
+- `find_duplicates` - Content-based duplicate detection (planned)
+- `index_status` - Indexing progress and statistics
+- `reindex_drive` - Manual drive reindexing
 
 ## 📦 Installation
 
+### Prerequisites
+- **Windows** (NTFS filesystem required)
+- **Administrator privileges** (for MFT access)
+- **Rust toolchain** (for building from source)
+
+### Build from Source
 ```bash
-npm install -g fastsearch-mcp
+git clone <repository-url>
+cd fastsearch-mcp
+cargo build --release
 ```
 
-## ⚙️ Claude Desktop Configuration
+## ⚙️ MCP Client Configuration
 
+### Claude Desktop
 Add to your `claude_desktop_config.json`:
 
 ```json
 {
   "mcpServers": {
     "fastsearch": {
-      "command": "fastsearch-mcp",
+      "command": "D:/Dev/repos/fastsearch-mcp/target/release/fastsearch.exe",
       "args": ["--mcp-server"]
     }
   }
 }
 ```
 
+### Other MCP Clients
+- **Windsurf**: Configure in MCP settings panel
+- **Cline**: Add to MCP server configuration
+- **Continue**: Include in MCP tools setup
+- **Cursor**: Configure for MCP protocol support
+- **Open Interpreter**: Add via MCP integration
+
 ## 🔧 Usage
 
-### Find files by pattern
+### Command Line
+```bash
+# Run as MCP server (for any MCP client)
+fastsearch --mcp-server
+
+# Run performance benchmark
+fastsearch --benchmark --drive C
+
+# Show help
+fastsearch --help
+```
+
+### From MCP Clients
 ```
 Find all TypeScript files in my project
-→ Searches instantly through millions of files
-```
+→ Uses fast_search tool with pattern "*.ts"
 
-### Search by attributes
-```
-Show me all files larger than 100MB modified today
-→ Results in <100ms
-```
+Show me large files modified today
+→ Combines pattern matching with size/date filters
 
-### Duplicate detection
-```
-Find duplicate images in my Photos folder
-→ Content-based deduplication
+Check indexing status
+→ Uses index_status tool for progress monitoring
 ```
 
 ## 🛠️ Development
 
-### Prerequisites
-- Rust toolchain
-- Node.js (for npm packaging)
-- Windows (NTFS filesystem)
+### Project Status
+- ✅ **NTFS MFT Reader**: Complete using ntfs-reader crate
+- ✅ **MCP Server**: Full protocol implementation  
+- ✅ **Background Indexing**: Thread-safe concurrent operations
+- ✅ **Search Engine**: Pattern matching with filters
+- 🔄 **Testing Phase**: Ready for build and performance validation
+- 📋 **Duplicate Detection**: Planned feature
 
-### Build from source
+### Expected Performance
+Based on `ntfs-reader` crate benchmarks:
+- **Indexing**: ~4 seconds for millions of files
+- **Search**: <100ms response time
+- **Memory**: ~400MB for 2M+ files
+
+### Testing
 ```bash
-git clone https://github.com/sandra-claudius/fastsearch-mcp
-cd fastsearch-mcp
+# Build and test
 cargo build --release
-npm install
-npm run build
+cargo test
+
+# Performance benchmark
+./target/release/fastsearch --benchmark --drive C
+
+# MCP protocol test
+echo '{"method":"initialize","params":{}}' | ./target/release/fastsearch --mcp-server
 ```
 
-### Local testing
-```bash
-npm run dev
-```
+## 🔒 Requirements
 
-## 📊 Benchmarks
+### System Requirements
+- **Windows 10/11** (NTFS filesystem)
+- **Administrator privileges** (for direct MFT access)
+- **8GB+ RAM** (recommended for large drives)
 
-| Tool | 2M Files Index | Search Response | Memory Usage |
-|------|----------------|-----------------|--------------|
-| FastSearch | 2.8s | <50ms | 400MB |
-| WizFile | 3.1s | ~100ms | 350MB |
-| Everything | 4.2s | ~150ms | 500MB |
-| Windows Search | ∞ | ∞ | ∞ |
+### Security Notes
+- Requires admin privileges to access raw volume (`\\\\.\\C:`)
+- Read-only access - no filesystem modifications
+- Graceful permission error handling with fallbacks
 
 ## 🤝 Contributing
 
 1. Fork the repository
 2. Create a feature branch
-3. Add tests for new functionality
+3. Implement changes with tests
 4. Submit a pull request
+
+Focus areas:
+- Performance optimizations
+- Additional search filters
+- Cross-platform compatibility
+- Duplicate detection algorithms
 
 ## 📄 License
 
 MIT License - see LICENSE file
 
-## 🔗 Links
+## 🔗 Dependencies
 
-- [GitHub Repository](https://github.com/sandra-claudius/fastsearch-mcp)
-- [npm Package](https://www.npmjs.com/package/fastsearch-mcp)
-- [Documentation](https://github.com/sandra-claudius/fastsearch-mcp/docs)
-- [Issue Tracker](https://github.com/sandra-claudius/fastsearch-mcp/issues)
+- [`ntfs-reader`](https://lib.rs/crates/ntfs-reader) - NTFS MFT access
+- [`serde_json`](https://serde.rs/) - JSON serialization
+- [`tokio`](https://tokio.rs/) - Async runtime
+- [`clap`](https://clap.rs/) - Command line parsing
+- [`anyhow`](https://github.com/dtolnay/anyhow) - Error handling
 
 ---
 
-**Built by Sandra & Claudius - Making file search instant! ⚡**
+**Built with Rust for maximum performance and safety** ⚡

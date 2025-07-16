@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FastSearch MCP - Lightning-Fast File Search</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">
+                <i class="fas fa-bolt"></i>
+                <h1>FastSearch MCP</h1>
+            </div>
+            <div class="tagline">Lightning-fast file search using NTFS Master File Table</div>
+        </header>
+
+        <!-- Search Section -->
+        <section class="search-section">
+            <div class="search-container">
+                <div class="search-box">
+                    <i class="fas fa-search search-icon"></i>
+                    <input type="text" id="searchInput" placeholder="Search for files and folders..." autocomplete="off">
+                    <button id="searchBtn" class="search-btn">
+                        <i class="fas fa-arrow-right"></i>
+                    </button>
+                </div>
+                
+                <div class="search-filters">
+                    <button class="filter-btn active" data-filter="all">
+                        <i class="fas fa-globe"></i> All Files
+                    </button>
+                    <button class="filter-btn" data-filter="documents">
+                        <i class="fas fa-file-alt"></i> Documents
+                    </button>
+                    <button class="filter-btn" data-filter="images">
+                        <i class="fas fa-image"></i> Images
+                    </button>
+                    <button class="filter-btn" data-filter="videos">
+                        <i class="fas fa-video"></i> Videos
+                    </button>
+                    <button class="filter-btn" data-filter="code">
+                        <i class="fas fa-code"></i> Code
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Stats Section -->
+        <section class="stats-section" id="statsSection">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-clock"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-number" id="searchTime">0ms</div>
+                        <div class="stat-label">Search Time</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-file"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-number" id="resultCount">0</div>
+                        <div class="stat-label">Results Found</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-hdd"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-number" id="indexedFiles">0</div>
+                        <div class="stat-label">Files Indexed</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-tachometer-alt"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-number" id="performance">Ultra Fast</div>
+                        <div class="stat-label">Performance</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Results Section -->
+        <section class="results-section" id="resultsSection">
+            <div class="results-header">
+                <h2 id="resultsTitle">Search Results</h2>
+                <div class="view-toggle">
+                    <button class="view-btn active" data-view="list">
+                        <i class="fas fa-list"></i>
+                    </button>
+                    <button class="view-btn" data-view="grid">
+                        <i class="fas fa-th-large"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="results-container" id="resultsContainer">
+                <!-- Results will be populated here -->
+            </div>
+            
+            <div class="no-results" id="noResults">
+                <i class="fas fa-search"></i>
+                <h3>No results found</h3>
+                <p>Try adjusting your search terms or filters</p>
+            </div>
+        </section>
+
+        <!-- Loading -->
+        <div class="loading" id="loading">
+            <div class="loading-spinner"></div>
+            <p>Searching files at lightning speed...</p>
+        </div>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <div class="footer-content">
+                <p>&copy; 2025 FastSearch MCP. Powered by NTFS Master File Table indexing.</p>
+                <div class="footer-links">
+                    <a href="#" onclick="showAbout()">About</a>
+                    <a href="#" onclick="showHelp()">Help</a>
+                    <a href="#" onclick="showSettings()">Settings</a>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Modals -->
+    <div class="modal" id="aboutModal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('aboutModal')">&times;</span>
+            <h2><i class="fas fa-info-circle"></i> About FastSearch MCP</h2>
+            <p>FastSearch MCP is a lightning-fast file search system that leverages the NTFS Master File Table for ultra-high performance file indexing and searching.</p>
+            <h3>Features:</h3>
+            <ul>
+                <li>Sub-millisecond search times</li>
+                <li>Real-time file system monitoring</li>
+                <li>Advanced filtering and sorting</li>
+                <li>MCP protocol integration</li>
+                <li>Cross-platform compatibility</li>
+            </ul>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html> 

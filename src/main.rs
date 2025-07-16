@@ -4,10 +4,8 @@ use std::io::{self, BufRead, BufReader, Write};
 use serde_json::{json, Value};
 use anyhow::Result;
 
-mod mft_reader;
-mod file_index;
 mod mcp_server;
-mod search_engine;
+mod ntfs_reader;
 
 use crate::mcp_server::McpServer;
 
@@ -42,11 +40,13 @@ fn main() -> Result<()> {
         info!("Starting FastSearch MCP Server");
         run_mcp_server()?;
     } else if matches.get_flag("benchmark") {
-        run_benchmark()?;
+        let drive = matches.get_one::<String>("drive").unwrap();
+        run_benchmark(drive)?;
     } else {
         println!("FastSearch - Lightning-fast file search");
         println!("Use --mcp-server to run as MCP server");
         println!("Use --benchmark to run performance tests");
+        println!("Use --drive <letter> to specify drive (default: C:)");
     }
 
     Ok(())
@@ -90,19 +90,21 @@ fn run_mcp_server() -> Result<()> {
     Ok(())
 }
 
-fn run_benchmark() -> Result<()> {
-    info!("Running FastSearch benchmark");
+fn run_benchmark(drive: &str) -> Result<()> {
+    info!("Running FastSearch benchmark for drive: {}", drive);
     
-    // TODO: Implement comprehensive benchmarking
-    // - Index build time
-    // - Search response time
-    // - Memory usage
-    // - Comparison with other tools
+    #[cfg(windows)]
+    {
+        // Run NTFS MFT benchmark
+        crate::ntfs_reader::benchmark_mft_performance(drive)?;
+    }
     
-    println!("Benchmark results:");
-    println!("Index build: TBD");
-    println!("Search time: TBD");
-    println!("Memory usage: TBD");
+    #[cfg(not(windows))]
+    {
+        println!("Benchmark is only available on Windows (NTFS required)");
+        println!("Drive specified: {}", drive);
+        println!("Platform: {}", std::env::consts::OS);
+    }
     
     Ok(())
 }
