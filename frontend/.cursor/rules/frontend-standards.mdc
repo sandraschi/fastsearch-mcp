@@ -1,0 +1,79 @@
+---
+description: Frontend development standards for FastSearch MCP test interface
+globs: ["*.html", "*.js", "*.css"]
+alwaysApply: true
+---
+
+# FastSearch MCP - Frontend Development Rules
+
+## 🎯 Frontend Purpose
+
+**IMPORTANT**: This frontend is a **TEST INTERFACE ONLY** for development and demonstration purposes. Production usage is via Claude Desktop MCP integration.
+
+## Development Standards
+
+### JavaScript (Vanilla)
+- **USE** modern ES6+ syntax
+- **IMPLEMENT** proper error handling with try/catch
+- **AVOID** jQuery or heavy frameworks (keep it lightweight)
+- **PROVIDE** clear user feedback for all actions
+
+### API Integration
+- **CONNECT** to local FastSearch server at `http://localhost:3000`
+- **HANDLE** CORS properly (server enables it)
+- **IMPLEMENT** proper loading states during searches
+- **DISPLAY** error messages clearly to users
+
+### User Experience
+- **PROVIDE** real-time search feedback
+- **SHOW** search timing and result counts
+- **IMPLEMENT** responsive design for different screen sizes
+- **INCLUDE** help text explaining search patterns
+
+### Performance Considerations
+- **DEBOUNCE** search input to avoid excessive API calls
+- **LIMIT** result display for large result sets
+- **IMPLEMENT** virtual scrolling for very large result lists
+- **CACHE** search results temporarily (frontend cache only)
+
+## Security & CORS
+
+### CORS Configuration
+- Server enables CORS for localhost development
+- **NEVER** disable CORS warnings in production
+- **USE** proper origin checking if deploying publicly
+- **IMPLEMENT** CSP headers for security
+
+### Data Handling
+- **NEVER** store sensitive file paths permanently
+- **CLEAR** search results on page refresh
+- **AVOID** logging file paths to console in production
+- **SANITIZE** user input before sending to API
+
+## Code Organization
+
+### File Structure
+- `index.html` - Main interface
+- `script.js` - API integration and UI logic  
+- `styles.css` - Responsive styling
+- Keep files focused and modular
+
+### Error Handling
+- **DISPLAY** meaningful error messages to users
+- **LOG** detailed errors to console for debugging
+- **PROVIDE** fallback UI states for API failures
+- **GUIDE** users on how to resolve common issues
+
+## Testing Notes
+
+### Mock Data Removal
+- **CONFIRMED**: All mock data has been removed
+- **CONNECT**: Only to real backend API
+- **AVOID**: Adding mock data back for any reason
+- **TEST**: With actual NTFS search functionality
+
+### Development Workflow
+- Start backend server first: `cargo run --bin fastsearch`
+- Open frontend in browser: `file:///.../frontend/index.html`
+- Test with real search patterns and verify results
+- Check browser console for any errors or warnings

@@ -1,0 +1,108 @@
+---
+description: Documentation and README maintenance standards
+globs: ["*.md", "docs/**/*.md"]
+alwaysApply: false
+---
+
+# FastSearch MCP - Documentation Standards
+
+## Documentation Philosophy
+
+### Architecture Protection Priority
+**PRIMARY PURPOSE**: All documentation serves to protect the direct NTFS MFT architecture from being "optimized" into traditional indexing patterns.
+
+### Target Audiences
+1. **AI Coding Assistants** (Cursor, Copilot, etc.) - Prevent architectural mistakes
+2. **Future Developers** - Maintain architectural integrity  
+3. **Users** - Understand why this approach is superior
+4. **Team Members** - Preserve design decisions
+
+## Content Requirements
+
+### Architecture Warnings
+- **INCLUDE** clear warnings against indexing in every technical doc
+- **EXPLAIN** why direct MFT access is intentional, not a bug
+- **REFERENCE** WizFile as commercial validation
+- **EMPHASIZE** performance targets that depend on direct approach
+
+### Technical Accuracy
+- **KEEP** performance benchmarks updated with real measurements
+- **INCLUDE** code examples that demonstrate correct patterns
+- **DOCUMENT** error conditions and troubleshooting steps
+- **PROVIDE** complete API schemas with examples
+
+### Clarity Standards
+- **USE** clear headings and section organization
+- **INCLUDE** emoji indicators for warnings (🚨) and requirements (✅)
+- **PROVIDE** quick reference sections
+- **MAINTAIN** consistent terminology throughout
+
+## File-Specific Standards
+
+### README.md
+- **LEAD** with clear value proposition and WizFile comparison
+- **INCLUDE** installation and setup instructions
+- **WARN** against architectural "improvements" prominently
+- **PROVIDE** quick start examples
+
+### PRODUCT_REQUIREMENTS.md  
+- **MAINTAIN** non-negotiable principles section
+- **UPDATE** success criteria as targets are validated
+- **DOCUMENT** any requirement changes with rationale
+- **PRESERVE** original architectural decisions
+
+### TECHNICAL_ARCHITECTURE.md
+- **KEEP** NTFS MFT explanation technically accurate  
+- **UPDATE** performance characteristics with real measurements
+- **INCLUDE** code examples from actual implementation
+- **DOCUMENT** any architectural evolution
+
+### API_REFERENCE.md
+- **MAINTAIN** complete tool schemas
+- **INCLUDE** working examples for all tools
+- **UPDATE** error codes and handling
+- **PROVIDE** troubleshooting guides
+
+## Quality Standards
+
+### Accuracy
+- **VERIFY** all code examples actually work
+- **TEST** all installation instructions
+- **VALIDATE** all API examples with real server
+- **CHECK** all links and references
+
+### Consistency  
+- **USE** consistent terminology (NTFS MFT, not "file indexing")
+- **MAINTAIN** same warning message patterns
+- **FOLLOW** same documentation structure
+- **PRESERVE** same tone and voice
+
+### Completeness
+- **COVER** all major use cases and patterns
+- **INCLUDE** error scenarios and solutions
+- **PROVIDE** context for architectural decisions
+- **DOCUMENT** future roadmap and limitations
+
+## Update Triggers
+
+### When to Update Documentation
+- Performance measurements change significantly
+- New tools or features added
+- Error handling improved
+- Installation process changes
+- Architectural principles clarified
+
+### What NOT to Change
+- **NEVER** remove architecture protection warnings
+- **NEVER** weaken language about indexing being forbidden
+- **NEVER** remove WizFile references and validation
+- **NEVER** soften non-negotiable principles
+
+## Review Standards
+
+### Before Committing Documentation Changes
+- **VERIFY** architecture protection messages remain strong
+- **CHECK** that WizFile comparison is preserved
+- **ENSURE** technical accuracy of all claims
+- **CONFIRM** examples work with current implementation
+- **VALIDATE** that warnings are prominent and clear

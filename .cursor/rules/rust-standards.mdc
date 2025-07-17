@@ -1,0 +1,59 @@
+---
+description: Rust coding standards and MCP protocol compliance for FastSearch
+globs: ["src/**/*.rs"]
+alwaysApply: false
+---
+
+# FastSearch MCP - Rust Development Standards
+
+## Code Quality Requirements
+
+### Error Handling
+- **ALWAYS** use `anyhow::Result` for error propagation
+- **ALWAYS** provide meaningful error context with `.context()`
+- **NEVER** use unwrap() except in tests
+- **PREFER** ? operator over explicit error handling
+
+### Performance Optimization  
+- **PREFER** early termination in loops when max_results reached
+- **USE** string interning for repeated path components
+- **AVOID** unnecessary allocations in hot paths
+- **IMPLEMENT** pattern optimization (simple string vs regex)
+
+### NTFS Integration
+- **ALWAYS** check admin privileges before NTFS access
+- **IMPLEMENT** graceful fallback to filesystem walk
+- **USE** proper Windows API error handling
+- **NEVER** assume NTFS access will succeed
+
+### MCP Protocol Compliance
+- **ALWAYS** follow JSON-RPC 2.0 specification exactly
+- **PROVIDE** comprehensive tool schemas with examples
+- **IMPLEMENT** proper error codes and messages
+- **ENSURE** stdin/stdout protocol compliance
+
+### Memory Management
+- **AVOID** large Vec allocations for file results
+- **USE** early termination to limit memory growth
+- **IMPLEMENT** streaming where possible
+- **MONITOR** memory usage in performance-critical paths
+
+## Code Style
+
+### Naming Conventions
+- Functions: snake_case
+- Types: PascalCase  
+- Constants: SCREAMING_SNAKE_CASE
+- File patterns: kebab-case for modules
+
+### Documentation
+- **ALWAYS** document public APIs with examples
+- **INCLUDE** error conditions in doc comments
+- **PROVIDE** usage examples for complex functions
+- **EXPLAIN** performance characteristics where relevant
+
+### Testing
+- **INCLUDE** unit tests for pattern matching logic
+- **TEST** error conditions and edge cases
+- **BENCHMARK** performance-critical functions
+- **MOCK** NTFS access for CI/CD environments

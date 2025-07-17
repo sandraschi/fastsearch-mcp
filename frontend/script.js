@@ -75,121 +75,113 @@ class FastSearchApp {
         this.showLoading();
         
         try {
-            // Simulate API call
-            const startTime = performance.now();
-            const results = await this.simulateSearch(query);
-            const endTime = performance.now();
+            // Call the actual FastSearch API
+            const results = await this.callFastSearchAPI(query);
             
-            this.searchResults = results;
-            this.displayResults(results);
-            this.updateStats(results.length, Math.round(endTime - startTime));
+            this.searchResults = results.results || [];
+            this.displayResults(this.searchResults);
+            this.updateStats(results.count || 0, results.search_time_ms || 0);
+            
+            if (!results.success) {
+                this.showToast(results.message || 'Search completed with warnings', 'warning');
+            } else {
+                this.showToast(`Found ${results.count} files in ${results.search_time_ms}ms`, 'info');
+            }
             
         } catch (error) {
-            this.showToast('Search failed. Please try again.', 'error');
-            console.error('Search error:', error);
+            let errorMessage = 'Failed to connect to FastSearch server. ';
+            
+            if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+                errorMessage += 'Make sure the FastSearch MCP server is running on port 3001.';
+            } else if (error.message.includes('HTTP error')) {
+                errorMessage += `Server returned error: ${error.message}`;
+            } else {
+                errorMessage += 'Please check the server connection and try again.';
+            }
+            
+            this.showToast(errorMessage, 'error');
+            console.error('FastSearch API error:', error);
+            
+            // Clear results on error
+            this.clearResults();
         } finally {
             this.isSearching = false;
             this.hideLoading();
         }
     }
 
-    async simulateSearch(query) {
-        // Simulate network delay
-        await new Promise(resolve => setTimeout(resolve, 200 + Math.random() * 500));
+    async callFastSearchAPI(query) {
+        // Call the actual FastSearch Web API
+        const apiUrl = 'http://localhost:3001/api/search';
         
-        // Mock search results
-        const mockResults = this.generateMockResults(query);
-        
-        // Filter by current filter
-        return this.filterResults(mockResults, this.currentFilter);
-    }
-
-    generateMockResults(query) {
-        const fileTypes = {
-            documents: ['.txt', '.pdf', '.doc', '.docx', '.md', '.rtf'],
-            images: ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.svg', '.webp'],
-            videos: ['.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv', '.webm'],
-            code: ['.js', '.ts', '.py', '.java', '.cpp', '.c', '.cs', '.php', '.go', '.rs']
+        const searchRequest = {
+            pattern: query,
+            max_results: 1000,
+            filters: {
+                exclude_dirs: this.currentFilter !== 'all' ? this.getExcludeDirs() : [],
+                file_types: this.currentFilter !== 'all' ? this.getFileTypes() : []
+            }
         };
-
-        const paths = [
-            'C:\\Users\\Documents\\Projects',
-            'C:\\Users\\Desktop\\Work',
-            'C:\\Program Files\\Development',
-            'D:\\Data\\Archives',
-            'C:\\Users\\Downloads',
-            'C:\\Users\\Pictures',
-            'C:\\Users\\Videos',
-            'C:\\dev\\repositories'
-        ];
-
-        const results = [];
-        const resultCount = Math.floor(Math.random() * 50) + 10;
-
-        for (let i = 0; i < resultCount; i++) {
-            const allExtensions = Object.values(fileTypes).flat();
-            const extension = allExtensions[Math.floor(Math.random() * allExtensions.length)];
-            const path = paths[Math.floor(Math.random() * paths.length)];
-            const filename = this.generateFilename(query, extension);
-            
-            results.push({
-                name: filename,
-                path: `${path}\\${filename}`,
-                extension: extension,
-                size: Math.floor(Math.random() * 1024 * 1024 * 100), // Random size up to 100MB
-                modified: new Date(Date.now() - Math.random() * 365 * 24 * 60 * 60 * 1000),
-                type: this.getFileType(extension)
+        
+        const response = await fetch(apiUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(searchRequest)
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        
+        // Transform the results to match our frontend format
+        if (result.success && result.results) {
+            result.results = result.results.map(file => {
+                const extension = this.extractFileExtension(file.name);
+                return {
+                    name: file.name,
+                    path: file.full_path,
+                    extension: extension,
+                    size: file.size || 0,
+                    modified: file.modified > 0 ? new Date(file.modified * 1000) : new Date(), // Convert from Unix timestamp
+                    type: this.getFileType(extension),
+                    is_directory: file.is_directory || false
+                };
             });
         }
-
-        return results.sort((a, b) => {
-            // Sort by relevance (how well the filename matches the query)
-            const aRelevance = this.calculateRelevance(a.name, query);
-            const bRelevance = this.calculateRelevance(b.name, query);
-            return bRelevance - aRelevance;
-        });
+        
+        return result;
+    }
+    
+    extractFileExtension(filename) {
+        const lastDot = filename.lastIndexOf('.');
+        return lastDot !== -1 ? filename.substring(lastDot) : '';
     }
 
-    generateFilename(query, extension) {
-        const queryWords = query.toLowerCase().split(' ');
-        const randomWords = ['project', 'file', 'document', 'data', 'backup', 'draft', 'final', 'v2', 'updated'];
-        
-        // Sometimes include query words in filename
-        let filename = '';
-        if (Math.random() > 0.3) {
-            filename = queryWords[Math.floor(Math.random() * queryWords.length)];
-            if (Math.random() > 0.5) {
-                filename += '_' + randomWords[Math.floor(Math.random() * randomWords.length)];
-            }
-        } else {
-            filename = randomWords[Math.floor(Math.random() * randomWords.length)];
-        }
-        
-        // Add random suffix sometimes
-        if (Math.random() > 0.7) {
-            filename += '_' + Math.floor(Math.random() * 100);
-        }
-        
-        return filename + extension;
+    getExcludeDirs() {
+        const excludeMap = {
+            'documents': ['.git', 'node_modules', 'target', 'build'],
+            'images': ['.git', 'node_modules', 'target', 'build', 'cache'],
+            'videos': ['.git', 'node_modules', 'target', 'build', 'cache'],
+            'code': ['node_modules', 'target', 'build', 'dist', '.git']
+        };
+        return excludeMap[this.currentFilter] || [];
+    }
+    
+    getFileTypes() {
+        const typeMap = {
+            'documents': ['.txt', '.pdf', '.doc', '.docx', '.md', '.rtf'],
+            'images': ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.svg', '.webp'],
+            'videos': ['.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv', '.webm'],
+            'code': ['.js', '.ts', '.py', '.java', '.cpp', '.c', '.cs', '.php', '.go', '.rs']
+        };
+        return typeMap[this.currentFilter] || [];
     }
 
-    calculateRelevance(filename, query) {
-        const lowerFilename = filename.toLowerCase();
-        const lowerQuery = query.toLowerCase();
-        
-        if (lowerFilename.includes(lowerQuery)) return 100;
-        
-        const queryWords = lowerQuery.split(' ');
-        let relevance = 0;
-        
-        queryWords.forEach(word => {
-            if (lowerFilename.includes(word)) {
-                relevance += 50;
-            }
-        });
-        
-        return relevance;
-    }
+
 
     getFileType(extension) {
         const typeMap = {
@@ -235,14 +227,15 @@ class FastSearchApp {
     }
 
     createResultHTML(result) {
-        const icon = this.getFileIcon(result.extension);
-        const size = this.formatFileSize(result.size);
+        const icon = result.is_directory ? 'fas fa-folder' : this.getFileIcon(result.extension);
+        const size = result.is_directory ? 'Folder' : this.formatFileSize(result.size);
         const date = this.formatDate(result.modified);
+        const itemType = result.is_directory ? 'folder' : result.type;
 
         return `
-            <div class="result-item" data-type="${result.type}">
+            <div class="result-item" data-type="${itemType}">
                 <div class="result-header">
-                    <div class="file-icon">
+                    <div class="file-icon" style="color: ${result.is_directory ? '#4CAF50' : '#2196F3'}">
                         <i class="${icon}"></i>
                     </div>
                     <div class="file-name">${result.name}</div>
@@ -251,7 +244,7 @@ class FastSearchApp {
                 <div class="file-meta">
                     <span><i class="fas fa-hdd"></i> ${size}</span>
                     <span><i class="fas fa-calendar"></i> ${date}</span>
-                    <span><i class="fas fa-tag"></i> ${result.type}</span>
+                    <span><i class="fas fa-tag"></i> ${itemType}</span>
                 </div>
             </div>
         `;
@@ -325,7 +318,6 @@ class FastSearchApp {
     updateStats(resultCount = 0, searchTime = 0) {
         document.getElementById('resultCount').textContent = resultCount.toLocaleString();
         document.getElementById('searchTime').textContent = `${searchTime}ms`;
-        document.getElementById('indexedFiles').textContent = (Math.floor(Math.random() * 1000000) + 100000).toLocaleString();
         
         // Update performance indicator
         const performanceEl = document.getElementById('performance');
@@ -338,6 +330,26 @@ class FastSearchApp {
         } else {
             performanceEl.textContent = 'Normal';
             performanceEl.style.color = '#FF9800';
+        }
+        
+        // Load real server status on first load or when stats are updated
+        this.loadServerStatus();
+    }
+    
+    async loadServerStatus() {
+        try {
+            const response = await fetch('http://localhost:3001/api/status');
+            if (response.ok) {
+                const status = await response.json();
+                if (status.success) {
+                    document.getElementById('indexedFiles').textContent = status.indexed_files.toLocaleString();
+                } else {
+                    document.getElementById('indexedFiles').textContent = 'Unknown';
+                }
+            }
+        } catch (error) {
+            console.warn('Could not load server status:', error);
+            document.getElementById('indexedFiles').textContent = 'Connecting...';
         }
     }
 
@@ -374,9 +386,26 @@ class FastSearchApp {
     }
 
     openFile(file) {
-        this.showToast(`Opening: ${file.name}`, 'info');
-        // In a real implementation, this would interact with the MCP server
-        console.log('Opening file:', file);
+        // For security reasons, we can't directly open files from a web interface
+        // Instead, show the file location for the user to navigate to
+        const message = file.is_directory ? 
+            `Directory location: ${file.path}` : 
+            `File location: ${file.path}`;
+        
+        this.showToast(message, 'info');
+        
+        // Copy file path to clipboard if possible
+        if (navigator.clipboard) {
+            navigator.clipboard.writeText(file.path).then(() => {
+                setTimeout(() => {
+                    this.showToast('File path copied to clipboard', 'info');
+                }, 1000);
+            }).catch(() => {
+                console.log('Could not copy to clipboard');
+            });
+        }
+        
+        console.log('File details:', file);
     }
 
     showToast(message, type = 'info') {
@@ -428,10 +457,28 @@ class FastSearchApp {
     }
 
     showWelcomeAnimation() {
-        // Add some demo stats on load
-        setTimeout(() => {
-            this.updateStats(0, 0);
-        }, 1000);
+        // Initialize with real server stats and check connection
+        this.checkServerConnection();
+        this.updateStats(0, 0);
+    }
+    
+    async checkServerConnection() {
+        try {
+            const response = await fetch('http://localhost:3001/api/health');
+            if (response.ok) {
+                const health = await response.json();
+                if (health.status === 'healthy') {
+                    this.showToast('✅ Connected to FastSearch MCP Server', 'info');
+                    this.loadServerStatus();
+                } else {
+                    this.showToast('⚠️ FastSearch server is not ready', 'warning');
+                }
+            }
+        } catch (error) {
+            console.warn('Server connection check failed:', error);
+            this.showToast('❌ Cannot connect to FastSearch server on localhost:3001', 'error');
+            document.getElementById('indexedFiles').textContent = 'Server offline';
+        }
     }
 }
 
@@ -445,7 +492,18 @@ function showHelp() {
 }
 
 function showSettings() {
-    app.showToast('Settings panel coming soon!', 'info');
+    const settingsInfo = `
+    FastSearch MCP Server Settings:
+    
+    • Server URL: http://localhost:3001
+    • Status: ${document.getElementById('indexedFiles').textContent === 'Server offline' ? 'Offline' : 'Connected'}
+    • Indexed Files: ${document.getElementById('indexedFiles').textContent}
+    
+    To start the server, run:
+    cargo run --release -- --web-api
+    `;
+    
+    app.showToast(settingsInfo, 'info');
 }
 
 function closeModal(modalId) {

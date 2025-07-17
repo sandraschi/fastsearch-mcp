@@ -14,8 +14,8 @@ path = "src/main.rs"
 [dependencies]
 # Windows API access
 winapi = { version = "0.3", features = ["winnt", "fileapi", "handleapi", "errhandlingapi"] }
-# NTFS parsing - using ntfs-reader for live MFT access
-ntfs-reader = "0.4.2"
+# NTFS parsing - using proper ntfs crate for live MFT access
+ntfs = { version = "0.4", features = ["time"] }
 # Async runtime
 tokio = { version = "1.0", features = ["full"] }
 # JSON serialization
@@ -40,9 +40,11 @@ regex = "1.10"
 notify = "6.1"
 # Crossbeam for concurrent data structures
 crossbeam = "0.8"
+# Web API server dependencies
+axum = "0.7"
+tower-http = { version = "0.6", features = ["cors"] }
 
 [dev-dependencies]
-criterion = "0.5"
 tempfile = "3.8"
 
 [profile.release]
@@ -53,7 +55,3 @@ panic = "abort"
 
 [profile.bench]
 debug = true
-
-[[bench]]
-name = "search_benchmarks"
-harness = false

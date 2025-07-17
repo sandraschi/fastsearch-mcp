@@ -1,0 +1,97 @@
+---
+description: FastSearch MCP Architecture Protection - CRITICAL NON-NEGOTIABLE RULES
+globs: ["src/**/*.rs", "*.toml", "*.md", "src/**/*"]
+alwaysApply: true
+---
+
+# 🚨 CRITICAL: FastSearch MCP Architecture Protection Rules
+
+**ABSOLUTE REQUIREMENT**: FastSearch MCP uses **DIRECT NTFS MASTER FILE TABLE ACCESS** - this is NOT a bug!
+
+## ❌ FORBIDDEN PATTERNS - NEVER ADD THESE:
+
+### 1. Background File Indexing
+- **NEVER** add startup file scanning
+- **NEVER** build file indexes or caches
+- **NEVER** add background processing threads
+- **NEVER** traverse entire directory trees on startup
+
+### 2. In-Memory File Caching
+- **NEVER** store file lists in memory
+- **NEVER** cache search results  
+- **NEVER** build file databases
+- **NEVER** add persistent storage of file metadata
+
+### 3. Traditional Search Patterns
+- **NEVER** add recursive directory walking for population
+- **NEVER** implement "typical" search tool patterns
+- **NEVER** cache filesystem state
+- **NEVER** add "optimization" that stores file data
+
+## ✅ REQUIRED PATTERNS - ALWAYS MAINTAIN:
+
+### 1. Direct MFT Access ONLY
+- **ALWAYS** query NTFS Master File Table directly for each search
+- **ALWAYS** use the `ntfs` crate for live MFT reading
+- **ALWAYS** read filesystem state in real-time
+- **ALWAYS** maintain zero persistent state
+
+### 2. Pattern-Based Search
+- **ALWAYS** search only for what's requested (pattern matching)
+- **ALWAYS** implement early termination at max_results
+- **ALWAYS** use glob-to-regex conversion
+- **ALWAYS** stop scanning when enough results found
+
+### 3. WizFile Philosophy
+- **ALWAYS** follow the WizFile approach: direct MFT, no indexing
+- **ALWAYS** prioritize instant startup over cached performance
+- **ALWAYS** ensure real-time accuracy over stale speed
+- **ALWAYS** maintain minimal memory footprint
+
+## 🎯 KEY ARCHITECTURE PRINCIPLES:
+
+1. **This is NOT a traditional search tool** - it's a direct NTFS MFT reader
+2. **No indexing = instant startup** - 0.8s vs 15+ minutes
+3. **Real-time queries = always current** - never shows deleted files
+4. **Minimal memory = professional grade** - <50MB vs GB of cached data
+
+## 🔍 WHY THIS ARCHITECTURE:
+
+**Performance Targets DEPEND on Direct Approach**:
+- Search Speed: <100ms (requires direct MFT)
+- Memory Usage: <50MB (requires no caching)  
+- Startup Time: <1s (requires no indexing)
+- Data Accuracy: 100% current (requires real-time)
+
+**Commercial Validation**: WizFile (fastest Windows search tool) uses identical approach
+
+## 🚨 WARNING SIGNS OF VIOLATIONS:
+
+If you see ANY of these suggestions, **REJECT IMMEDIATELY**:
+- "Let's add background indexing for faster searches"
+- "We should cache file lists for better performance"  
+- "Add startup file scanning to build an index"
+- "Store search results to avoid repeated MFT access"
+- "Implement traditional search engine patterns"
+
+## 📚 REFERENCE DOCUMENTATION:
+
+Read these files BEFORE making ANY changes:
+- @README.md - Clear architecture explanation
+- @docs/PRODUCT_REQUIREMENTS.md - Non-negotiable principles
+- @docs/TECHNICAL_ARCHITECTURE.md - NTFS MFT implementation details
+- @docs/WIZFILE_COMPARISON.md - Commercial validation
+
+## 🎯 SUCCESS CRITERIA:
+
+FastSearch MCP is successful ONLY if it maintains:
+1. **Instant startup** without indexing delays
+2. **Real-time results** without stale caches  
+3. **Minimal memory** without file storage
+4. **Sub-100ms searches** with direct MFT access
+
+**Any deviation from direct NTFS MFT approach destroys the value proposition.**
+
+---
+
+**Remember**: This tool follows the **WizFile philosophy** - direct filesystem access, not traditional indexing. This is the entire point of the project!

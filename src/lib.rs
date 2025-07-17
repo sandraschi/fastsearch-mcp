@@ -9,7 +9,7 @@ pub mod mft_reader {
     }
     
     impl MftReader {
-        pub fn new(drive: &str) -> Result<Self> {
+        pub fn new(_drive: &str) -> Result<Self> {
             // TODO: Open NTFS volume, read MFT
             Ok(MftReader {})
         }
@@ -42,12 +42,12 @@ pub mod file_index {
             FileIndex {}
         }
         
-        pub fn add_files(&mut self, files: Vec<FileRecord>) -> Result<()> {
+        pub fn add_files(&mut self, _files: Vec<FileRecord>) -> Result<()> {
             // TODO: Build search indexes
             Ok(())
         }
         
-        pub fn search(&self, pattern: &str) -> Vec<&FileRecord> {
+        pub fn search(&self, _pattern: &str) -> Vec<&FileRecord> {
             // TODO: Pattern matching, filtering
             vec![]
         }
@@ -60,17 +60,17 @@ pub mod search_engine {
     use anyhow::Result;
     
     pub struct SearchEngine {
-        index: FileIndex,
+        _index: FileIndex,
     }
     
     impl SearchEngine {
         pub fn new() -> Self {
             SearchEngine {
-                index: FileIndex::new(),
+                _index: FileIndex::new(),
             }
         }
         
-        pub fn search(&self, query: &SearchQuery) -> Result<Vec<SearchResult>> {
+        pub fn search(&self, _query: &SearchQuery) -> Result<Vec<SearchResult>> {
             // TODO: Execute search with filters
             Ok(vec![])
         }

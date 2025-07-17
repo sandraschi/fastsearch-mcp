@@ -1,15 +1,17 @@
 use clap::{Arg, Command};
 use log::{info, error};
-use std::io::{self, BufRead, BufReader, Write};
+use std::io::{self, BufRead, Write};
 use serde_json::{json, Value};
 use anyhow::Result;
 
 mod mcp_server;
 mod ntfs_reader;
+mod web_api;
 
 use crate::mcp_server::McpServer;
 
-fn main() -> Result<()> {
+#[tokio::main]
+async fn main() -> Result<()> {
     env_logger::init();
     
     let matches = Command::new("fastsearch")
@@ -34,17 +36,27 @@ fn main() -> Result<()> {
                 .help("Run performance benchmark")
                 .action(clap::ArgAction::SetTrue)
         )
+        .arg(
+            Arg::new("web-api")
+                .long("web-api")
+                .help("Run as web API server for frontend integration")
+                .action(clap::ArgAction::SetTrue)
+        )
         .get_matches();
 
     if matches.get_flag("mcp-server") {
         info!("Starting FastSearch MCP Server");
         run_mcp_server()?;
+    } else if matches.get_flag("web-api") {
+        info!("Starting FastSearch Web API Server");
+        run_web_api().await?;
     } else if matches.get_flag("benchmark") {
         let drive = matches.get_one::<String>("drive").unwrap();
         run_benchmark(drive)?;
     } else {
         println!("FastSearch - Lightning-fast file search");
         println!("Use --mcp-server to run as MCP server");
+        println!("Use --web-api to run as web API server");
         println!("Use --benchmark to run performance tests");
         println!("Use --drive <letter> to specify drive (default: C:)");
     }
@@ -107,4 +119,9 @@ fn run_benchmark(drive: &str) -> Result<()> {
     }
     
     Ok(())
+}
+
+async fn run_web_api() -> Result<()> {
+    let server = crate::web_api::WebApiServer::new()?;
+    server.serve().await
 }
