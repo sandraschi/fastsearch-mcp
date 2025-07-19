@@ -1,11 +1,11 @@
 pub mod mcp_bridge;
 pub mod ipc_client;
-pub mod types;
 pub mod validation;
 
+// Re-export shared types
+pub use fastsearch_shared::*;
 pub use mcp_bridge::McpBridge;
 pub use ipc_client::{IpcClient, IpcError};
-pub use types::*;
 
 #[derive(thiserror::Error, Debug)]
 pub enum BridgeError {
@@ -18,9 +18,9 @@ pub enum BridgeError {
     #[error("IO operation failed: {0}")]
     Io(#[from] std::io::Error),
     
-    #[error("Validation failed: {0}")]
+    #[error("Request validation failed: {0}")]
     Validation(String),
     
-    #[error("Internal error: {0}")]
-    Internal(String),
+    #[error("Service unavailable: {0}")]
+    ServiceUnavailable(String),
 }
