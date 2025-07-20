@@ -1,12 +1,17 @@
 // NTFS MFT Reader - DIRECT QUERY IMPLEMENTATION (NO INDEXING!)
 
-use anyhow::Result;
+use anyhow::{Result, Context};
 use log::{info, debug, warn};
 use std::time::Instant;
 use std::fs::File;
 use std::io::{Read, Seek};
 use ntfs::Ntfs;
 use regex::Regex;
+use std::path::Path;
+use winapi::um::fileapi::{GetDriveTypeW, GetLogicalDriveStringsW};
+use widestring::WideCString;
+use std::ffi::OsString;
+use std::os::windows::ffi::OsStringExt;
 
 #[derive(Debug, Clone)]
 pub struct FileEntry {
@@ -318,6 +323,93 @@ fn search_filesystem_direct(
     }
     
     Ok(())
+}
+
+/// Get a list of all available NTFS drives on the system
+#[cfg(windows)]
+pub fn get_ntfs_drives() -> Result<Vec<String>> {
+    use std::os::windows::ffi::OsStrExt;
+    use std::ffi::OsStr;
+    
+    const DRIVE_FIXED: u32 = 3; // DRIVE_FIXED from winapi
+    const MAX_PATH: usize = 260;
+    
+    // Get all drive letters
+    let mut buffer = [0u16; MAX_PATH * 4]; // Should be enough for all drives
+    let len = unsafe {
+        GetLogicalDriveStringsW(
+            buffer.len() as u32,
+            buffer.as_mut_ptr()
+        )
+    };
+    
+    if len == 0 {
+        return Err(std::io::Error::last_os_error().into());
+    }
+    
+    let buffer = &buffer[..len as usize];
+    let mut drives = Vec::new();
+    
+    // Split the null-terminated wide strings
+    for drive in buffer.split(|&c| c == 0) {
+        if drive.is_empty() {
+            continue;
+        }
+        
+        // Convert wide string to Rust string
+        let drive_str = OsString::from_wide(drive)
+            .to_string_lossy()
+            .to_string();
+            
+        // Check if it's a fixed drive (not removable, network, etc.)
+        let drive_type = unsafe { 
+            GetDriveTypeW(
+                WideCString::from_str(&drive_str)
+                    .map_err(|_| anyhow::anyhow!("Invalid drive string"))?
+                    .as_ptr()
+            )
+        };
+        
+        if drive_type == DRIVE_FIXED {
+            // Remove the trailing backslash
+            if let Some(drive_letter) = drive_str.trim_end_matches('\\').chars().next() {
+                drives.push(drive_letter.to_uppercase().to_string());
+            }
+        }
+    }
+    
+    Ok(drives)
+}
+
+/// Search multiple NTFS drives
+#[cfg(windows)]
+pub fn search_multiple_drives(drives: &[String], pattern: &str, path_filter: &str, max_results: usize) -> Result<Vec<FileEntry>> {
+    let mut all_results = Vec::new();
+    let mut remaining_results = max_results;
+    
+    for drive in drives {
+        if remaining_results == 0 {
+            break;
+        }
+        
+        match search_files_direct(drive, pattern, path_filter, remaining_results) {
+            Ok(mut results) => {
+                let len = results.len();
+                all_results.append(&mut results);
+                
+                if len >= remaining_results {
+                    break;
+                }
+                remaining_results -= len;
+            }
+            Err(e) => {
+                warn!("Failed to search drive {}: {}", drive, e);
+                // Continue with next drive
+            }
+        }
+    }
+    
+    Ok(all_results)
 }
 
 // LEGACY FUNCTIONS - DEPRECATED (but kept for compatibility)

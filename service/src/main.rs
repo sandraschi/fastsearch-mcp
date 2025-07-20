@@ -27,7 +27,7 @@ async fn main() -> Result<()> {
             Arg::new("drive")
                 .short('d')
                 .long("drive")
-                .help("Drive letter to index (e.g., C:)")
+                .help("NTFS drive letter to search (e.g., C:). The drive must be formatted with NTFS.")
                 .default_value("C:")
         )
         .arg(

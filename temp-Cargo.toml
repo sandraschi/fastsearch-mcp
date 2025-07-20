@@ -1,0 +1,18 @@
+[workspace]
+members = [
+    "bridge",
+    "service",
+    "shared"
+]
+resolver = "2"
+
+[package]
+name = "fastsearch-mcp-temp"
+version = "0.1.0"
+edition = "2021"
+description = "Temporary package to build FastSearch MCP components"
+
+# This is a dummy lib to satisfy Cargo
+[lib]
+name = "fastsearch_mcp_temp"
+path = "src/lib.rs"

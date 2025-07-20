@@ -58,38 +58,91 @@ fastsearch-mcp/
 
 ## Installation & Usage
 
-### One-Time Installation (UAC Required)
-```bash
+### Prerequisites
+- Windows 10/11 with NTFS file system
+- Rust toolchain (for building from source)
+- Administrator privileges (required for initial setup only)
+
+### Manual Installation (Recommended for Development)
+
+1. **Build the project** (from an elevated command prompt):
+   ```powershell
+   # Clone the repository
+   git clone https://github.com/yourusername/fastsearch-mcp.git
+   cd fastsearch-mcp
+   
+   # Build in release mode
+   cargo build --release
+   ```
+
+2. **Install the Windows Service** (one-time setup with admin rights):
+   ```powershell
+   # Run as Administrator
+   $servicePath = "D:\Dev\repos\fastsearch-mcp\target\release\fastsearch.exe"
+   sc.exe create FastSearch binPath= "$servicePath --run-as-service" start= auto
+   sc.exe description FastSearch "FastSearch MCP Service for lightning-fast file search using NTFS MFT"
+   sc.exe start FastSearch
+   ```
+   
+   > **Note**: Update `$servicePath` to match your actual path to the built `fastsearch.exe`
+
+3. **Verify the service is running**:
+   ```powershell
+   sc.exe query FastSearch
+   ```
+
+### One-Click Installer (Coming Soon)
+```powershell
 # Download installer from GitHub releases
 # Run installer as Administrator (one-time UAC prompt)
 setup.exe
 ```
 
-**What the installer does:**
-- Installs FastSearch service with elevated privileges
-- Installs MCP bridge for Claude Desktop
-- Registers service for automatic startup
-- Sets up named pipe communication
+**What the installer will do:**
+- Install FastSearch service with elevated privileges
+- Register service for automatic startup
+- Set up named pipe communication
+- Configure the MCP bridge for Claude Desktop
 
 ### Claude Desktop Configuration
 
-Add to your `claude_desktop_config.json`:
+Add to your Claude Desktop configuration (typically in `settings.json` or via UI):
 
 ```json
 {
   "mcpServers": {
     "fastsearch": {
-      "command": "D:\\Dev\\repos\\fastsearch-mcp\\bridge\\target\\release\\fastsearch-mcp-bridge.exe"
+      "command": "D:\\Dev\\repos\\fastsearch-mcp\\target\\release\\fastsearch-mcp-bridge.exe",
+      "args": ["--service-pipe", "\\\\\\.\\pipe\\fastsearch-service"],
+      "timeout": 30,
+      "autoStart": true,
+      "enabled": true,
+      "description": "FastSearch MCP Bridge for lightning-fast file search using NTFS MFT"
     }
   }
 }
 ```
 
-### Normal Operation (No UAC)
-- **Service runs automatically** - No user intervention needed
-- **Bridge connects to Claude** - User-level operation only
-- **Fast NTFS searches** - Sub-100ms response times
-- **Seamless integration** - No privilege prompts during use
+> **Note**: Update the path to point to your `fastsearch-mcp-bridge.exe` location
+
+### Normal Operation (Privilege Separation)
+
+- **Service (Elevated)**
+  - Runs automatically at system startup
+  - Has direct NTFS MFT access
+  - Listens on named pipe: `\\.\pipe\fastsearch-service`
+  - No UI, runs in background
+
+- **Bridge (User Mode)**
+  - Started by Claude Desktop
+  - Runs with normal user privileges
+  - Forwards requests to elevated service
+  - No UAC prompts during normal use
+
+- **Performance**
+  - Sub-100ms search response times
+  - Minimal memory footprint
+  - Efficient NTFS MFT scanning
 
 ## Development
 
@@ -145,6 +198,28 @@ cd shared && cargo build --release
 - **Real-time results** - Sub-100ms response times
 - **Privilege separation** - Secure bridge/service architecture
 - **Graceful fallback** - Helpful messages if service unavailable
+
+## Release Process
+
+FastSearch MCP uses GitHub Actions for automated builds and releases. The release process is fully automated:
+
+1. Create a version tag (e.g., `v1.0.0`)
+2. Push the tag to trigger the release workflow
+3. GitHub Actions builds for all platforms
+4. Artifacts are uploaded to GitHub Releases
+
+For detailed release instructions, see [RELEASING.md](RELEASING.md).
+
+### Testing a Release Locally
+
+Before creating a release, test the build process locally:
+
+```powershell
+# Run the test script
+.\test-release.ps1
+```
+
+This will verify that all components build correctly and the installer is created successfully.
 - **Web interface** - Optional frontend for direct access
 
 ## License

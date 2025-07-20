@@ -9,6 +9,44 @@ package-lock.json
 
 # IDEs and editors
 .vscode/
+.idea/
+*.swp
+*.swo
 
-# Logs
+# Logs and debug files
 *.log
+*.rpt
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Build outputs
+**/target/release/examples/
+**/target/debug/
+**/target/rls/
+**/target/wasm32-unknown-unknown/
+
+# Installer outputs
+/installer/*.msi
+/installer/*.wixobj
+/installer/*.wixpdb
+/installer/*.wxl
+/installer/*.wxs
+/installer/*.wxi
+/installer/*.wxl
+/installer/*.wxs
+/installer/*.wixobj
+/installer/*.wixpdb
+/installer/*.wxl
+/installer/*.wxs
+/installer/*.wxi
+/installer/*.wxl
+/installer/*.wxs
+/installer/*.wixobj
+/installer/*.wixpdb
+/installer/*.wxl
+
+# Local development files
+.env
+*.local

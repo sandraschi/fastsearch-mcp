@@ -1,0 +1,126 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'  # Trigger on version tags (e.g., v1.0.0)
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-windows:
+    name: Build Windows Installer
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Needed for version detection
+    
+    - name: Setup Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        target: x86_64-pc-windows-msvc
+        profile: minimal
+        override: true
+    
+    - name: Install WiX Toolset
+      uses: sebastianpopp/install-wix@v1
+    
+    - name: Add WiX to PATH
+      run: |
+        echo "$env:WIX_PATH"
+        echo "$env:WIX_PATH\bin" | Out-File -FilePath $env:GITHUB_PATH -Append
+    
+    - name: Build release
+      run: |
+        cargo build --release --all-targets
+        if ($LASTEXITCODE -ne 0) { exit 1 }
+    
+    - name: Create installer
+      run: |
+        .\build-installer.ps1
+        if ($LASTEXITCODE -ne 0) { exit 1 }
+    
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: FastSearchMCP-Installer
+        path: |
+          installer/FastSearchMCP-Setup.exe
+          target/release/fastsearch-mcp-bridge.exe
+          target/release/fastsearch.exe
+    
+    - name: Create GitHub Release
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v2
+      with:
+        files: |
+          installer/FastSearchMCP-Setup.exe
+          target/release/fastsearch-mcp-bridge.exe
+          target/release/fastsearch.exe
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-linux:
+    name: Build Linux Binary
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        target: x86_64-unknown-linux-gnu
+        profile: minimal
+        override: true
+    
+    - name: Build release
+      run: |
+        cargo build --release --target x86_64-unknown-linux-gnu
+    
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: FastSearchMCP-Linux
+        path: |
+          target/x86_64-unknown-linux-gnu/release/fastsearch-mcp-bridge
+          target/x86_64-unknown-linux-gnu/release/fastsearch
+
+  build-macos:
+    name: Build macOS Binary
+    runs-on: macos-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        target: x86_64-apple-darwin
+        profile: minimal
+        override: true
+    
+    - name: Install dependencies
+      run: |
+        brew install pkg-config
+    
+    - name: Build release
+      run: |
+        cargo build --release --target x86_64-apple-darwin
+    
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: FastSearchMCP-macOS
+        path: |
+          target/x86_64-apple-darwin/release/fastsearch-mcp-bridge
+          target/x86_64-apple-darwin/release/fastsearch

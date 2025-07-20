@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:bal="http://wixtoolset.org/schemas/v4/wxs/bal"
+     xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
+
+  <Bundle Name="FastSearch MCP" 
+          Version="1.0.0.0" 
+          Manufacturer="FastSearch" 
+          UpgradeCode="YOUR-UPGRADE-CODE-HERE"
+          IconSourceFile="$(var.SolutionDir)assets\icon.ico">
+    
+    <BootstrapperApplicationRef Id="WixStandardBootstrapperApplication.RtlLicense">
+      <bal:WixStandardBootstrapperApplication 
+        LicenseFile="$(var.SolutionDir)wix\license.rtf"
+        LogoFile="$(var.SolutionDir)assets\banner.bmp"
+        SuppressOptionsUI="yes"
+        SuppressRepair="yes"
+        SuppressDowngradeFailure="yes"
+        SuppressMissingSourceOrLoggedDataFailure="yes"
+        SuppressOptionsUI="yes"
+        ThemeFile="$(var.SolutionDir)wix\theme.xml"
+        />
+    </BootstrapperApplicationRef>
+
+    <!-- Check for .NET 6.0 or later -->
+    <util:RegistrySearch 
+      Root="HKLM"
+      Key="SOFTWARE\dotnet\Setup\InstalledVersions\x64\sharedhost"
+      Value="Version"
+      Variable="DotNetVersion"
+      Result="value"
+      Format="raw" />
+
+    <Chain>
+      <!-- Install .NET 6.0 Desktop Runtime if needed -->
+      <ExePackage Id="DotNetDesktopRuntime"
+                  DisplayName="Microsoft .NET 6.0 Desktop Runtime"
+                  Cache="yes"
+                  Compressed="yes"
+                  PerMachine="yes"
+                  Permanent="yes"
+                  Vital="yes"
+                  SourceFile="$(var.SolutionDir)redist\windowsdesktop-runtime-6.0.0-win-x64.exe"
+                  DownloadUrl="https://download.visualstudio.microsoft.com/download/pr/5e3f1a1c-5b3a-47c0-9d70-2c0d9caf9c3c/1b5e0d1f7b3c5b5e5f7a9b0d3e5f7a9b0/windowsdesktop-runtime-6.0.0-win-x64.exe"
+                  InstallCommand="/install /quiet /norestart"
+                  DetectCondition="DotNetVersion >= v6.0.0">
+        <ExitCode Behavior="success" Value="0" />
+        <ExitCode Behavior="error" Value="3010" /> <!-- Reboot required -->
+      </ExePackage>
+
+      <!-- Main MSI package -->
+      <MsiPackage 
+        SourceFile="$(var.SolutionDir)installer\FastSearchMCP.msi"
+        DisplayInternalUI="yes"
+        Vital="yes"
+        Id="FastSearchMCP"
+        Compressed="yes"
+        Cache="yes">
+        <MsiProperty Name="INSTALLFOLDER" Value="[InstallFolder]" />
+      </MsiPackage>
+    </Chain>
+  </Bundle>
+</Wix>

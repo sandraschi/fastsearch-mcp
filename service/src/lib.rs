@@ -1,3 +1,4 @@
+pub mod file_types;
 pub mod ntfs_reader;
 pub mod search_engine;
 pub mod web_api;

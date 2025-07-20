@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Theme xmlns="http://wixtoolset.org/schemas/thmutil/2010">
+  <Window Width="493" Height="312" HexStyle="100a0000" FontId="0">
+    <Image X="0" Y="0" Width="493" Height="58" ImageFile="banner.bmp" Visible="yes" />
+    <Image X="0" Y="234" Width="493" Height="49" ImageFile="dlgbmp.bmp" Visible="yes" />
+    
+    <!-- Title -->
+    <Text X="11" Y="6" Width="-11" Height="30" FontId="1" DisablePrefix="yes">FastSearch MCP Setup</Text>
+    
+    <!-- Welcome text -->
+    <Text X="11" Y="70" Width="-11" Height="20" FontId="2">Welcome to the FastSearch MCP Installer</Text>
+    <Text X="11" Y="90" Width="-11" Height="60" FontId="0">
+      This will install FastSearch MCP [Version] on your computer.
+      
+      FastSearch MCP provides lightning-fast file search using the NTFS Master File Table.
+      Click Next to continue or Cancel to exit the Setup.
+    </Text>
+    
+    <!-- Progress bar -->
+    <Progressbar Name="ProgressBar" X="20" Y="170" Width="450" Height="15" />
+    <Text X="20" Y="190" Width="450" Height="20" FontId="0" DisablePrefix="yes">Installing FastSearch MCP...</Text>
+    
+    <!-- Buttons -->
+    <Button Name="InstallButton" X="241" Y="243" Width="80" Height="23" TabStop="yes" FontId="0">Install</Button>
+    <Button Name="CancelButton" X="326" Y="243" Width="80" Height="23" TabStop="yes" FontId="0">Cancel</Button>
+    <Button Name="NextButton" X="326" Y="243" Width="80" Height="23" TabStop="yes" FontId="0">Next &gt;</Button>
+    <Button Name="BackButton" X="236" Y="243" Width="80" Height="23" TabStop="yes" FontId="0">&lt; Back</Button>
+    <Button Name="CloseButton" X="411" Y="243" Width="75" Height="23" TabStop="yes" FontId="0">Close</Button>
+    
+    <!-- Fonts -->
+    <Font Id="0" Height="9" Weight="400" Foreground="000000" Background="F0F0F0">Segoe UI</Font>
+    <Font Id="1" Height="18" Weight="700" Foreground="000000" Background="F0F0F0">Segoe UI</Font>
+    <Font Id="2" Height="12" Weight="700" Foreground="000000" Background="F0F0F0">Segoe UI</Font>
+  </Window>
+  
+  <ImageList>
+    <Image Id="banner.bmp" FilePath="banner.bmp" />
+    <Image Id="dlgbmp.bmp" FilePath="dlgbmp.bmp" />
+  </ImageList>
+</Theme>

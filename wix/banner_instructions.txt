@@ -1,0 +1,5 @@
+Please create a 493x58 pixel bitmap image named 'banner.bmp' with a dark blue gradient background and white text that says "FastSearch MCP Setup" in the top left corner.
+
+Also, create a 493x49 pixel bitmap named 'dlgbmp.bmp' with a light gray background for the dialog footer.
+
+Place both files in the 'wix' directory.

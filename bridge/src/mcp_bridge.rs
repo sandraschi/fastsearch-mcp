@@ -167,7 +167,9 @@ impl McpBridge {
             None => return self.error_response(id, -32602, "Tool name required"),
         };
         
-        let args = params.get("arguments").unwrap_or(&json!({}));
+        // Create a default JSON object that will live long enough
+        let default_args = json!({});
+        let args = params.get("arguments").unwrap_or(&default_args);
         
         match tool_name {
             "fast_search" => self.handle_fast_search(id, args).await,

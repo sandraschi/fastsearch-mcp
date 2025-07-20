@@ -1,9 +1,11 @@
 // FastSearch MCP Server - DIRECT SEARCH IMPLEMENTATION (NO INDEXING!)
 
 use serde_json::{json, Value};
-use anyhow::Result;
-use log::{info, debug};
+use anyhow::{Result, Context};
+use log::{info, debug, warn};
 use std::time::Instant;
+use std::collections::HashSet;
+use crate::file_types::{DocumentType, parse_document_type};
 
 pub struct McpServer {
     // NO MORE FILE INDEX! We do direct searches now
@@ -53,6 +55,14 @@ impl McpServer {
             "result": {
                 "tools": [
                     {
+                        "name": "list_ntfs_drives",
+                        "description": "List all available NTFS drives on the system",
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {}
+                        }
+                    },
+                    {
                         "name": "fast_search",
                         "description": "Lightning-fast DIRECT file search using NTFS Master File Table (no indexing)",
                         "inputSchema": {
@@ -63,19 +73,37 @@ impl McpServer {
                                     "description": "File pattern to search for (*.js, README*, config.*, etc.)"
                                 },
                                 "path": {
-                                    "type": "string", 
-                                    "description": "Path filter (searches files whose path contains this string)"
+                                    "type": "string",
+                                    "description": "Optional path to search within (e.g., \"src/\" or \"C:\\Windows\")"
                                 },
                                 "drive": {
                                     "type": "string",
-                                    "description": "Drive letter to search (default: C)",
+                                    "description": "Drive letter to search (e.g., 'C'). Use '*' to search all NTFS drives.",
                                     "default": "C"
                                 },
                                 "max_results": {
                                     "type": "integer",
-                                    "description": "Maximum number of results to return",
+                                    "description": "Maximum number of results to return (default: 1000)",
                                     "default": 1000
-                                }
+                                },
+                                "type": {
+                                    "type": "string",
+                                    "description": "Type filter: 'file', 'directory', or 'any' (default)",
+                                    "enum": ["file", "directory", "any"],
+                                    "default": "any"
+                                },
+                                "doc_type": {
+                                    "type": "string",
+                                    "description": "Document type filter (e.g., 'text', 'code', 'image', 'pdf')",
+                                    "default": ""
+                                },
+                                "extensions": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string"
+                                    },
+                                    "description": "File extensions to include (without leading .), overrides doc_type if both are specified"
+                                },
                             },
                             "required": ["pattern"]
                         }
@@ -123,6 +151,57 @@ impl McpServer {
         }))
     }
     
+    /// List all supported document types and their extensions
+    fn list_document_types(&self) -> Result<Value> {
+        use strum::IntoEnumIterator;
+        use std::collections::HashMap;
+        
+        let mut doc_types = HashMap::new();
+        
+        for doc_type in DocumentType::iter() {
+            let name = match doc_type {
+                DocumentType::Text => "text",
+                DocumentType::Code => "code",
+                DocumentType::Image => "image",
+                DocumentType::Spreadsheet => "spreadsheet",
+                DocumentType::Presentation => "presentation",
+                DocumentType::Archive => "archive",
+                DocumentType::Audio => "audio",
+                DocumentType::Video => "video",
+                DocumentType::Pdf => "pdf",
+            };
+            
+            doc_types.insert(name.to_string(), get_extensions(doc_type));
+        }
+        
+        Ok(json!({
+            "result": {
+                "content": [{
+                    "type": "text",
+                    "text": format!("Supported document types: {}", 
+                        doc_types.keys().map(|s| s.as_str()).collect::<Vec<_>>().join(", "))
+                }],
+                "document_types": doc_types
+            }
+        }))
+    }
+    
+    /// List all available NTFS drives on the system
+    fn list_ntfs_drives(&self) -> Result<Value> {
+        let drives = crate::ntfs_reader::get_ntfs_drives()?;
+        
+        Ok(json!({
+            "result": {
+                "content": [{
+                    "type": "text",
+                    "text": format!("Available NTFS drives: {}", 
+                        drives.join(", "))
+                }],
+                "drives": drives
+            }
+        }))
+    }
+    
     fn handle_tool_call(&self, request: Value) -> Result<Value> {
         let tool_name = request["params"]["name"].as_str().unwrap_or("");
         let arguments = &request["params"]["arguments"];
@@ -131,6 +210,8 @@ impl McpServer {
             "fast_search" => self.fast_search(arguments),
             "find_large_files" => self.find_large_files(arguments),
             "benchmark_search" => self.benchmark_search(arguments),
+            "list_ntfs_drives" => self.list_ntfs_drives(),
+            "list_document_types" => self.list_document_types(),
             _ => Ok(json!({
                 "error": {
                     "code": -32602,
@@ -141,27 +222,66 @@ impl McpServer {
     }
     
     /// DIRECT SEARCH - NO INDEXING!
+    /// 
+    /// Args:
+    /// - pattern: File pattern to search for (e.g., "*.txt", "*.rs")
+    /// - path_filter: Filter by path (optional)
+    /// - drive: Drive letter (e.g., "C") or "*" for all NTFS drives
+    /// - max_results: Maximum number of results to return
     pub fn fast_search(&self, args: &Value) -> Result<Value> {
         let pattern = args["pattern"].as_str().unwrap_or("*");
         let path_filter = args["path"].as_str().unwrap_or("");
         let drive = args["drive"].as_str().unwrap_or("C");
         let max_results = args["max_results"].as_u64().unwrap_or(1000) as usize;
         
+        // Parse document type filter
+        let doc_type = args["doc_type"]
+            .as_str()
+            .and_then(|s| parse_document_type(s));
+            
+        // Parse explicit extensions if provided
+        let extensions: Option<HashSet<String>> = args["extensions"]
+            .as_array()
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str())
+                    .map(|s| s.trim_start_matches('.').to_lowercase())
+                    .collect()
+            });
+            
+        info!("Search filters - doc_type: {:?}, extensions: {:?}", doc_type, extensions);
+        
         info!("DIRECT FastSearch: pattern='{}', path='{}', drive='{}', max_results={}", 
               pattern, path_filter, drive, max_results);
         
         let search_start = Instant::now();
         
-        // DIRECT MFT SEARCH - NO CACHING!
-        let results = crate::ntfs_reader::search_files_direct(drive, pattern, path_filter, max_results)
-            .map_err(|e| {
-                if e.to_string().contains("Access is denied") {
-                    anyhow::anyhow!("Administrator privileges required for NTFS access. Please run Claude Desktop as Administrator.\nError: {}", e)
-                } else {
-                    e
-                }
-            })?;
-        
+        // Search either a single drive or all NTFS drives
+        let results = if drive == "*" {
+            // Get all NTFS drives
+            let drives = crate::ntfs_reader::get_ntfs_drives()?;
+            if drives.is_empty() {
+                return Err(anyhow::anyhow!("No NTFS drives found"));
+            }
+            info!("Searching all NTFS drives: {:?}", drives);
+            
+            // Search across all drives
+            crate::ntfs_reader::search_multiple_drives(&drives, pattern, path_filter, max_results)?
+        } else {
+            // Search a single drive
+            crate::ntfs_reader::search_files_direct(drive, pattern, path_filter, max_results)
+                .map_err(|e| {
+                    if e.to_string().contains("Access is denied") {
+                        anyhow::anyhow!(
+                            "Administrator privileges required for NTFS access on drive {}. \nError: {}", 
+                            drive, e
+                        )
+                    } else {
+                        e
+                    }
+                })?
+        };
+            
         let search_duration = search_start.elapsed();
         
         let results_text = if results.is_empty() {
