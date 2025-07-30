@@ -198,6 +198,13 @@ cd shared && cargo build --release
 - **Real-time results** - Sub-100ms response times
 - **Privilege separation** - Secure bridge/service architecture
 - **Graceful fallback** - Helpful messages if service unavailable
+- **REST API** - Web interface for integration with other applications
+
+## Documentation
+
+- [Project Plan](projects/FastSearch%20MCP%20Server%20-%20Project%20Plan.md)
+- [MCP Ecosystem](MCP_ECOSYSTEM.md) - About MCP protocol and ecosystem
+- [Web API](WEB_API.md) - REST API documentation for web and application integration
 
 ## Release Process
 
