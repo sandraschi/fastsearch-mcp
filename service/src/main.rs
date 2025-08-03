@@ -4,11 +4,8 @@ use std::io::{self, BufRead, Write};
 use serde_json::{json, Value};
 use anyhow::Result;
 
-mod mcp_server;
-mod ntfs_reader;
-mod web_api;
-
-use crate::mcp_server::McpServer;
+// Use modules from the fastsearch_service module
+use fastsearch_service::mcp_server::McpServer;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -44,27 +41,21 @@ async fn main() -> Result<()> {
         )
         .get_matches();
 
-    if matches.get_flag("mcp-server") {
-        info!("Starting FastSearch MCP Server");
-        run_mcp_server()?;
-    } else if matches.get_flag("web-api") {
-        info!("Starting FastSearch Web API Server");
-        run_web_api().await?;
-    } else if matches.get_flag("benchmark") {
-        let drive = matches.get_one::<String>("drive").unwrap();
-        run_benchmark(drive)?;
-    } else {
-        println!("FastSearch - Lightning-fast file search");
-        println!("Use --mcp-server to run as MCP server");
-        println!("Use --web-api to run as web API server");
-        println!("Use --benchmark to run performance tests");
-        println!("Use --drive <letter> to specify drive (default: C:)");
+    match matches.subcommand() {
+        Some(("mcp", _)) => run_mcp_server().await,
+        Some(("benchmark", sub_matches)) => {
+            let drive = sub_matches.get_one::<String>("drive").unwrap();
+            run_benchmark(drive).await
+        },
+        Some(("web", _)) => run_web_api().await,
+        _ => {
+            println!("No valid subcommand provided. Use --help for usage information.");
+            Ok(())
+        }
     }
-
-    Ok(())
 }
 
-fn run_mcp_server() -> Result<()> {
+async fn run_mcp_server() -> Result<()> {
     let server = McpServer::new()?;
     
     // MCP server protocol: read from stdin, write to stdout
@@ -102,26 +93,15 @@ fn run_mcp_server() -> Result<()> {
     Ok(())
 }
 
-fn run_benchmark(drive: &str) -> Result<()> {
-    info!("Running FastSearch benchmark for drive: {}", drive);
-    
-    #[cfg(windows)]
-    {
-        // Run NTFS MFT benchmark
-        crate::ntfs_reader::benchmark_mft_performance(drive)?;
-    }
-    
-    #[cfg(not(windows))]
-    {
-        println!("Benchmark is only available on Windows (NTFS required)");
-        println!("Drive specified: {}", drive);
-        println!("Platform: {}", std::env::consts::OS);
-    }
-    
+async fn run_benchmark(drive: &str) -> Result<()> {
+    info!("Running benchmark on drive {}...", drive);
+    fastsearch_service::ntfs_reader::benchmark_mft_performance(drive)?;
     Ok(())
 }
 
 async fn run_web_api() -> Result<()> {
-    let server = crate::web_api::WebApiServer::new()?;
-    server.serve().await
+    info!("Starting web API server...");
+    let server = fastsearch_service::web_api::WebApiServer::new()?;
+    server.serve().await?;
+    Ok(())
 }

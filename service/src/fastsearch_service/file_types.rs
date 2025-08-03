@@ -2,7 +2,6 @@
 
 use std::collections::HashSet;
 use lazy_static::lazy_static;
-use log::debug;
 
 use strum_macros::EnumIter;
 
@@ -21,7 +20,8 @@ pub enum DocumentType {
 }
 
 lazy_static! {
-    static ref EXTENSION_MAP: std::collections::HashMap<DocumentType, HashSet<&'static str>> = {
+    /// Global mapping of document types to their file extensions
+    pub static ref EXTENSION_MAP: std::collections::HashMap<DocumentType, HashSet<&'static str>> = {
         let mut m = std::collections::HashMap::new();
         
         // Text documents
@@ -119,9 +119,8 @@ pub fn parse_document_type(s: &str) -> Option<DocumentType> {
 
 /// Get all extensions for a document type
 pub fn get_extensions(doc_type: DocumentType) -> Vec<&'static str> {
-    EXTENSION_MAP
-        .get(&doc_type)
-        .map(|exts| exts.iter().map(|&s| s).collect())
+    EXTENSION_MAP.get(&doc_type)
+        .map(|exts| exts.iter().copied().collect())
         .unwrap_or_default()
 }
 

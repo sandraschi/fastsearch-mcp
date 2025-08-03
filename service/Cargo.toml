@@ -36,6 +36,10 @@ strum_macros = "0.25"
 anyhow = "1.0"
 # String interning for memory efficiency
 string-interner = "0.17"
+# Wide string support for Windows
+widestring = "1.0"
+# Lazy static initialization
+lazy_static = "1.4"
 # Fast hashing
 ahash = "0.8"
 # Memory-mapped files

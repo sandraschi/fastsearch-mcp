@@ -1,13 +1,12 @@
 // NTFS MFT Reader - DIRECT QUERY IMPLEMENTATION (NO INDEXING!)
 
-use anyhow::{Result, Context};
+use anyhow::Result;
 use log::{info, debug, warn};
 use std::time::Instant;
 use std::fs::File;
 use std::io::{Read, Seek};
 use ntfs::Ntfs;
 use regex::Regex;
-use std::path::Path;
 use winapi::um::fileapi::{GetDriveTypeW, GetLogicalDriveStringsW};
 use widestring::WideCString;
 use std::ffi::OsString;
@@ -224,18 +223,6 @@ fn path_could_contain_filter(current_path: &str, filter: &str) -> bool {
     }
 }
 
-/// Convert NTFS time to Unix timestamp
-#[cfg(windows)]
-fn ntfs_time_to_unix(ntfs_time: ntfs::NtfsTime) -> u64 {
-    let nt_timestamp = ntfs_time.nt_timestamp();
-    const NT_UNIX_DIFF: u64 = 116_444_736_000_000_000;
-    if nt_timestamp > NT_UNIX_DIFF {
-        (nt_timestamp - NT_UNIX_DIFF) / 10_000_000
-    } else {
-        0
-    }
-}
-
 /// NON-WINDOWS FALLBACK - DIRECT FILESYSTEM SEARCH
 #[cfg(not(windows))]
 pub fn search_files_direct(_drive: &str, pattern: &str, path_filter: &str, max_results: usize) -> Result<Vec<FileEntry>> {
@@ -328,8 +315,8 @@ fn search_filesystem_direct(
 /// Get a list of all available NTFS drives on the system
 #[cfg(windows)]
 pub fn get_ntfs_drives() -> Result<Vec<String>> {
-    use std::os::windows::ffi::OsStrExt;
-    use std::ffi::OsStr;
+    
+    
     
     const DRIVE_FIXED: u32 = 3; // DRIVE_FIXED from winapi
     const MAX_PATH: usize = 260;

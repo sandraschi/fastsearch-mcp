@@ -15,7 +15,7 @@ use std::sync::Arc;
 use tower_http::cors::{Any, CorsLayer};
 use anyhow::Result;
 
-use crate::mcp_server::McpServer;
+use crate::McpServer;
 
 #[derive(Deserialize)]
 pub struct SearchRequest {
@@ -100,7 +100,7 @@ async fn search_files(
 
     // Call MCP server
     match server.mcp_server.fast_search(&args) {
-        Ok(mcp_response) => {
+        Ok(_mcp_response) => {
             let search_time = start_time.elapsed().as_millis() as f64;
             
             // Parse MCP response - for now just return success

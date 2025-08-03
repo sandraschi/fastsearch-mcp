@@ -1,20 +1,24 @@
 // FastSearch MCP Server - DIRECT SEARCH IMPLEMENTATION (NO INDEXING!)
 
 use serde_json::{json, Value};
-use anyhow::{Result, Context};
-use log::{info, debug, warn};
+use anyhow::Result;
+use log::{info, debug};
 use std::time::Instant;
 use std::collections::HashSet;
-use crate::file_types::{DocumentType, parse_document_type};
 
-pub struct McpServer {
+// Import file_types with relative path
+use crate::file_types::{get_extensions, DocumentType, parse_document_type};
+
+/// SearchEngine handles all search-related functionality
+pub struct SearchEngine {
     // NO MORE FILE INDEX! We do direct searches now
 }
 
-impl McpServer {
+impl SearchEngine {
+    /// Create a new SearchEngine instance
     pub fn new() -> Result<Self> {
-        info!("Initializing FastSearch MCP Server (DIRECT SEARCH MODE)");
-        Ok(McpServer {})
+        info!("Initializing FastSearch Search Engine (DIRECT SEARCH MODE)");
+        Ok(SearchEngine {})
     }
     
     pub fn handle_request(&self, request: Value) -> Result<Value> {
@@ -50,7 +54,7 @@ impl McpServer {
         }))
     }
     
-    fn handle_tools_list(&self) -> Result<Value> {
+    pub(crate) fn handle_tools_list(&self) -> Result<Value> {
         Ok(json!({
             "result": {
                 "tools": [

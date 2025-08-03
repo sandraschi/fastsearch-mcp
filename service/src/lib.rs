@@ -1,12 +1,7 @@
-pub mod file_types;
-pub mod ntfs_reader;
-pub mod search_engine;
-pub mod web_api;
+//! FastSearch MCP Service - Core functionality
 
-// Re-export shared types
-pub use fastsearch_shared::*;
+// Use the module defined in mod.rs
+mod fastsearch_service;
 
-// Re-export main modules
-pub use ntfs_reader::*;
-pub use search_engine::*;
-pub use web_api::*;
+// Re-export everything from the module
+pub use fastsearch_service::*;

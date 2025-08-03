@@ -3,7 +3,7 @@ members = [
     "bridge",
     "service", 
     "shared"
-, "temp-bridge"]
+, "temp-bridge", "test_mods"]
 resolver = "2"
 
 [workspace.dependencies]
