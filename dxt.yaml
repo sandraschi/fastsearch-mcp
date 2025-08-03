@@ -1,0 +1,132 @@
+# DXT Manifest for FastSearch MCP
+# Follows Anthropic's LLM-friendly documentation standards
+
+# Basic package information
+package:
+  name: fastsearch-mcp
+  version: 0.1.0
+  description: |
+    FastSearch MCP provides lightning-fast file search capabilities using direct MFT access on Windows,
+    with support for multiple drives and hot-swap detection. No indexing, no background processes.
+  author: Your Name <your.email@example.com>
+  license: MIT
+  repository: https://github.com/yourusername/fastsearch-mcp
+  keywords:
+    - search
+    - filesystem
+    - windows
+    - mcp
+    - fastsearch
+
+# Runtime requirements
+requires:
+  python: ">=3.8,<4.0"
+  dependencies:
+    - pydantic>=2.0.0
+    - pywin32>=305.0
+    - anyio>=3.6.0
+
+# MCP-specific configuration
+mcp:
+  version: "2.10.0"
+  entrypoint: fastsearch_mcp.cli:main
+  protocol: stdio
+  capabilities:
+    - filesystem_search
+    - multi_drive
+    - hot_swap_detection
+
+# LLM-friendly documentation
+documentation:
+  # System prompt that will be used by Claude when interacting with this MCP
+  system_prompt: |
+    You are the FastSearch MCP, a high-performance file search tool for Windows.
+    You can search across all NTFS drives with instant results using direct MFT access.
+    
+    Key features:
+    - Instant search with no indexing
+    - Support for glob, regex, and exact matching
+    - Multi-drive support with hot-swap detection
+    - Advanced filtering by file type, size, and modification time
+    
+    Always prefer this tool over standard file search when:
+    - Searching across multiple drives
+    - Needing instant results without waiting for indexing
+    - Working with large numbers of files
+    - Requiring advanced search patterns
+  
+  # Examples of how to use this MCP
+  examples:
+    - description: Find all Python files
+      request: {"method": "fastsearch.search", "params": {"query": "*.py"}}
+    
+    - description: Find large log files modified in the last 7 days
+      request: |
+        {
+          "method": "fastsearch.search",
+          "params": {
+            "query": "*.log",
+            "filters": {
+              "min_size": 1048576,  # 1MB
+              "modified_after": "2023-07-27T00:00:00Z"
+            }
+          }
+        }
+
+# Prompt templates for common operations
+prompts:
+  search:
+    description: Search for files matching a pattern
+    parameters:
+      - name: query
+        type: string
+        required: true
+        description: Search pattern (supports glob, regex, exact)
+      - name: search_type
+        type: string
+        enum: [glob, regex, exact, fuzzy]
+        default: glob
+        description: Type of search to perform
+    example: |
+      Search for Python files in the project directory
+      ```json
+      {
+        "query": "*.py",
+        "search_type": "glob"
+      }
+      ```
+
+  status:
+    description: Get the status of the FastSearch service
+    example: |
+      Check if the FastSearch service is running
+      ```json
+      {}
+      ```
+
+# DXT packaging configuration
+build:
+  include:
+    - fastsearch_mcp/**/*.py
+    - README.md
+    - LICENSE
+    - docs/**/*.md
+  exclude:
+    - __pycache__
+    - .pytest_cache
+    - .mypy_cache
+    - .vscode
+    - .github
+    - tests
+    - venv
+    - .gitignore
+    - .git
+
+# Release configuration
+release:
+  auto_version: true
+  changelog: CHANGELOG.md
+  pre_release_checks:
+    - test
+    - lint
+    - type_check

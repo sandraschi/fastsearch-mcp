@@ -6,7 +6,8 @@ on:
       - 'v*'
 
 jobs:
-  build-and-release:
+  build-and-package:
+    name: Build and Package
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -23,7 +24,20 @@ jobs:
             binary_ext: ""
     
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e .[dev]
     
     - name: Install Rust
       uses: actions-rs/toolchain@v1
@@ -33,21 +47,64 @@ jobs:
         profile: minimal
         override: true
     
-    - name: Install Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '18'
-        registry-url: 'https://registry.npmjs.org'
-    
-    - name: Install dependencies
-      run: npm ci
-    
-    - name: Build Rust binary
-      run: cargo build --release --target ${{ matrix.target }}
-    
-    - name: Copy binary to bin directory
-      shell: bash
+    - name: Build Rust service
       run: |
+        cd service
+        cargo build --release --target ${{ matrix.target }}
+    
+    - name: Run tests
+      run: |
+        python -m pytest tests/ -v
+    
+    - name: Generate documentation
+      run: |
+        python scripts/generate_docs.py
+    
+    - name: Create DXT package
+      run: |
+        pip install dxt
+        dxt pack
+    
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: fastsearch-mcp-package-${{ matrix.os }}
+        path: |
+          dist/*
+          service/target/${{ matrix.target }}/release/fastsearch-service${{ matrix.binary_ext }}
+    
+  create-release:
+    name: Create Release
+    needs: build-and-package
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Download all artifacts
+      uses: actions/download-artifact@v3
+      with:
+        path: artifacts
+    
+    - name: Create Release
+      id: create_release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ github.ref }}
+        name: FastSearch MCP ${{ github.ref_name }}
+        body_path: CHANGELOG.md
+        draft: false
+        prerelease: false
+        files: |
+          artifacts/fastsearch-mcp-package-*/*
+    
+    - name: Get version from tag
+      id: get_version
+      run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+    
+    - name: Publish to PyPI
+      if: startsWith(github.ref, 'refs/tags/v')
+      run: |
+        pip install twine
+        twine upload --skip-existing dist/*
         mkdir -p bin
         cp target/${{ matrix.target }}/release/fastsearch${{ matrix.binary_ext }} bin/
     

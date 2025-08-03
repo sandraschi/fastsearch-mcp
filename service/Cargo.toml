@@ -28,6 +28,10 @@ clap = { version = "4.0", features = ["derive"] }
 # Logging
 log = "0.4"
 env_logger = "0.10"
+
+# Enum utilities
+strum = { version = "0.25", features = ["derive"] }
+strum_macros = "0.25"
 # Error handling
 anyhow = "1.0"
 # String interning for memory efficiency

@@ -20,11 +20,13 @@ This directory contains the installation package that:
 ## Installation Process
 
 **One-time UAC Required**: Only during installation for:
+
 - Installing Windows service with elevated privileges
 - Setting up named pipe security
 - Registering service for automatic startup
 
 **Normal Operation**: No UAC prompts
+
 - Bridge runs at user level
 - Service runs as system service
 - Claude Desktop integrates seamlessly

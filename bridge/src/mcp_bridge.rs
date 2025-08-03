@@ -1,5 +1,7 @@
-use crate::{IpcClient, IpcError, SearchRequest, BridgeError};
+use crate::{ipc_client::{IpcClient, IpcError}, BridgeError};
+use fastsearch_shared::{SearchRequest, SearchResponse, SearchStats, SearchFilters};
 use serde_json::{Value, json};
+use std::fmt;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader, stdin, stdout};
 use tracing::{debug, error, warn};
 
@@ -173,7 +175,7 @@ impl McpBridge {
         
         match tool_name {
             "fast_search" => self.handle_fast_search(id, args).await,
-            "search_stats" => self.handle_search_stats(id).await,
+            "search_stats" => self.handle_service_status(id).await, // Redirect to service_status handler
             "service_status" => self.handle_service_status(id).await,
             _ => self.error_response(id, -32602, &format!("Unknown tool: {}", tool_name))
         }
@@ -223,43 +225,9 @@ impl McpBridge {
                 self.success_response(id, help_text)
             }
             Err(e) => {
-                error!("IPC error: {}", e);
-                self.error_response(id, -32603, &format!("Service error: {}", e))
-            }
-        }
-    }
-    
-    async fn handle_search_stats(&mut self, id: Option<&Value>) -> Value {
-        match self.ipc_client.get_stats().await {
-            Ok(stats) => {
-                let stats_text = format!(
-                    "📊 FastSearch Engine Statistics\n\n\
-                    🚀 Performance:\n\
-                    • Average search time: {}ms\n\
-                    • Total searches performed: {}\n\
-                    • Cache hit rate: {:.1}%\n\n\
-                    💾 Memory & Index:\n\
-                    • Files indexed: {} files\n\
-                    • Memory usage: {}MB\n\
-                    • Service uptime: {}s\n\n\
-                    🔧 Status:\n\
-                    • Service: {}\n\
-                    • Engine mode: {}",
-                    stats.avg_search_time_ms,
-                    stats.total_searches,
-                    stats.cache_hit_rate * 100.0,
-                    stats.index_size,
-                    stats.memory_usage_mb,
-                    stats.uptime_seconds,
-                    if stats.service_running { "✅ Running" } else { "❌ Stopped" },
-                    if stats.ntfs_mode { "NTFS Direct Access" } else { "Standard APIs (slower)" }
-                );
-                
-                self.success_response(id, &stats_text)
-            }
-            Err(e) => {
-                let error_text = format!("❌ Failed to get stats: {}", e);
-                self.success_response(id, &error_text)
+                let error_text = format!("Error: {}", e);
+                error!("IPC error: {}", error_text);
+                self.error_response(id, 500, &error_text)
             }
         }
     }
@@ -276,8 +244,7 @@ impl McpBridge {
             Ok(false) => {
                 "⚠️ FastSearch Service: INSTALLED BUT STOPPED\n\n\
                 🔧 Service is installed but not currently running\n\
-                📋 To start manually: 'net start FastSearchEngine' (as Admin)\n\
-                💡 Or restart computer (service auto-starts)"
+                📋 To start manually: 'net start FastSearchEngine' (as Admin)"
             }
             Err(_) => {
                 "❌ FastSearch Service: NOT INSTALLED\n\n\
@@ -290,8 +257,7 @@ impl McpBridge {
                 • Search through millions of files instantly\n\
                 • Real-time NTFS indexing\n\
                 • Background operation (no user interaction)\n\
-                • 60% memory optimization\n\n\
-                💡 Current fallback mode: Slower but functional"
+                • 60% memory optimization"
             }
         };
         
@@ -299,72 +265,107 @@ impl McpBridge {
     }
     
     fn args_to_search_request(&self, args: &Value) -> Result<SearchRequest, BridgeError> {
-        let pattern = args.get("pattern")
-            .and_then(|p| p.as_str())
-            .ok_or_else(|| BridgeError::Validation("Pattern required".to_string()))?
+        // Get the search pattern (required)
+        let pattern = args["pattern"]
+            .as_str()
+            .ok_or_else(|| BridgeError::InvalidArgs("pattern is required".to_string()))?
             .to_string();
-            
-        let search_type = args.get("search_type")
-            .and_then(|s| s.as_str())
-            .unwrap_or("smart")
+
+        // Get search type (defaults to "fuzzy" if not specified)
+        let search_type = args["search_type"]
+            .as_str()
+            .unwrap_or("fuzzy")
             .to_string();
+
+        // Get max results (defaults to 50 if not specified)
+        let max_results = args["max_results"]
+            .as_u64()
+            .map(|n| n as u32)
+            .unwrap_or(50);
+
+        // Build search filters if any filter parameters are provided
+        let filters = if args["file_types"].is_array() || 
+                        args["min_size"].is_string() || 
+                        args["max_size"].is_string() || 
+                        args["modified_after"].is_string() ||
+                        args["include_hidden"].is_boolean() ||
+                        args["directories_only"].is_boolean() {
             
-        let max_results = args.get("max_results")
-            .and_then(|m| m.as_u64())
-            .unwrap_or(100) as u32;
-            
+            let file_types = if args["file_types"].is_array() {
+                Some(args["file_types"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .filter_map(|v| v.as_str().map(String::from))
+                    .collect())
+            } else {
+                None
+            };
+
+            Some(SearchFilters {
+                min_size: args["min_size"].as_str().map(String::from),
+                max_size: args["max_size"].as_str().map(String::from),
+                file_types,
+                modified_after: args["modified_after"].as_str().map(String::from),
+                include_hidden: args["include_hidden"].as_bool(),
+                directories_only: args["directories_only"].as_bool(),
+            })
+        } else {
+            None
+        };
+
         Ok(SearchRequest {
             pattern,
             search_type,
             max_results,
-            filters: None,
+            filters,
         })
     }
     
-    fn format_search_results(&self, response: crate::types::SearchResponse) -> String {
+    fn format_search_results(&self, response: SearchResponse) -> String {
         if response.results.is_empty() {
             return format!(
-                "🔍 No files found matching '{}'\n\n\
+                "🔍 No files found matching pattern: '{}'\n\n\
                 ⏱️ Search completed in {}ms\n\
-                📊 Engine: {} | Index: {} files",
+                📊 Search type: {}",
                 response.search_info.pattern,
                 response.search_info.search_time_ms,
-                if response.search_info.ntfs_mode { "NTFS Direct" } else { "Standard APIs" },
-                response.search_info.index_size
+                response.search_info.search_type
             );
         }
         
         let mut result = format!(
             "🔍 Found {} files matching '{}'\n\
-            ⏱️ Search time: {}ms | Engine: {}\n\n",
+            ⏱️ Search time: {}ms | Type: {} | Match: {}\n\n\n",
             response.results.len(),
             response.search_info.pattern,
             response.search_info.search_time_ms,
-            if response.search_info.ntfs_mode { "NTFS Direct" } else { "Standard APIs" }
+            response.search_info.search_type,
+            response.search_info.match_type
         );
         
-        let show_count = std::cmp::min(20, response.results.len());
-        
+        // Add each result
         for (i, file) in response.results.iter().enumerate() {
-            if i >= show_count {
-                result.push_str(&format!("\n... and {} more files", response.results.len() - show_count));
-                break;
-            }
+            let size_mb = file.size as f64 / (1024.0 * 1024.0);
             
-            let icon = if file.is_directory { "📁" } else { "📄" };
             result.push_str(&format!(
-                "{} {} ({})\n   📍 {}\n",
-                icon,
-                file.name,
-                file.size_human,
-                file.path
+                "{}. {} ({:.2} MB, modified: {})\n   Match: {:.1}% | {}\n\n",
+                i + 1,
+                file.path,
+                size_mb,
+                file.modified,
+                file.match_score * 100.0,
+                file.match_type
             ));
         }
         
+        // Add search metadata
         result.push_str(&format!(
-            "\n📊 Index: {} files | Match: {}",
+            "\n📊 Search stats:\n\
+            • Index size: {} files\n\
+            • NTFS mode: {}",
             response.search_info.index_size,
-            response.search_info.match_type
+            if response.search_info.ntfs_mode { "enabled" } else { "disabled" }
         ));
         
         result

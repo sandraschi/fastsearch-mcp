@@ -1,38 +1,66 @@
-use fastsearch_mcp_bridge::{McpBridge, IpcClient, BridgeError};
-use tracing::{info, error};
+use std::error::Error;
+use std::io::{self, BufRead};
+use serde_json::json;
+use fastsearch_shared::types::{SearchRequest, SearchResponse};
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Initialize logging to stderr (stdout is for MCP communication)
-    tracing_subscriber::fmt()
-        .with_writer(std::io::stderr)
-        .init();
+mod mcp_compat;
+use mcp_compat::{McpServer, McpError};
+
+/// Handle search requests from the MCP client
+fn handle_search(params: serde_json::Value) -> Result<serde_json::Value, McpError> {
+    // Parse the search request
+    let request: SearchRequest = serde_json::from_value(params)
+        .map_err(|e| McpError::InvalidParams(e.to_string()))?;
     
-    info!("FastSearch MCP Bridge v1.0.0 starting...");
-    
-    // Try to connect to admin service
-    let ipc_client = match IpcClient::new("\\\\.\\pipe\\fastsearch-engine").await {
-        Ok(client) => {
-            info!("✅ Connected to FastSearch service");
-            client
-        }
-        Err(e) => {
-            info!("⚠️ Service not available: {} (will show installation help)", e);
-            IpcClient::disconnected()
-        }
+    // In a real implementation, this would call the actual search logic
+    // For now, we'll return a mock response
+    let response = SearchResponse {
+        results: vec![],
+        total_matches: 0,
+        search_time_ms: 0,
     };
     
-    // Create and run MCP bridge
-    let mut bridge = McpBridge::new(ipc_client);
+    Ok(serde_json::to_value(response).unwrap())
+}
+
+/// Handle service status requests
+fn handle_status(_params: serde_json::Value) -> Result<serde_json::Value, McpError> {
+    // In a real implementation, this would check the service status
+    Ok(json!({
+        "status": "running",
+        "version": env!("CARGO_PKG_VERSION"),
+        "service_available": false
+    }))
+}
+
+fn main() -> Result<(), Box<dyn Error>> {
+    // Initialize logging
+    env_logger::init();
+    log::info!("🚀 FastSearch MCP Bridge v{} starting...", env!("CARGO_PKG_VERSION"));
+
+    // Create the MCP server
+    let server = McpServer::new(
+        "fastsearch-mcp",
+        env!("CARGO_PKG_VERSION"),
+        "FastSearch MCP - Lightning-fast file search using NTFS MFT"
+    )
+    .add_tool(
+        "fast_search",
+        "Search for files using the FastSearch engine",
+        handle_search
+    )
+    .add_tool(
+        "service_status",
+        "Get the status of the FastSearch service",
+        handle_status
+    );
+
+    log::info!("🔧 MCP Server initialized with FastMCP compatibility layer");
+    log::info!("📡 Listening for MCP requests...");
+
+    // Run the server (this blocks until stdin is closed)
+    server.run_stdio();
     
-    info!("🚀 MCP Bridge ready for requests");
-    
-    // Run the bridge (blocks until stdin closes)
-    if let Err(e) = bridge.run().await {
-        error!("❌ Bridge error: {}", e);
-        std::process::exit(1);
-    }
-    
-    info!("🔚 MCP Bridge shutting down");
+    log::info!("🔚 MCP Server shutting down");
     Ok(())
 }

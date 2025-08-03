@@ -10,6 +10,7 @@
 FastSearch MCP is built on a **fundamentally different architecture** from traditional file search tools. Instead of indexing files and caching results, it queries the **NTFS Master File Table (MFT) directly** for each search request.
 
 ### **Traditional Search Architecture (What We DON'T Do)**
+
 ```
 ┌─────────────┐    ┌──────────────┐    ┌─────────────┐    ┌──────────────┐
 │   Startup   │───▶│ Index Entire │───▶│ Cache Files │───▶│ Search Cache │
@@ -18,12 +19,14 @@ FastSearch MCP is built on a **fundamentally different architecture** from tradi
 ```
 
 **Problems:**
+
 - ❌ Long startup delays (10+ minutes)
 - ❌ Massive memory usage (GB of cached data)
 - ❌ Stale results (deleted files still shown)
 - ❌ Missed new files (cache not updated)
 
 ### **FastSearch Architecture (Direct MFT Access)**
+
 ```
 ┌─────────────┐    ┌──────────────┐    ┌─────────────┐
 │ Search      │───▶│ Query NTFS   │───▶│ Return      │
@@ -32,6 +35,7 @@ FastSearch MCP is built on a **fundamentally different architecture** from tradi
 ```
 
 **Advantages:**
+
 - ✅ Instant startup (no indexing needed)
 - ✅ Minimal memory usage (<50MB)
 - ✅ Always current results (live filesystem state)
@@ -49,6 +53,7 @@ FastSearch MCP is built on a **fundamentally different architecture** from tradi
 **NTFS Master File Table**: A special file on every NTFS volume that contains metadata about every file and directory. It's essentially a database of the entire filesystem.
 
 **MFT Structure**:
+
 ```
 MFT Record 0: $MFT (the MFT itself)
 MFT Record 1: $MFTMirr (MFT backup)
@@ -61,6 +66,7 @@ MFT Record N: Your files and directories
 ```
 
 **Each MFT Record Contains**:
+
 - File name and attributes
 - File size and timestamps
 - Data location on disk
@@ -92,6 +98,7 @@ MFT Record N: Your files and directories
 #### **Implementation Details**
 
 **Volume Access**:
+
 ```rust
 // Open NTFS volume directly
 let volume_handle = CreateFileW(
@@ -106,6 +113,7 @@ let volume_handle = CreateFileW(
 ```
 
 **MFT Reading**:
+
 ```rust
 // Read MFT using ntfs crate
 let ntfs = Ntfs::new(&mut volume)?;
@@ -119,6 +127,7 @@ for record_number in 0..mft.record_count() {
 ```
 
 **Pattern Matching**:
+
 ```rust
 // Convert glob patterns to regex
 let pattern = glob_to_regex(&search_pattern)?;
@@ -138,6 +147,7 @@ if regex.is_match(&filename) {
 **Strategic Design Decision**: FastSearch MCP implements **two complementary interfaces** for maximum adoption and utility.
 
 #### **Interface 1: MCP Server** (`src/mcp_server.rs`)
+
 **Purpose**: Model Context Protocol integration for Claude Desktop  
 
 #### **MCP Protocol Overview**
@@ -145,6 +155,7 @@ if regex.is_match(&filename) {
 The Model Context Protocol (MCP) allows Claude Desktop to communicate with external tools through JSON-RPC over stdin/stdout.
 
 **Message Flow**:
+
 ```
 Claude Desktop ←→ stdin/stdout ←→ FastSearch MCP Server ←→ NTFS MFT
 ```
@@ -152,6 +163,7 @@ Claude Desktop ←→ stdin/stdout ←→ FastSearch MCP Server ←→ NTFS MFT
 #### **Tool Implementations**
 
 **1. fast_search Tool**
+
 ```json
 {
   "name": "fast_search",
@@ -181,6 +193,7 @@ Claude Desktop ←→ stdin/stdout ←→ FastSearch MCP Server ←→ NTFS MFT
 ```
 
 **2. find_large_files Tool**
+
 ```json
 {
   "name": "find_large_files",
@@ -202,6 +215,7 @@ Claude Desktop ←→ stdin/stdout ←→ FastSearch MCP Server ←→ NTFS MFT
 ```
 
 **3. benchmark_search Tool**
+
 ```json
 {
   "name": "benchmark_search",
@@ -219,9 +233,11 @@ Claude Desktop ←→ stdin/stdout ←→ FastSearch MCP Server ←→ NTFS MFT
 ```
 
 #### **Interface 2: HTTP REST API** (`src/web_api.rs`)
+
 **Purpose**: Universal web/application integration
 
 **REST Endpoints**:
+
 - `POST /search` - File search (same as MCP fast_search)
 - `POST /large-files` - Large file discovery
 - `POST /benchmark` - Performance testing
@@ -230,23 +246,28 @@ Claude Desktop ←→ stdin/stdout ←→ FastSearch MCP Server ←→ NTFS MFT
 **Why Dual Interface is Strategic**:
 
 ✅ **Market Reach Expansion**
+
 - **MCP**: Claude Desktop ecosystem (growing but niche)
 - **REST**: Universal HTTP clients (massive market)
 
 ✅ **Use Case Optimization**
+
 - **MCP**: AI workflows, conversational search, schema discovery
 - **REST**: Dashboards, mobile apps, microservices, CI/CD
 
 ✅ **Risk Mitigation**
+
 - **Protocol independence**: If MCP changes, REST unaffected
 - **Future-proofing**: REST universally supported
 
 ✅ **Implementation Efficiency**
+
 - **90% code sharing**: Same core NTFS logic
 - **10% interface wrappers**: Thin adaptation layers
 - **Minimal overhead**: ~200 lines for complete REST API
 
 **Real-World Scenarios Enabled**:
+
 ```
 Web Dashboard: REST API for large file visualization
 Mobile App: REST API for file discovery on-the-go
@@ -257,6 +278,7 @@ Claude Desktop: MCP for conversational file search
 ### **3. Performance Optimization Strategies**
 
 #### **Early Termination**
+
 ```rust
 let mut results = Vec::new();
 for record in mft_records {
@@ -272,6 +294,7 @@ for record in mft_records {
 ```
 
 #### **Path Pruning**
+
 ```rust
 // Skip directories that can't contain matches
 if let Some(path_filter) = &path_filter {
@@ -282,6 +305,7 @@ if let Some(path_filter) = &path_filter {
 ```
 
 #### **Pattern Optimization**
+
 ```rust
 // Pre-compile regex patterns
 let compiled_pattern = Regex::new(&glob_to_regex(pattern))?;
@@ -297,6 +321,7 @@ if pattern.contains('*') || pattern.contains('?') {
 ```
 
 #### **Memory Management**
+
 ```rust
 // Use string interning for repeated paths
 let mut string_interner = StringInterner::new();
@@ -312,6 +337,7 @@ let mut stack_results: ArrayVec<FileInfo, MAX_STACK_RESULTS> = ArrayVec::new();
 ### **4. Error Handling and Fallbacks**
 
 #### **Privilege Management**
+
 ```rust
 // Check for admin privileges
 if !has_admin_privileges() {
@@ -321,6 +347,7 @@ if !has_admin_privileges() {
 ```
 
 #### **Cross-Platform Fallback**
+
 ```rust
 #[cfg(windows)]
 fn search_files(pattern: &str) -> Result<Vec<FileInfo>> {
@@ -336,6 +363,7 @@ fn search_files(pattern: &str) -> Result<Vec<FileInfo>> {
 ```
 
 #### **Graceful Degradation**
+
 ```rust
 // Try NTFS first, fallback to standard methods
 match ntfs_direct_search(pattern) {
@@ -362,6 +390,7 @@ match ntfs_direct_search(pattern) {
 ### **Scaling Characteristics**
 
 **File Count vs Performance**:
+
 ```
 100K files:   ~20ms
 500K files:   ~40ms  
@@ -371,6 +400,7 @@ match ntfs_direct_search(pattern) {
 ```
 
 **Drive Size vs Performance**:
+
 ```
 250GB SSD:    ~30ms
 500GB SSD:    ~45ms
@@ -382,11 +412,13 @@ match ntfs_direct_search(pattern) {
 ### **Memory Usage Profile**
 
 **Static Memory**:
+
 - Base application: ~5MB
 - NTFS crate overhead: ~2MB
 - Pattern compilation: ~1MB
 
 **Dynamic Memory** (per search):
+
 - MFT record processing: ~2-5MB
 - Result collection: ~1-10MB (depends on max_results)
 - String allocations: ~1-3MB
@@ -429,6 +461,7 @@ match ntfs_direct_search(pattern) {
 **NTFS MFT Access**: Requires `SeBackupPrivilege` or Administrator rights
 
 **Privilege Check**:
+
 ```rust
 fn check_ntfs_access() -> bool {
     // Try to open volume handle
@@ -451,12 +484,14 @@ fn check_ntfs_access() -> bool {
 ### **Security Boundaries**
 
 **What FastSearch CAN Access**:
+
 - File and directory names
 - File sizes and timestamps
 - File attributes and permissions
 - Directory structure
 
 **What FastSearch CANNOT Access**:
+
 - File contents
 - Encrypted file contents
 - Files on unmounted volumes
@@ -465,12 +500,14 @@ fn check_ntfs_access() -> bool {
 ### **Privacy Considerations**
 
 **Data Handling**:
+
 - No file contents are read
 - No data is cached or stored
 - No network communication
 - No telemetry or logging of search terms
 
 **Minimal Exposure**:
+
 - Only filename metadata accessed
 - Results sent only to requesting Claude session
 - No persistent storage of search history
@@ -480,11 +517,13 @@ fn check_ntfs_access() -> bool {
 ### **Debug Mode Features**
 
 **Enable Debug Logging**:
+
 ```bash
 RUST_LOG=debug fastsearch.exe --mcp-server
 ```
 
 **Performance Profiling**:
+
 ```bash
 RUST_LOG=trace fastsearch.exe --benchmark
 ```
@@ -492,18 +531,21 @@ RUST_LOG=trace fastsearch.exe --benchmark
 ### **Common Debug Scenarios**
 
 **1. MFT Access Issues**
+
 ```
 Error: Access denied to NTFS MFT
 Solution: Run as Administrator or check SeBackupPrivilege
 ```
 
 **2. Pattern Compilation Errors**
+
 ```
 Error: Invalid regex pattern from glob
 Solution: Validate glob pattern syntax
 ```
 
 **3. Memory Issues**
+
 ```
 Error: Out of memory during large searches
 Solution: Reduce max_results or add pagination
@@ -512,16 +554,19 @@ Solution: Reduce max_results or add pagination
 ### **Testing Strategies**
 
 **Unit Tests**:
+
 - Pattern matching accuracy
 - MFT record parsing
 - Error handling paths
 
 **Integration Tests**:
+
 - Full MCP protocol flow
 - Large filesystem performance
 - Cross-platform fallbacks
 
 **Performance Tests**:
+
 - Search latency benchmarks
 - Memory usage profiling
 - Concurrent request handling
@@ -531,21 +576,25 @@ Solution: Reduce max_results or add pagination
 ## 🎯 **Architectural Principles (Non-Negotiable)**
 
 ### **1. Direct Access Only**
+
 - NEVER cache filesystem data
 - NEVER build background indexes
 - ALWAYS query live filesystem state
 
 ### **2. Early Termination**
+
 - ALWAYS stop at max_results
 - NEVER scan entire filesystem unnecessarily
 - OPTIMIZE for common search patterns
 
 ### **3. Minimal Resource Usage**
+
 - KEEP memory usage under 50MB
 - AVOID unnecessary allocations
 - LEVERAGE system filesystem caches
 
 ### **4. Real-Time Accuracy**
+
 - NEVER return stale data
 - ALWAYS reflect current filesystem state
 - HANDLE concurrent filesystem changes gracefully

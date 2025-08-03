@@ -12,6 +12,7 @@
 FastSearch MCP implements the Model Context Protocol for seamless Claude Desktop integration. All communication uses JSON-RPC 2.0 over stdin/stdout.
 
 **Base Message Format**:
+
 ```json
 {
   "jsonrpc": "2.0",
@@ -27,6 +28,7 @@ FastSearch MCP implements the Model Context Protocol for seamless Claude Desktop
 ```
 
 **Response Format**:
+
 ```json
 {
   "jsonrpc": "2.0", 
@@ -47,6 +49,7 @@ FastSearch MCP implements the Model Context Protocol for seamless Claude Desktop
 **Description**: Lightning-fast file search using direct NTFS Master File Table access
 
 #### **Input Schema**
+
 ```json
 {
   "name": "fast_search",
@@ -105,6 +108,7 @@ FastSearch MCP implements the Model Context Protocol for seamless Claude Desktop
 #### **Example Requests**
 
 **Basic File Search**:
+
 ```json
 {
   "name": "fast_search",
@@ -117,6 +121,7 @@ FastSearch MCP implements the Model Context Protocol for seamless Claude Desktop
 ```
 
 **Configuration File Search**:
+
 ```json
 {
   "name": "fast_search", 
@@ -129,6 +134,7 @@ FastSearch MCP implements the Model Context Protocol for seamless Claude Desktop
 ```
 
 **Large File Search**:
+
 ```json
 {
   "name": "fast_search",
@@ -141,6 +147,7 @@ FastSearch MCP implements the Model Context Protocol for seamless Claude Desktop
 ```
 
 #### **Response Format**
+
 ```json
 {
   "results": [
@@ -173,6 +180,7 @@ FastSearch MCP implements the Model Context Protocol for seamless Claude Desktop
 **Description**: Discover the largest files on your system for storage analysis
 
 #### **Input Schema**
+
 ```json
 {
   "name": "find_large_files",
@@ -219,6 +227,7 @@ FastSearch MCP implements the Model Context Protocol for seamless Claude Desktop
 #### **Example Requests**
 
 **Find Large Video Files**:
+
 ```json
 {
   "name": "find_large_files",
@@ -231,6 +240,7 @@ FastSearch MCP implements the Model Context Protocol for seamless Claude Desktop
 ```
 
 **Storage Cleanup Analysis**:
+
 ```json
 {
   "name": "find_large_files",
@@ -243,6 +253,7 @@ FastSearch MCP implements the Model Context Protocol for seamless Claude Desktop
 ```
 
 #### **Response Format**
+
 ```json
 {
   "results": [
@@ -272,6 +283,7 @@ FastSearch MCP implements the Model Context Protocol for seamless Claude Desktop
 **Description**: Performance testing and system capability analysis
 
 #### **Input Schema**
+
 ```json
 {
   "name": "benchmark_search",
@@ -310,6 +322,7 @@ FastSearch MCP implements the Model Context Protocol for seamless Claude Desktop
 ```
 
 #### **Example Request**
+
 ```json
 {
   "name": "benchmark_search",
@@ -322,6 +335,7 @@ FastSearch MCP implements the Model Context Protocol for seamless Claude Desktop
 ```
 
 #### **Response Format**
+
 ```json
 {
   "benchmark_results": [
@@ -368,9 +382,11 @@ FastSearch MCP implements the Model Context Protocol for seamless Claude Desktop
 ### **Endpoints**
 
 #### **GET /health**
+
 **Description**: Health check and server status
 
 **Response**:
+
 ```json
 {
   "status": "healthy",
@@ -382,9 +398,11 @@ FastSearch MCP implements the Model Context Protocol for seamless Claude Desktop
 ```
 
 #### **POST /search**
+
 **Description**: File search endpoint
 
 **Request Body**:
+
 ```json
 {
   "pattern": "*.js",
@@ -396,9 +414,11 @@ FastSearch MCP implements the Model Context Protocol for seamless Claude Desktop
 **Response**: Same as MCP `fast_search` tool
 
 #### **POST /large-files**
+
 **Description**: Large file discovery
 
 **Request Body**:
+
 ```json
 {
   "min_size_mb": 100,
@@ -409,9 +429,11 @@ FastSearch MCP implements the Model Context Protocol for seamless Claude Desktop
 **Response**: Same as MCP `find_large_files` tool
 
 #### **POST /benchmark**
+
 **Description**: Performance benchmarking
 
 **Request Body**:
+
 ```json
 {
   "drive": "C",
@@ -422,9 +444,11 @@ FastSearch MCP implements the Model Context Protocol for seamless Claude Desktop
 **Response**: Same as MCP `benchmark_search` tool
 
 #### **GET /stats**
+
 **Description**: Server statistics and metrics
 
 **Response**:
+
 ```json
 {
   "total_searches": 1042,
@@ -452,6 +476,7 @@ FastSearch MCP implements the Model Context Protocol for seamless Claude Desktop
 ### **Error Response Format**
 
 **MCP Error**:
+
 ```json
 {
   "jsonrpc": "2.0",
@@ -468,6 +493,7 @@ FastSearch MCP implements the Model Context Protocol for seamless Claude Desktop
 ```
 
 **HTTP Error**:
+
 ```json
 {
   "error": {
@@ -496,12 +522,14 @@ FastSearch MCP implements the Model Context Protocol for seamless Claude Desktop
 ### **Performance Guidelines**
 
 **Optimal Performance**:
+
 - Use specific patterns when possible (`package.json` vs `*`)
 - Include path filters to narrow scope
 - Set reasonable max_results (100-1000)
 - Avoid overly complex regex patterns
 
 **Memory Considerations**:
+
 - Each result consumes ~200 bytes
 - 10,000 results ≈ 2MB memory
 - Keep max_results under 5,000 for best performance
@@ -511,31 +539,37 @@ FastSearch MCP implements the Model Context Protocol for seamless Claude Desktop
 ### **Common Search Patterns**
 
 **Find all JavaScript files**:
+
 ```json
 {"pattern": "*.js"}
 ```
 
 **Find configuration files**:
+
 ```json
 {"pattern": "config.*"}
 ```
 
 **Find README files**:
+
 ```json
 {"pattern": "README*"}
 ```
 
 **Find specific file**:
+
 ```json
 {"pattern": "package.json"}
 ```
 
 **Find in specific directory**:
+
 ```json
 {"pattern": "*.py", "path": "src"}
 ```
 
 **Find large executables**:
+
 ```json
 {"pattern": "*.exe", "min_size_bytes": 10485760}
 ```
@@ -543,6 +577,7 @@ FastSearch MCP implements the Model Context Protocol for seamless Claude Desktop
 ### **Performance Optimization Examples**
 
 **Fast specific search**:
+
 ```json
 {
   "pattern": "webpack.config.js",
@@ -552,6 +587,7 @@ FastSearch MCP implements the Model Context Protocol for seamless Claude Desktop
 ```
 
 **Efficient large file discovery**:
+
 ```json
 {
   "min_size_mb": 100,
@@ -561,6 +597,7 @@ FastSearch MCP implements the Model Context Protocol for seamless Claude Desktop
 ```
 
 **Targeted benchmark**:
+
 ```json
 {
   "test_patterns": ["*.js"],
@@ -574,11 +611,13 @@ FastSearch MCP implements the Model Context Protocol for seamless Claude Desktop
 ### **Debug Mode**
 
 **Enable verbose logging**:
+
 ```bash
 RUST_LOG=debug fastsearch.exe --mcp-server
 ```
 
 **Enable trace logging**:
+
 ```bash
 RUST_LOG=trace fastsearch.exe --mcp-server  
 ```
@@ -586,11 +625,13 @@ RUST_LOG=trace fastsearch.exe --mcp-server
 ### **Manual Testing**
 
 **Test MCP Protocol**:
+
 ```bash
 echo '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | fastsearch.exe --mcp-server
 ```
 
 **Test HTTP API**:
+
 ```bash
 curl -X POST http://localhost:3000/search \
   -H "Content-Type: application/json" \
@@ -600,6 +641,7 @@ curl -X POST http://localhost:3000/search \
 ### **Configuration Files**
 
 **MCP Server Config** (`~/.config/fastsearch/config.json`):
+
 ```json
 {
   "max_concurrent_searches": 5,
@@ -615,6 +657,7 @@ curl -X POST http://localhost:3000/search \
 ## 🚀 **Quick Reference Card**
 
 ### **Most Common Usage**
+
 ```json
 // Basic file search
 {"tool": "fast_search", "pattern": "*.js"}
@@ -627,12 +670,14 @@ curl -X POST http://localhost:3000/search \
 ```
 
 ### **Key Performance Tips**
+
 1. **Use specific patterns** - `package.json` vs `*`
 2. **Add path filters** - `"path": "src"` to narrow scope  
 3. **Set reasonable limits** - `max_results: 100-1000`
 4. **Exclude system files** - for storage analysis
 
 ### **Troubleshooting Checklist**
+
 - ✅ Run as Administrator for NTFS access
 - ✅ Check drive exists and is accessible
 - ✅ Verify pattern syntax (glob format)

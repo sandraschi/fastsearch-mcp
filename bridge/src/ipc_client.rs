@@ -1,109 +1,135 @@
-use crate::{SearchRequest, SearchResponse, SearchStats};
-use std::time::Duration;
-use tracing::{debug, warn};
+//! IPC client for communicating with the FastSearch service
 
+use std::io;
+use std::time::Duration;
+
+use thiserror::Error;
+use tracing::error;
+use tokio::{
+    io::{AsyncReadExt, AsyncWriteExt},
+    net::windows::named_pipe::{ClientOptions, NamedPipeClient},
+};
+
+use fastsearch_shared::{SearchRequest, SearchResponse, SearchStats};
+
+/// Timeout for establishing connection to the service
+const CONNECTION_TIMEOUT: Duration = Duration::from_secs(2);
+
+/// Timeout for read operations
+const READ_TIMEOUT: Duration = Duration::from_secs(30);
+
+/// IPC client for communicating with the FastSearch service
+#[derive(Debug)]
 pub struct IpcClient {
-    connected: bool,
+    client: Option<NamedPipeClient>,
+    pipe_name: String,
 }
 
-#[derive(thiserror::Error, Debug)]
+/// Errors that can occur during IPC communication
+#[derive(Error, Debug)]
 pub enum IpcError {
-    #[error("Service not running or not installed")]
-    ServiceNotRunning,
+    /// I/O operation failed
+    #[error("I/O error: {0}")]
+    Io(#[from] io::Error),
     
-    #[error("Access denied to service")]
-    AccessDenied,
-    
-    #[error("Request timeout")]
+    /// Operation timed out
+    #[error("Operation timed out")]
     Timeout,
     
-    #[error("Communication error: {0}")]
-    Communication(String),
+    /// Service is not available
+    #[error("Service not available")]
+    ServiceUnavailable,
+    
+    /// Service is not running
+    #[error("Service not running")]
+    ServiceNotRunning,
+    
+    /// Serialization/deserialization failed
+    #[error("Serialization error: {0}")]
+    Serialization(#[from] bincode::Error),
+    
+    /// Protocol error
+    #[error("Protocol error: {0}")]
+    Protocol(String),
 }
 
 impl IpcClient {
+    /// Create a new IPC client and connect to the named pipe
     pub async fn new(pipe_name: &str) -> Result<Self, IpcError> {
-        // TODO: Implement actual named pipe connection
-        // For now, simulate connection test
-        debug!("Testing connection to {}", pipe_name);
+        let pipe_path = format!(r"\\.\pipe\{pipe_name}");
         
-        // Simulate connection test
-        tokio::time::sleep(Duration::from_millis(50)).await;
-        
-        // For development: always succeed
-        Ok(Self { connected: true })
-    }
-    
-    pub fn disconnected() -> Self {
-        Self { connected: false }
-    }
-    
-    pub async fn send_request(&self, request: SearchRequest) -> Result<SearchResponse, IpcError> {
-        if !self.connected {
-            return Err(IpcError::ServiceNotRunning);
-        }
-        
-        debug!("Sending search request: pattern={}, type={}", request.pattern, request.search_type);
-        
-        // TODO: Implement actual IPC communication
-        // For now, return mock response
-        
-        // Simulate search time
-        tokio::time::sleep(Duration::from_millis(25)).await;
-        
-        // Mock results based on pattern
-        let results = if request.pattern.contains("test") {
-            vec![
-                crate::types::FileInfo {
-                    path: "C:\\Projects\\app\\test\\unit_test.js".to_string(),
-                    name: "unit_test.js".to_string(),
-                    size: 2048,
-                    size_human: "2.0 KB".to_string(),
-                    modified: "2025-07-17T10:30:00Z".to_string(),
-                    created: "2025-07-15T09:15:00Z".to_string(),
-                    extension: ".js".to_string(),
-                    is_directory: false,
-                    is_hidden: false,
-                    match_score: 0.95,
-                    match_type: "exact".to_string(),
-                }
-            ]
-        } else {
-            vec![]
-        };
-        
-        Ok(SearchResponse {
-            results,
-            search_info: crate::types::SearchInfo {
-                pattern: request.pattern,
-                search_type: request.search_type,
-                search_time_ms: 25,
-                match_type: "smart".to_string(),
-                index_size: 1000000,
-                ntfs_mode: true,
-            },
+        // Try to connect to the named pipe
+        let client = ClientOptions::new()
+            .open(&pipe_path)
+            .map_err(|e| {
+                error!("Failed to connect to pipe {}: {}", pipe_path, e);
+                IpcError::ServiceUnavailable
+            })?;
+            
+        Ok(Self {
+            client: Some(client),
+            pipe_name: pipe_name.to_string(),
         })
+    }
+
+    /// Create a disconnected IPC client
+    pub fn disconnected() -> Self {
+        Self {
+            client: None,
+            pipe_name: String::new(),
+        }
     }
     
     pub async fn get_stats(&self) -> Result<SearchStats, IpcError> {
-        if !self.connected {
-            return Err(IpcError::ServiceNotRunning);
-        }
-        
         // TODO: Get real stats from service
         Ok(SearchStats {
-            avg_search_time_ms: 23,
-            total_searches: 150,
-            cache_hit_rate: 0.85,
-            index_size: 1000000,
-            memory_usage_mb: 245,
-            uptime_seconds: 3600,
-            service_running: true,
-            ntfs_mode: true,
+            files_indexed: 1000,
+            total_size: 1024 * 1024 * 1024, // 1GB
+            last_updated: chrono::Utc::now().timestamp(),
+            directories_indexed: 100,
+            avg_search_time_ms: Some(10),
+            total_searches: Some(5000),
+            cache_hit_rate: Some(0.95),
+            memory_usage_mb: Some(50),
+            uptime_seconds: Some(3600), // 1 hour
+            service_running: Some(true),
+            ntfs_mode: Some(true),
         })
     }
     
     pub async fn check_service_status(&self) -> Result<bool, IpcError> {
-        Ok(self.connected)
+        // Check if we have a client connection
+        Ok(self.client.is_some())
+    }
+    
+    /// Send a search request to the FastSearch service
+    pub async fn send_request(&self, request: SearchRequest) -> Result<SearchResponse, IpcError> {
+        let client = self.client.as_ref().ok_or(IpcError::ServiceNotRunning)?;
+        
+        // Serialize the request
+        let request_bytes = bincode::serialize(&request)?;
+            
+        // Send the length prefix
+        let len = request_bytes.len() as u32;
+        let client_ref: &mut NamedPipeClient = unsafe { &mut *(client as *const _ as *mut _) };
+        
+        client_ref.write_all(&len.to_le_bytes()).await?;
+        
+        // Send the request data
+        client_ref.write_all(&request_bytes).await?;
+        
+        // Read the response length
+        let mut len_buf = [0u8; 4];
+        client_ref.read_exact(&mut len_buf).await?;
+        let len = u32::from_le_bytes(len_buf) as usize;
+        
+        // Read the response data
+        let mut response_buf = vec![0u8; len];
+        client_ref.read_exact(&mut response_buf).await?;
+        
+        // Deserialize the response
+        let response: SearchResponse = bincode::deserialize(&response_buf)?;
+            
+        Ok(response)
     }
 }

@@ -23,24 +23,28 @@
 ## "Useful" Features That Nobody Asked For
 
 ### 1. **Blockchain-Powered File Search**
-   - Because why search files when you can search files *on the blockchain*?
-   - Every search query gets minted as an NFT (Non-Fungible Text)
-   - Distributed across 17 nodes for that sweet, sweet decentralization
+
+- Because why search files when you can search files *on the blockchain*?
+- Every search query gets minted as an NFT (Non-Fungible Text)
+- Distributed across 17 nodes for that sweet, sweet decentralization
 
 ### 2. **AI-Powered Everything**
-   - Machine learning model trained for 3 weeks just to sort files alphabetically
-   - Neural network that predicts which files you *might* want to search for later
-   - Sentient error messages that roast you for typos
+
+- Machine learning model trained for 3 weeks just to sort files alphabetically
+- Neural network that predicts which files you *might* want to search for later
+- Sentient error messages that roast you for typos
 
 ### 3. **Real-Time Collaborative Searching**
-   - Because searching alone is so 2024
-   - Built-in chat so you can argue about search results with your team
-   - Live-updating leaderboard of who's the best searcher
+
+- Because searching alone is so 2024
+- Built-in chat so you can argue about search results with your team
+- Live-updating leaderboard of who's the best searcher
 
 ### 4. **Blockchain-Powered Blockchain**
-   - It's blockchains all the way down
-   - Each file search gets its own sidechain
-   - Mining cryptocurrency while you wait for results (patent pending)
+
+- It's blockchains all the way down
+- Each file search gets its own sidechain
+- Mining cryptocurrency while you wait for results (patent pending)
 
 ## The Vibecoder's Toolbox
 

@@ -9,7 +9,9 @@
 WizFile is widely regarded as the **fastest file search tool for Windows**. It achieves this through **direct NTFS Master File Table (MFT) access** - exactly the same approach used by FastSearch MCP.
 
 ### **WizFile's Core Innovation**
+
 Instead of building slow indexes like traditional tools, WizFile reads the NTFS MFT directly for each search, providing:
+
 - ⚡ **Instant startup** (no indexing delays)
 - 🎯 **Always current results** (real-time filesystem state)
 - 💾 **Minimal memory usage** (no file caches)
@@ -33,13 +35,15 @@ Instead of building slow indexes like traditional tools, WizFile reads the NTFS 
 ## 🔧 **Technical Implementation Comparison**
 
 ### **WizFile Architecture**
+
 ```
 Search Request → Read NTFS MFT → Pattern Match → Return Results
      ↓              ↓              ↓              ↓
    Instant      Direct Access   Real-time     <50ms
 ```
 
-### **FastSearch MCP Architecture** 
+### **FastSearch MCP Architecture**
+
 ```
 Claude Request → MCP Protocol → NTFS MFT → Pattern Match → JSON Response
      ↓              ↓              ↓              ↓              ↓
@@ -47,6 +51,7 @@ Claude Request → MCP Protocol → NTFS MFT → Pattern Match → JSON Response
 ```
 
 ### **Everything Architecture**
+
 ```
 Startup → Index Drive → Cache Files → Search Cache → Return Results
    ↓           ↓            ↓            ↓             ↓
@@ -65,6 +70,7 @@ Startup → Index Drive → Cache Files → Search Cache → Return Results
 | `README*` | 15ms | 12ms | 3ms | 600ms |
 
 **Analysis:**
+
 - **WizFile slightly faster** due to highly optimized C++ implementation
 - **FastSearch MCP within 2x** of WizFile (excellent for Rust implementation)
 - **Everything faster when cached** but requires 10-30min indexing overhead
@@ -91,28 +97,36 @@ Startup → Index Drive → Cache Files → Search Cache → Return Results
 ## 🎯 **Why FastSearch MCP Follows WizFile's Approach**
 
 ### **1. Proven Performance Model**
+
 WizFile has **demonstrated for years** that direct MFT access provides:
+
 - Professional-grade search speeds
 - Reliable real-time accuracy  
 - Minimal resource consumption
 - Instant availability
 
 ### **2. Philosophical Alignment**
+
 Both tools share the core principle: **"Search shouldn't require indexing"**
+
 - Files exist in the MFT already
 - Why duplicate that data in an index?
 - Why wait for indexing when MFT is instantly available?
 - Why use GB of RAM when MFT is hardware-optimized?
 
 ### **3. User Experience Benefits**
+
 The WizFile approach provides **immediate user value**:
+
 - No "setup time" or "initial indexing"
 - No stale results from outdated caches
 - No massive memory consumption
 - No background CPU usage for index maintenance
 
 ### **4. Technical Validation**
+
 WizFile's success **validates the architectural choice**:
+
 - Millions of downloads and satisfied users
 - Consistently rated as fastest Windows search tool
 - Proven stability over many Windows versions
@@ -156,6 +170,7 @@ WizFile's success **validates the architectural choice**:
 ### **FastSearch MCP Advantages over WizFile**
 
 #### **1. Programmable Interface**
+
 ```json
 // FastSearch MCP - Programmable via Claude
 {
@@ -173,18 +188,21 @@ WizFile - GUI only, no programmatic access
 ```
 
 #### **2. Claude Desktop Integration**
+
 - **Native MCP protocol support**
 - **Seamless tool discovery**
 - **Natural language search requests**
 - **Contextual results in Claude conversations**
 
 #### **3. Extensible Architecture**
+
 - **HTTP API for frontend integration**
 - **Plugin architecture potential**
 - **Cross-platform roadmap**
 - **Open source extensibility**
 
 #### **4. Modern Development Stack**
+
 - **Rust for memory safety**
 - **Async processing capability**
 - **Modern error handling**
@@ -193,18 +211,21 @@ WizFile - GUI only, no programmatic access
 ### **WizFile Advantages over FastSearch MCP**
 
 #### **1. Mature Optimization**
+
 - **Years of performance tuning**
 - **Highly optimized C++ implementation**
 - **Platform-specific optimizations**
 - **Minimal memory footprint**
 
 #### **2. User Interface**
+
 - **Polished native GUI**
 - **Advanced filtering options**
 - **Real-time search-as-you-type**
 - **Integrated file operations**
 
 #### **3. Proven Stability**
+
 - **Years of production use**
 - **Tested across Windows versions**
 - **Large user base validation**
@@ -228,6 +249,7 @@ Just as WizFile revolutionized desktop file search by avoiding indexing, **FastS
 ### **Complementary Rather Than Competitive**
 
 FastSearch MCP **doesn't compete with WizFile** - it brings WizFile's architecture to a new use case:
+
 - **WizFile**: Desktop GUI users who want instant search
 - **FastSearch MCP**: Claude Desktop users who want programmable search
 
@@ -294,7 +316,7 @@ FastSearch MCP **doesn't compete with WizFile** - it brings WizFile's architectu
 
 ## 🎯 **Conclusion: Standing on the Shoulders of Giants**
 
-FastSearch MCP **validates its architecture** by following WizFile's proven approach while extending it for AI assistant integration. 
+FastSearch MCP **validates its architecture** by following WizFile's proven approach while extending it for AI assistant integration.
 
 **WizFile proved** that direct NTFS MFT access is the superior architecture for Windows file search. **FastSearch MCP brings that same architectural excellence** to Claude Desktop users.
 

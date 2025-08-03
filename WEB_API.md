@@ -29,6 +29,7 @@ cargo build --release
 Search for files matching a pattern.
 
 **Request Body:**
+
 ```json
 {
   "pattern": "*.rs",
@@ -39,12 +40,14 @@ Search for files matching a pattern.
 ```
 
 **Parameters:**
+
 - `pattern` (string, required): Search pattern (supports glob format)
 - `path` (string, optional): Base directory to search in (default: root of all NTFS volumes)
 - `max_results` (number, optional): Maximum number of results to return (default: 1000)
 - `doc_type` (string, optional): Filter by document type (e.g., "code", "image", "audio", "video")
 
 **Response:**
+
 ```json
 {
   "success": true,
@@ -71,6 +74,7 @@ Search for files matching a pattern.
 Get the current status of the FastSearch service.
 
 **Response:**
+
 ```json
 {
   "success": true,
@@ -89,10 +93,12 @@ Get the current status of the FastSearch service.
 Run a performance benchmark with the given search parameters.
 
 **Query Parameters:**
+
 - `pattern` (required): Search pattern
 - `path` (optional): Base directory to search in
 
 **Response:**
+
 ```json
 {
   "success": true,
@@ -111,6 +117,7 @@ Run a performance benchmark with the given search parameters.
 Simple health check endpoint for monitoring.
 
 **Response:**
+
 ```json
 {
   "status": "ok",
@@ -135,6 +142,7 @@ All API endpoints return appropriate HTTP status codes and JSON error responses:
 ## Authentication
 
 The API currently doesn't implement authentication, so it's recommended to:
+
 1. Only expose the API on localhost (default)
 2. Use a reverse proxy with authentication for remote access
 3. Configure appropriate firewall rules
@@ -142,12 +150,14 @@ The API currently doesn't implement authentication, so it's recommended to:
 ## Rate Limiting
 
 No built-in rate limiting is currently implemented. For production use, consider:
+
 1. Running behind a reverse proxy with rate limiting (e.g., nginx, Cloudflare)
 2. Implementing request throttling in your application
 
 ## CORS
 
 CORS is enabled by default with the following settings:
+
 - Allowed Origins: `*`
 - Allowed Methods: `GET, POST, OPTIONS`
 - Allowed Headers: `Content-Type, Authorization`
@@ -161,6 +171,7 @@ You can configure the web server using environment variables:
 - `FASTSEARCH_WORKERS`: Number of worker threads (default: number of CPU cores)
 
 Example:
+
 ```bash
 FASTSEARCH_WEB_HOST=0.0.0.0 FASTSEARCH_WEB_PORT=8080 ./target/release/fastsearch --web-api
 ```

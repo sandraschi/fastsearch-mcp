@@ -51,12 +51,30 @@ pub struct SearchInfo {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SearchStats {
-    pub avg_search_time_ms: u32,
-    pub total_searches: u64,
-    pub cache_hit_rate: f32,
-    pub index_size: u64,
-    pub memory_usage_mb: u32,
-    pub uptime_seconds: u64,
-    pub service_running: bool,
-    pub ntfs_mode: bool,
+    pub files_indexed: u64,
+    pub total_size: u64,
+    pub last_updated: i64,  // Unix timestamp in seconds
+    pub directories_indexed: u64,
+    
+    // Additional fields that might be used elsewhere
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub avg_search_time_ms: Option<u32>,
+    
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub total_searches: Option<u64>,
+    
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cache_hit_rate: Option<f32>,
+    
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub memory_usage_mb: Option<u32>,
+    
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub uptime_seconds: Option<u64>,
+    
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub service_running: Option<bool>,
+    
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ntfs_mode: Option<bool>,
 }

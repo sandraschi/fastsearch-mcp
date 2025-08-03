@@ -2,6 +2,34 @@
 /target/
 Cargo.lock
 
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+.mypy_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# DXT package
+dist/*.dxt
+
 # Node.js
 node_modules/
 frontend/node_modules/
@@ -12,6 +40,8 @@ package-lock.json
 .idea/
 *.swp
 *.swo
+*.sublime-*
+*.code-workspace
 
 # Logs and debug files
 *.log
@@ -34,19 +64,65 @@ package-lock.json
 /installer/*.wxl
 /installer/*.wxs
 /installer/*.wxi
-/installer/*.wxl
-/installer/*.wxs
-/installer/*.wixobj
-/installer/*.wixpdb
-/installer/*.wxl
-/installer/*.wxs
-/installer/*.wxi
-/installer/*.wxl
-/installer/*.wxs
-/installer/*.wixobj
-/installer/*.wixpdb
-/installer/*.wxl
 
 # Local development files
+.env
+.env.*
+!.env.example
+
+# Virtual Environment
+venv/
+env/
+ENV/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Distribution / packaging
+.Python
+*.manifest
+*.spec
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+
+# Translations
+*.mo
+*.pot
+
+# Documentation
+docs/_build/
+
+# PyCharm
+.idea/
+
+# VS Code
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
 .env
 *.local

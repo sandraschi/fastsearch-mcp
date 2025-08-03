@@ -1,0 +1,20 @@
+cff-version: 1.2.0
+message: "If you use FastSearch MCP in your research, please cite it using these metadata.
+title: "FastSearch MCP: Lightning-fast file search for Claude Desktop"
+authors:
+  - family-names: "YourLastName"
+    given-names: "YourFirstName"
+    orcid: "https://orcid.org/YOUR-ORCID"
+    affiliation: "Your Organization"
+version: 0.1.0
+date-released: 2025-08-03
+url: "https://github.com/yourusername/fastsearch-mcp"
+repository-code: "https://github.com/yourusername/fastsearch-mcp"
+keywords:
+  - "file-search"
+  - "ntfs"
+  - "mcp"
+  - "claude-desktop"
+  - "productivity"
+license: MIT
+abstract: "FastSearch MCP provides lightning-fast file search capabilities for Claude Desktop by leveraging direct NTFS Master File Table access, enabling users to quickly locate files without the need for indexing."

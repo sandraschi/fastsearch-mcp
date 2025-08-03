@@ -1,0 +1,67 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e .[dev]
+    
+    - name: Run tests
+      run: |
+        python -m pytest tests/ -v
+    
+    - name: Generate documentation
+      run: |
+        python scripts/generate_docs.py
+    
+    - name: Validate DXT package
+      run: |
+        pip install dxt
+        dxt validate
+
+  package:
+    needs: test
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install DXT
+      run: pip install dxt
+    
+    - name: Package DXT
+      run: dxt pack
+      
+    - name: Upload artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: fastsearch-mcp.dxt
+        path: dist/*.dxt
+        if-no-files-found: error

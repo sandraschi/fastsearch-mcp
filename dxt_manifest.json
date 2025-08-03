@@ -1,0 +1,177 @@
+{
+  "name": "fastsearch-mcp",
+  "version": "2.0.0",
+  "description": "Lightning-fast file search for Claude Desktop using NTFS Master File Table with privilege separation architecture.",
+  "author": "Sandra & Claudius",
+  "license": "MIT",
+  "homepage": "https://github.com/sandraschi/fastsearch-mcp",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sandraschi/fastsearch-mcp.git"
+  },
+  "keywords": ["mcp", "fastsearch", "filesystem", "search", "ntfs"],
+  "categories": ["filesystem", "search", "productivity"],
+  "icon": "icons/search.png",
+  "entrypoint": "fastsearch-mcp-bridge",
+  "permissions": [
+    "filesystem.read",
+    "network.client",
+    "process"
+  ],
+  "prompts": [
+    {
+      "name": "search_files_prompt",
+      "description": "Search for files using the FastSearch engine",
+      "template": "Search for files containing '{query}' in {path}. {case_sensitive?Case-sensitive search:Case-insensitive search}. {max_results?Return up to {max_results} results.}"
+    },
+    {
+      "name": "search_by_extension_prompt",
+      "description": "Search for files with specific extensions",
+      "template": "Find {extensions} files containing '{query}' in {path}. {max_results?Show up to {max_results} results.}"
+    },
+    {
+      "name": "search_recent_files_prompt",
+      "description": "Search for recently modified files",
+      "template": "Find recently {modified:modified|created|accessed} files in {path} {query?containing '{query}'}. {max_results?Show up to {max_results} results.}"
+    },
+    {
+      "name": "get_search_stats_prompt",
+      "description": "Get statistics about the search index",
+      "template": "Show search index statistics"
+    },
+    {
+      "name": "check_service_status_prompt",
+      "description": "Check the status of the FastSearch service",
+      "template": "Check if the FastSearch service is running"
+    },
+    {
+      "name": "find_duplicate_files_prompt",
+      "description": "Find duplicate files in a directory",
+      "template": "Find duplicate files in {path} {max_size?larger than {max_size} bytes} {min_size?smaller than {min_size} bytes}"
+    },
+    {
+      "name": "find_large_files_prompt",
+      "description": "Find large files in a directory",
+      "template": "Find files in {path} larger than {size} {unit:MB|GB|KB}"
+    },
+    {
+      "name": "search_by_date_range_prompt",
+      "description": "Search for files modified within a date range",
+      "template": "Find files in {path} {modified:modified|created|accessed} between {start_date} and {end_date} {query?containing '{query}'}"
+    }
+  ],
+  "examples": [
+    {
+      "name": "Search for configuration files",
+      "prompt": "Find all .config and .json files in the project directory",
+      "action": {
+        "tool": "fast_search",
+        "input": {
+          "query": "",
+          "path": "/path/to/project",
+          "extensions": ["config", "json"]
+        }
+      }
+    },
+    {
+      "name": "Find large log files",
+      "prompt": "Find log files larger than 100MB in the logs directory",
+      "action": {
+        "tool": "fast_search",
+        "input": {
+          "query": "",
+          "path": "/var/logs",
+          "extensions": ["log"],
+          "min_size": 104857600
+        }
+      }
+    },
+    {
+      "name": "Search for recently modified Python files",
+      "prompt": "Find Python files modified in the last 7 days",
+      "action": {
+        "tool": "fast_search",
+        "input": {
+          "query": "",
+          "path": "/path/to/project",
+          "extensions": ["py"],
+          "modified_after": "7 days ago"
+        }
+      }
+    }
+  ],
+  "configuration": {
+    "default_max_results": 50,
+    "default_search_paths": [
+      "~"
+    ],
+    "exclude_paths": [
+      "**/node_modules/**",
+      "**/.git/**",
+      "**/__pycache__/**"
+    ]
+  },
+  "capabilities": {
+    "filesystem_search": {
+      "enabled": true,
+      "features": [
+        "content_search",
+        "metadata_search",
+        "regex_search"
+      ]
+    },
+    "indexing": {
+      "enabled": true,
+      "real_time": true
+    },
+    "security": {
+      "privilege_separation": true,
+      "sandboxed": true
+    }
+  },
+  "requirements": {
+    "os": ["windows"],
+    "filesystem": ["ntfs"],
+    "elevation": "required"
+  },
+  "health_check": {
+    "command": "service_status",
+    "interval": 300,
+    "timeout": 5
+  },
+  "troubleshooting": {
+    "common_issues": [
+      {
+        "issue": "Service not running",
+        "solution": "Run the FastSearch service with administrator privileges"
+      },
+      {
+        "issue": "Permission denied",
+        "solution": "Ensure the service has proper permissions to access the search paths"
+      },
+      {
+        "issue": "No results found",
+        "solution": "Check if the index is up to date and the search paths are correctly configured"
+      }
+    ]
+  },
+  "changelog": [
+    {
+      "version": "2.0.0",
+      "date": "2025-08-03",
+      "changes": [
+        "Upgraded to FastMCP 2.10",
+        "Added comprehensive prompt templates",
+        "Improved error handling and logging",
+        "Added DXT packaging support"
+      ]
+    },
+    {
+      "version": "1.0.0",
+      "date": "2025-07-15",
+      "changes": [
+        "Initial release"
+      ]
+    }
+  ]
+}

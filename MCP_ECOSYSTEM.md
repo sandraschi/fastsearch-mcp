@@ -31,6 +31,7 @@ Born just 6 months ago, MCP has become the de facto standard for AI tool integra
 ### MCP Directories
 
 Discover thousands of MCP servers:
+
 - [MCP Hub](https://mcphub.dev) - Curated directory of 5,000+ MCP servers
 - [Awesome MCP](https://github.com/awesome-mcp/awesome-mcp) - GitHub list of high-quality MCP servers
 - [MCP Index](https://mcp-index.org) - Searchable database of 10,000+ MCP servers
@@ -57,16 +58,19 @@ This has led to an interesting phenomenon we call "vibecoding" - where the vibes
 ## The Good, The Bad, and The Hilarious
 
 ### The Good
+
 - Democratized AI tool development
 - Rapid experimentation and iteration
 - Some genuinely innovative use cases emerging
 
 ### The Bad
+
 - Security? What's that?
 - Documentation is often "read the source code, bro"
 - Discoverability is a nightmare (10,000+ repos and counting)
 
 ### The Hilarious
+
 - The number of MCP servers that are just wrappers around `curl`
 - "I made an MCP server in 5 minutes!" (it shows)
 - The inevitable "why doesn't this work on Windows?" issues

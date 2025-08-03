@@ -1,0 +1,83 @@
+# DXT Configuration for FastSearch MCP Bridge
+name: fastsearch-mcp
+version: 1.0.0
+description: "FastSearch MCP Bridge - Fast file search for Claude Desktop"
+
+# Main entry point
+entrypoint: fastsearch_mcp_bridge
+
+# Python configuration
+python:
+  version: "3.8+"
+  requirements: 
+    - pywin32>=305
+    - pydantic>=1.8.0
+    - python-jsonrpc-server>=0.4.0
+    - python-dotenv>=0.19.0
+
+# Build configuration
+build:
+  # Use PyInstaller to create a single executable
+  builder: pyinstaller
+  options:
+    onefile: true
+    name: fastsearch-mcp-bridge
+    console: false
+    add-binary: []
+    hidden-import:
+      - win32timezone
+
+# MCP server configuration
+mcp:
+  version: "2.10"
+  capabilities:
+    - filesystem_search
+    - status_monitoring
+  
+# Permissions
+permissions:
+  filesystem:
+    read: ["*"]
+  network: false
+  system: false
+
+# Metadata
+metadata:
+  author: "Your Name"
+  license: "MIT"
+  repository: "https://github.com/yourusername/fastsearch-mcp"
+  documentation: "https://github.com/yourusername/fastsearch-mcp#readme"
+
+# Hooks for DXT lifecycle events
+hooks:
+  post_install: ""
+  pre_uninstall: ""
+  post_uninstall: ""
+
+# Dependencies on other DXT packages
+dependencies: []
+
+# Platform-specific configurations
+platforms:
+  win32:
+    # Windows-specific configurations
+    service:
+      name: "FastSearch"
+      display_name: "FastSearch NTFS Indexing Service"
+      description: "Provides fast file search capabilities using NTFS MFT"
+    
+  # Other platforms can be added here
+  # linux:
+  #   service:
+  #     name: "fastsearch"
+  #     user: "fastsearch"
+  #     group: "fastsearch"
+
+# Environment variables
+environment:
+  - name: "FASTSEARCH_PIPE"
+    default: "\\\\.\\pipe\\fastsearch-service"
+    description: "Named pipe for FastSearch service communication"
+  - name: "LOG_LEVEL"
+    default: "INFO"
+    description: "Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)"

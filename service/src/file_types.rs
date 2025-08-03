@@ -4,8 +4,10 @@ use std::collections::HashSet;
 use lazy_static::lazy_static;
 use log::debug;
 
+use strum_macros::EnumIter;
+
 /// Supported document type presets
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, EnumIter)]
 pub enum DocumentType {
     Text,
     Code,

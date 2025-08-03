@@ -13,11 +13,13 @@ permalink: database-basic-memory-database-schema-analysis
 ## Database Files
 
 ### Main Files
+
 - `memory.db` - Primary database
 - `memory_borked.db` - Corrupted/problematic database we need to extract from
 - `memory - Copy.db` & `memory - Copy (2).db` - Backup copies
 
 ### Related Files
+
 - `bm_db_fix.sql` - Repair scripts
 - `cleanup.sql`, `conservative_cleanup.sql` - Data cleanup scripts
 - `investigate_myai.sql`, `investigate_veogen.sql` - Project analysis scripts
@@ -28,6 +30,7 @@ permalink: database-basic-memory-database-schema-analysis
 ### Core Tables
 
 #### 1. `project` Table
+
 ```sql
 -- Primary projects table
 CREATE TABLE project (
@@ -39,6 +42,7 @@ CREATE TABLE project (
 
 **Purpose**: Manages different Basic Memory projects  
 **Current Projects** (from config.json):
+
 - `main` → `C:\Users\sandr\basic-memory`
 - `plexmcp` → `C:\Users\sandr\AppData\Local\AnthropicClaude\app-0.11.6\PlexMCP`
 - `myai` → `d:\dev\repos\myai`
@@ -47,6 +51,7 @@ CREATE TABLE project (
 - `general-ai` → `C:\Users\sandr\Documents\general-ai`
 
 #### 2. `entity` Table
+
 ```sql
 -- Main entities table - files, notes, concepts
 CREATE TABLE entity (
@@ -65,6 +70,7 @@ CREATE TABLE entity (
 
 **Purpose**: Stores all content entities (files, notes, markdown documents)  
 **Key Fields**:
+
 - `file_path` - Full filesystem path to the file
 - `entity_type` - Type of entity (note, file, etc.)
 - `title` - Display title
@@ -72,6 +78,7 @@ CREATE TABLE entity (
 - `checksum` - For change detection
 
 #### 3. `observation` Table
+
 ```sql
 -- Observations/relations between entities
 CREATE TABLE observation (
@@ -87,7 +94,9 @@ CREATE TABLE observation (
 **Purpose**: Stores relationships, observations, and connections between entities
 
 ### Index Structure
+
 The database likely includes indexes on:
+
 - `entity.file_path` - For fast file lookups
 - `entity.project_id` - For project filtering
 - `entity.entity_type` - For type filtering
@@ -96,6 +105,7 @@ The database likely includes indexes on:
 ## Common Query Patterns
 
 ### File Type Analysis
+
 ```sql
 -- Categorize files by type/location
 SELECT 
@@ -117,6 +127,7 @@ ORDER BY count DESC;
 ```
 
 ### Duplicate Detection
+
 ```sql
 -- Find duplicate file entries
 SELECT file_path, COUNT(*) as count
@@ -127,6 +138,7 @@ ORDER BY count DESC;
 ```
 
 ### Orphaned Records Cleanup
+
 ```sql
 -- Clean up orphaned observations
 DELETE FROM observation 
@@ -136,16 +148,19 @@ WHERE entity_id NOT IN (SELECT id FROM entity);
 ## Performance Issues Identified
 
 ### 1. Node Modules Explosion
+
 - **Problem**: `node_modules` directories contain 100,000+ files
 - **Impact**: Makes database huge and sync extremely slow
 - **Solution**: Exclude `node_modules`, `build`, `dist`, cache directories
 
 ### 2. Build Artifacts
+
 - **Problem**: Temporary build files being indexed
 - **Categories**: `build/`, `dist/`, `.cache/`, `__pycache__/`, `.temp/`
 - **Solution**: Implement exclusion patterns
 
 ### 3. Virtual Environments
+
 - **Problem**: Python `venv/` and similar environments indexed
 - **Impact**: Thousands of unnecessary files tracked
 - **Solution**: Add to exclusion list
@@ -153,12 +168,14 @@ WHERE entity_id NOT IN (SELECT id FROM entity);
 ## Data Extraction Strategy for memory_borked.db
 
 ### 1. Schema Verification
+
 ```sql
 -- Check if schema matches expected structure
 .schema
 ```
 
 ### 2. Data Integrity Check
+
 ```sql
 -- Check for corruption
 PRAGMA integrity_check;
@@ -166,6 +183,7 @@ PRAGMA foreign_key_check;
 ```
 
 ### 3. Safe Data Export
+
 ```sql
 -- Export projects
 SELECT * FROM project;
@@ -183,6 +201,7 @@ SELECT * FROM observation;
 ```
 
 ### 4. Recovery Commands
+
 ```bash
 # Create clean database from borked one
 sqlite3 memory_borked.db ".dump" | sqlite3 memory_recovered.db
@@ -195,6 +214,7 @@ sqlite3 memory_borked.db ".dump entity" > entities.sql
 ## Maintenance Queries
 
 ### Database Size Analysis
+
 ```sql
 -- Check table sizes
 SELECT 
@@ -206,6 +226,7 @@ WHERE type='table';
 ```
 
 ### Content Analysis
+
 ```sql
 -- Analyze content distribution by project
 SELECT 
@@ -222,6 +243,7 @@ ORDER BY entity_count DESC;
 ---
 
 **Next Steps for Recovery**:
+
 1. Run integrity check on memory_borked.db
 2. Export clean data excluding problematic paths
 3. Create new database with filtered content
