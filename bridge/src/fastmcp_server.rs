@@ -1,9 +1,7 @@
 use log::{debug, error, info};
 use mcp_core::{
-    server::ServerBuilder,
-    types::{
-        Tool, ToolCall, ToolCallResult, ToolAnnotations,
-    },
+    ServerBuilder,
+    Tool, ToolCall, ToolCallResult, ToolAnnotations,
 };
 use serde_json::json;
 use std::sync::Arc;
@@ -90,54 +88,55 @@ impl McpBridge {
     }
 
     /// Create the search tool definition
-    fn create_search_tool() -> Tool {
-        let mut schema = JsonSchema::new(JsonSchemaType::Object);
-        schema.properties.insert(
-            "pattern".to_string(),
-            JsonSchema::new(JsonSchemaType::String)
-                .with_description("The search pattern (supports glob format)")
-                .with_required(true),
-        );
-        schema.properties.insert(
-            "search_type".to_string(),
-            JsonSchema::new(JsonSchemaType::String)
-                .with_enum_values(&["smart", "exact", "glob", "regex", "fuzzy"])
-                .with_default(json!("smart"))
-                .with_description("The type of search to perform"),
-        );
-        schema.properties.insert(
-            "max_results".to_string(),
-            JsonSchema::new(JsonSchemaType::Integer)
-                .with_minimum(1)
-                .with_default(json!(100))
-                .with_description("Maximum number of results to return"),
-        );
-
+    fn create_search_tool(&self) -> Tool {
+        // Create a simple search tool with basic parameters
         Tool {
             name: "search".to_string(),
-            description: Some("Search for files matching the given pattern".to_owned()),
-            input_schema: schema,
-            ..Default::default()
+            description: "Search for files and directories".to_string(),
+            parameters: Some(serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "Search query (supports glob patterns, regex, or literal text)"
+                    },
+                    "path": {
+                        "type": "string",
+                        "description": "Base directory to search in (default: all drives)"
+                    },
+                    "case_sensitive": {
+                        "type": "boolean",
+                        "description": "Whether the search is case-sensitive (default: false)",
+                        "default": false
+                    },
+                    "max_results": {
+                        "type": "integer",
+                        "description": "Maximum number of results to return (default: 100)",
+                        "minimum": 1,
+                        "maximum": 1000,
+                        "default": 100
+                    }
+                },
+                "required": ["query"]
+            })),
         }
     }
 
     /// Create the search stats tool definition
-    fn create_search_stats_tool() -> Tool {
+    fn create_search_stats_tool(&self) -> Tool {
         Tool {
             name: "search_stats".to_string(),
-            description: Some("Get search statistics".to_owned()),
-            input_schema: JsonSchema::new(JsonSchemaType::Object),
-            ..Default::default()
+            description: "Get statistics about the search index".to_string(),
+            parameters: Some(serde_json::json!({})), // No parameters needed for stats
         }
     }
 
     /// Create the service status tool definition
-    fn create_service_status_tool() -> Tool {
+    fn create_service_status_tool(&self) -> Tool {
         Tool {
             name: "service_status".to_string(),
-            description: Some("Get the status of the FastSearch service".to_owned()),
-            input_schema: JsonSchema::new(JsonSchemaType::Object),
-            ..Default::default()
+            description: "Get the status of the FastSearch service".to_string(),
+            parameters: Some(serde_json::json!({})), // No parameters needed for status
         }
     }
 
@@ -151,31 +150,40 @@ impl McpBridge {
 
         // Extract search parameters
         let pattern = call
-            .params
-            .get("query")
+            .parameters
+            .as_ref()
+            .and_then(|p| p.get("query"))
             .and_then(Value::as_str)
             .ok_or_else(|| Error::InvalidParams("Missing required field: query".to_string()))?
             .to_string();
 
-        let limit = call
-            .params
-            .get("limit")
+        let max_results = call
+            .parameters
+            .as_ref()
+            .and_then(|p| p.get("max_results"))
             .and_then(Value::as_u64)
             .unwrap_or(50) as u32;
 
-        // Create search request with correct fields
+        let case_sensitive = call
+            .parameters
+            .as_ref()
+            .and_then(|p| p.get("case_sensitive"))
+            .and_then(Value::as_bool)
+            .unwrap_or(false);
+
+        // Create search request with the correct fields
         let request = fastsearch_shared::SearchRequest {
             pattern,
-            search_type: "fuzzy".to_string(), // Default to fuzzy search
-            max_results: limit,
+            search_type: if case_sensitive { "exact" } else { "fuzzy" }.to_string(),
+            max_results,
             filters: None, // No filters by default
         };
 
         // Send request to IPC client
         let response = self.ipc_client.lock().await.send_request(request).await?;
 
-        // Format results
-        let results = response
+        // Format results into a vector of JSON objects
+        let results: Vec<serde_json::Value> = response
             .results
             .into_iter()
             .map(|result| {
@@ -197,11 +205,12 @@ impl McpBridge {
                 
                 json_result
             })
-            .collect::<Vec<_>>();
+            .collect();
         
-        // Return success with results
-        Ok(ToolCallResult::Success {
-            content: serde_json::to_value(json!({ "results": results }))?,
+        // Return the results as a successful tool call result
+        Ok(ToolCallResult {
+            call_id: call.call_id,
+            content: Some(json!({ "results": results })),
             is_error: false,
         })
     }
@@ -217,23 +226,14 @@ impl McpBridge {
         let stats = self.ipc_client.lock().await.get_stats().await?;
         
         // Create a JSON object with all available fields
-        let result = json!({ 
-            "files_indexed": stats.files_indexed,
-            "total_size": stats.total_size,
             "last_updated": stats.last_updated,
-            "directories_indexed": stats.directories_indexed,
-            "avg_search_time_ms": stats.avg_search_time_ms,
-            "total_searches": stats.total_searches,
-            "cache_hit_rate": stats.cache_hit_rate,
-            "memory_usage_mb": stats.memory_usage_mb,
-            "uptime_seconds": stats.uptime_seconds,
-            "service_running": stats.service_running,
-            "ntfs_mode": stats.ntfs_mode,
+            "index_size_mb": stats.index_size_mb,
         });
         
         // Return success with stats
-        Ok(ToolCallResult::Success {
-            content: serde_json::to_value(result)?,
+        Ok(ToolCallResult {
+            call_id: call.call_id,
+            content: Some(stats_value),
             is_error: false,
         })
     }
@@ -244,19 +244,19 @@ impl McpBridge {
         &self,
         call: ToolCall,
     ) -> Result<ToolCallResult, Error> {
-        debug!("Handling service status request");
-
-        let is_running = self.ipc_client.lock().await.check_service_status().await?;
+        // Check if the service is running
+        let status = self.ipc_client.lock().await.check_service_status().await;
         
-        // Create response
-        let result = json!({
-            "status": if is_running { "running" } else { "stopped" },
-            "timestamp": chrono::Utc::now().to_rfc3339(),
+        // Format the status as a JSON object
+        let status_value = json!({ 
+            "status": if status.is_ok() { "running" } else { "stopped" },
+            "version": env!("CARGO_PKG_VERSION"),
         });
         
         // Return success with status
-        Ok(ToolCallResult::Success {
-            content: serde_json::to_value(result)?,
+        Ok(ToolCallResult {
+            call_id: call.call_id,
+            content: Some(status_value),
             is_error: false,
         })
     }
@@ -264,24 +264,50 @@ impl McpBridge {
     /// Run the MCP server
     #[instrument(skip(self))]
     pub async fn run(self) -> Result<(), Error> {
-        use mcp_core::server::ServerBuilder;
         use std::sync::Arc;
+        use tokio::sync::Mutex;
+        use mcp_core::ServerBuilder;
 
         // Create a new MCP server builder
         let server_builder = ServerBuilder::new()
             .with_name("fastsearch-mcp")
             .with_version(env!("CARGO_PKG_VERSION").to_string())
-            .with_description(Some("FastSearch MCP Server - Lightning-fast file search using NTFS MFT".to_string()));
+            .with_description("FastSearch MCP Server - Lightning-fast file search using NTFS MFT");
 
-        // Register tools
-        let server = server_builder.with_tools(Self::get_tools());
+        // Get the list of tools
+        let tools = self.get_tools();
+        
+        // Register tool handlers
+        let server = server_builder
+            .with_tools(tools)
+            .with_tool_handler("search", {
+                let this = self.clone();
+                move |call| {
+                    let this = this.clone();
+                    async move { this.handle_search(call).await }
+                }
+            })
+            .with_tool_handler("search_stats", {
+                let this = self.clone();
+                move |call| {
+                    let this = this.clone();
+                    async move { this.handle_search_stats(call).await }
+                }
+            })
+            .with_tool_handler("service_status", {
+                let this = self.clone();
+                move |call| {
+                    let this = this.clone();
+                    async move { this.handle_service_status(call).await }
+                }
+            });
 
         // Set up signal handling for graceful shutdown
-        let (shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel();
+        let (shutdown_tx, mut shutdown_rx) = tokio::sync::mpsc::channel(1);
         let ctrl_c = tokio::spawn(async move {
             tokio::signal::ctrl_c().await.ok();
             info!("Received Ctrl+C, shutting down...");
-            let _ = shutdown_tx.send(());
+            let _ = shutdown_tx.send(()).await;
         });
 
         // Start the server
@@ -290,6 +316,7 @@ impl McpBridge {
         // Run the server until shutdown signal is received
         let server_handle = server.start().await?;
         
+        // Wait for either server completion or shutdown signal
         tokio::select! {
             result = server_handle => {
                 if let Err(e) = result {
@@ -298,7 +325,7 @@ impl McpBridge {
                 }
                 info!("Server task completed");
             }
-            _ = shutdown_rx => {
+            _ = shutdown_rx.recv() => {
                 info!("Shutdown signal received");
             }
         }

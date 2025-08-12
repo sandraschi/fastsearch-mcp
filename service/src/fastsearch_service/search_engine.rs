@@ -1,24 +1,40 @@
-// FastSearch MCP Server - DIRECT SEARCH IMPLEMENTATION (NO INDEXING!)
+// FastSearch MCP Server - CACHED MFT SEARCH IMPLEMENTATION
 
 use serde_json::{json, Value};
-use anyhow::Result;
-use log::{info, debug};
+use anyhow::{Result, Context};
+use log::{info, debug, error};
 use std::time::Instant;
-use std::collections::HashSet;
+use std::collections::{HashSet, HashMap};
+use std::sync::Arc;
+use parking_lot::RwLock;
 
 // Import file_types with relative path
 use crate::file_types::{get_extensions, DocumentType, parse_document_type};
+use super::mft_cache::{MftCache, FileEntry};
 
 /// SearchEngine handles all search-related functionality
 pub struct SearchEngine {
-    // NO MORE FILE INDEX! We do direct searches now
+    // MFT cache for fast file searches
+    mft_cache: Arc<RwLock<HashMap<char, MftCache>>>,
+    
+    // Cache for document type extensions
+    doc_type_extensions: HashMap<DocumentType, HashSet<String>>,
 }
 
 impl SearchEngine {
-    /// Create a new SearchEngine instance
+    /// Create a new SearchEngine instance with MFT cache
     pub fn new() -> Result<Self> {
-        info!("Initializing FastSearch Search Engine (DIRECT SEARCH MODE)");
-        Ok(SearchEngine {})
+        info!("Initializing FastSearch Search Engine (MFT CACHE MODE)");
+        
+        // Initialize document type extensions
+        let doc_type_extensions = get_extensions()
+            .into_iter()
+            .collect();
+            
+        Ok(SearchEngine {
+            mft_cache: Arc::new(RwLock::new(HashMap::new())),
+            doc_type_extensions,
+        })
     }
     
     pub fn handle_request(&self, request: Value) -> Result<Value> {
@@ -225,7 +241,7 @@ impl SearchEngine {
         }
     }
     
-    /// DIRECT SEARCH - NO INDEXING!
+    /// FAST SEARCH USING MFT CACHE
     /// 
     /// Args:
     /// - pattern: File pattern to search for (e.g., "*.txt", "*.rs")
@@ -234,8 +250,8 @@ impl SearchEngine {
     /// - max_results: Maximum number of results to return
     pub fn fast_search(&self, args: &Value) -> Result<Value> {
         let pattern = args["pattern"].as_str().unwrap_or("*");
-        let path_filter = args["path"].as_str().unwrap_or("");
-        let drive = args["drive"].as_str().unwrap_or("C");
+        let path_filter = args["path"].as_str().unwrap_or("").to_lowercase();
+        let drive = args["drive"].as_str().unwrap_or("C").to_uppercase();
         let max_results = args["max_results"].as_u64().unwrap_or(1000) as usize;
         
         // Parse document type filter
@@ -254,46 +270,79 @@ impl SearchEngine {
             });
             
         info!("Search filters - doc_type: {:?}, extensions: {:?}", doc_type, extensions);
-        
-        info!("DIRECT FastSearch: pattern='{}', path='{}', drive='{}', max_results={}", 
+        info!("FAST SEARCH: pattern='{}', path='{}', drive='{}', max_results={}", 
               pattern, path_filter, drive, max_results);
         
         let search_start = Instant::now();
         
-        // Search either a single drive or all NTFS drives
-        let results = if drive == "*" {
-            // Get all NTFS drives
-            let drives = crate::ntfs_reader::get_ntfs_drives()?;
-            if drives.is_empty() {
-                return Err(anyhow::anyhow!("No NTFS drives found"));
+        // Get or create MFT cache for the drive
+        let drive_char = drive.chars().next().unwrap_or('C');
+        let mft_cache = self.get_or_create_cache(drive_char)?;
+        
+        // Get read locks on the cache
+        let files = mft_cache.get_files();
+        let path_index = mft_cache.get_path_index();
+        
+        // Convert pattern to regex
+        let pattern_regex = self.pattern_to_regex(pattern)?;
+        
+        // Filter files based on criteria
+        let mut results = Vec::new();
+        let mut result_count = 0;
+        
+        for (_, file) in files.iter() {
+            // Apply path filter
+            if !path_filter.is_empty() && !file.path.to_lowercase().contains(&path_filter) {
+                continue;
             }
-            info!("Searching all NTFS drives: {:?}", drives);
             
-            // Search across all drives
-            crate::ntfs_reader::search_multiple_drives(&drives, pattern, path_filter, max_results)?
-        } else {
-            // Search a single drive
-            crate::ntfs_reader::search_files_direct(drive, pattern, path_filter, max_results)
-                .map_err(|e| {
-                    if e.to_string().contains("Access is denied") {
-                        anyhow::anyhow!(
-                            "Administrator privileges required for NTFS access on drive {}. \nError: {}", 
-                            drive, e
-                        )
-                    } else {
-                        e
+            // Apply pattern filter
+            if !pattern_regex.is_match(&file.name) {
+                continue;
+            }
+            
+            // Apply extension filter if specified
+            if let Some(exts) = &extensions {
+                if let Some(ext) = &file.extension {
+                    if !exts.contains(ext) {
+                        continue;
                     }
-                })?
-        };
+                } else if !exts.is_empty() {
+                    continue; // No extension but extensions were specified
+                }
+            }
             
+            // Apply document type filter
+            if let Some(doc_type) = doc_type {
+                if let Some(ext) = &file.extension {
+                    if !self.doc_type_extensions.get(&doc_type)
+                        .map_or(false, |exts| exts.contains(ext)) {
+                        continue;
+                    }
+                } else {
+                    continue; // No extension but document type requires one
+                }
+            }
+            
+            // Add to results
+            results.push(file.clone());
+            result_count += 1;
+            
+            // Early exit if we've reached max results
+            if result_count >= max_results {
+                break;
+            }
+        }
+        
         let search_duration = search_start.elapsed();
         
+        // Format results
         let results_text = if results.is_empty() {
             format!("No files found matching pattern '{}' in drive {} (searched in {:.2}ms)", 
                     pattern, drive, search_duration.as_millis())
         } else {
-            let mut text = format!("🚀 DIRECT SEARCH: Found {} files matching '{}' in {:.2}ms\n\n", 
-                                   results.len(), pattern, search_duration.as_millis());
+            let mut text = format!("🚀 FAST SEARCH: Found {} files matching '{}' in {:.2}ms\n\n", 
+                                 results.len(), pattern, search_duration.as_millis());
             
             for (i, file) in results.iter().enumerate() {
                 let size_info = if file.is_directory { 
@@ -302,16 +351,16 @@ impl SearchEngine {
                     format!("{} bytes", file.size) 
                 };
                 text.push_str(&format!("{}. {} ({})\n", 
-                                       i + 1, 
-                                       file.full_path,
-                                       size_info));
+                                     i + 1, 
+                                     file.path,
+                                     size_info));
             }
             
             if results.len() >= max_results {
                 text.push_str(&format!("\n⚡ Stopped at {} results (use max_results to get more)", max_results));
             }
             
-            text.push_str(&format!("\n💡 Search completed in {:.2}ms - NO INDEXING!", search_duration.as_millis()));
+            text.push_str(&format!("\n💡 Search completed in {:.2}ms - USING MFT CACHE", search_duration.as_millis()));
             text
         };
         
@@ -376,6 +425,59 @@ impl SearchEngine {
                 }]
             }
         }))
+    }
+    
+    /// Helper to get or create MFT cache for a drive
+    fn get_or_create_cache(&self, drive: char) -> Result<Arc<MftCache>> {
+        // Check if we already have a cache for this drive
+        let cache_map = self.mft_cache.read().map_err(|e| anyhow::anyhow!("Failed to acquire read lock: {}", e))?;
+        if let Some(cache) = cache_map.get(&drive) {
+            return Ok(Arc::clone(cache));
+        }
+        
+        // Release read lock before acquiring write lock
+        drop(cache_map);
+        
+        // Create new cache for this drive
+        let mut cache_map = self.mft_cache.write().map_err(|e| anyhow::anyhow!("Failed to acquire write lock: {}", e))?;
+        
+        // Double check in case another thread created it while we were waiting for the write lock
+        if let Some(cache) = cache_map.get(&drive) {
+            return Ok(Arc::clone(cache));
+        }
+        
+        info!("Creating new MFT cache for drive {}:", drive);
+        let mft_cache = match MftCache::new(drive) {
+            Ok(cache) => Arc::new(cache),
+            Err(e) => return Err(anyhow::anyhow!("Failed to create MFT cache: {}", e)),
+        };
+        
+        // Insert into our cache map
+        cache_map.insert(drive, Arc::clone(&mft_cache));
+        
+        Ok(mft_cache)
+    }
+    
+    /// Convert a file pattern to a regex
+    fn pattern_to_regex(&self, pattern: &str) -> Result<regex::Regex> {
+        // Handle special cases
+        if pattern == "*" || pattern == "*.*" {
+            return Ok(regex::Regex::new(".*").unwrap());
+        }
+        
+        // Escape special regex characters
+        let mut regex_str = regex::escape(pattern);
+        
+        // Convert wildcards to regex patterns
+        regex_str = regex_str.replace(".", "\\.."); // Escape literal dots
+        regex_str = regex_str.replace("*", ".*");     // Convert * to .*
+        regex_str = regex_str.replace("?", ".");      // Convert ? to .
+        
+        // Make case-insensitive and ensure we match the whole string
+        regex_str = format!(r"^(?i){}$", regex_str);
+        
+        regex::Regex::new(&regex_str)
+            .with_context(|| format!("Invalid search pattern: {}", pattern))
     }
     
     /// Benchmark direct search performance

@@ -31,13 +31,13 @@ if (-not $SkipBuild) {
 }
 
 # Verify WiX is installed
-$wixPath = "C:\Program Files (x86)\WiX Toolset v3.11\bin"
+$wixPath = "C:\Program Files (x86)\WiX Toolset v3.14\bin"
 if (-not (Test-Path -Path $wixPath)) {
-    $wixPath = "C:\Program Files\WiX Toolset v3.11\bin"
+    $wixPath = "C:\Program Files\WiX Toolset v3.14\bin"
 }
 
 if (-not (Test-Path -Path $wixPath)) {
-    Write-Error "WiX Toolset not found. Please install WiX Toolset v3.11 or later."
+    Write-Error "WiX Toolset not found. Please install WiX Toolset v3.14 or later."
     Write-Host "Download from: https://wixtoolset.org/releases/" -ForegroundColor Yellow
     exit 1
 }
@@ -52,8 +52,9 @@ $wxsFile = "$wixDir\Product.wxs"
 $wixobjFile = "$installerDir\FastSearchMCP.wixobj"
 $msiFile = "$installerDir\FastSearchMCP.msi"
 
-# Compile WiX source
-candle.exe -nologo -out "$wixobjFile" "$wxsFile"
+# Compile WiX source with SolutionDir preprocessor variable
+$solutionDirEscaped = $solutionDir.Replace('\', '\\')
+candle.exe -nologo -dSolutionDir="$solutionDirEscaped" -out "$wixobjFile" "$wxsFile"
 if ($LASTEXITCODE -ne 0) {
     Write-Error "WiX compilation failed"
     exit $LASTEXITCODE

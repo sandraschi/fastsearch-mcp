@@ -15,37 +15,72 @@ path = "src/main.rs"
 fastsearch-shared = { path = "../shared" }
 
 # Windows API access
-winapi = { version = "0.3.9", features = ["winbase", "winuser", "winnt", "fileapi", "handleapi", "errhandlingapi", "namedpipeapi"] }
+winapi = { version = "0.3.9", features = [
+    "winbase", "winuser", "winnt", "fileapi", "handleapi", 
+    "errhandlingapi", "namedpipeapi", "wincon", "winerror"
+] }
+
+# Windows Service
+windows-service = { version = "0.7.0", default-features = false }
+
 # NTFS parsing - using proper ntfs crate for live MFT access
 ntfs = "0.4.0"
+
 # Async runtime
 tokio = { version = "1.0", features = ["full"] }
+
 # JSON serialization
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+
 # Command line parsing
 clap = { version = "4.0", features = ["derive"] }
+
 # Logging
 log = "0.4"
 env_logger = "0.10"
+simplelog = { version = "0.12", features = ["termcolor"] }
 
 # Enum utilities
 strum = { version = "0.25", features = ["derive"] }
 strum_macros = "0.25"
+
 # Error handling
 anyhow = "1.0"
+
+# Time formatting
+humantime = "2.1"
+
 # String interning for memory efficiency
 string-interner = "0.17"
+
 # Wide string support for Windows
 widestring = "1.0"
+
 # Lazy static initialization
 lazy_static = "1.4"
+
 # Fast hashing
 ahash = "0.8"
+
+# Regular expressions and pattern matching
+regex = "1.10"
+
+# Parallel processing
+rayon = { version = "1.8", features = [] }
+
+# System information for memory detection
+systemstat = "0.2"
+
+# Parking lot for efficient read-write locks
+parking_lot = { version = "0.12", features = ["arc_lock"] }
+
+# Cross-platform path handling
+path-absolutize = "3.1"
+
 # Memory-mapped files
 memmap2 = "0.9"
-# Pattern matching
-regex = "1.10"
+
 # File watching
 notify = "6.1"
 # Crossbeam for concurrent data structures

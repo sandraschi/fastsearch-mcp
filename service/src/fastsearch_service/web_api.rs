@@ -17,6 +17,27 @@ use anyhow::Result;
 
 use crate::McpServer;
 
+/// Configuration for the Web API server
+#[derive(Debug, Clone)]
+pub struct WebApiConfig {
+    /// The port to bind the server to
+    pub port: u16,
+    /// Whether to enable CORS
+    pub enable_cors: bool,
+    /// Default number of results to return if not specified
+    pub default_max_results: usize,
+}
+
+impl Default for WebApiConfig {
+    fn default() -> Self {
+        Self {
+            port: 8080,  // Default port
+            enable_cors: true,
+            default_max_results: 100,
+        }
+    }
+}
+
 #[derive(Deserialize)]
 pub struct SearchRequest {
     pub pattern: String,
@@ -51,21 +72,42 @@ pub struct StatusResponse {
 }
 
 pub struct WebApiServer {
-    mcp_server: Arc<McpServer>,
+    server: Arc<McpServer>,
+    config: WebApiConfig,
 }
 
 impl WebApiServer {
+    /// Create a new Web API server with default configuration
     pub fn new() -> Result<Self> {
-        let mcp_server = Arc::new(McpServer::new()?);
-        Ok(WebApiServer { mcp_server })
+        Self::with_config(WebApiConfig::default())
+    }
+    
+    /// Create a new Web API server with custom configuration
+    pub fn with_config(config: WebApiConfig) -> Result<Self> {
+        Ok(Self {
+            server: Arc::new(McpServer::new()?),
+            config,
+        })
+    }
+    
+    /// Get the current configuration
+    pub fn config(&self) -> &WebApiConfig {
+        &self.config
     }
 
     pub async fn serve(self) -> Result<()> {
-        let cors = CorsLayer::new()
-            .allow_methods([Method::GET, Method::POST])
-            .allow_origin(Any)
-            .allow_headers(Any);
+        // Set up CORS
+        let cors = if self.config.enable_cors {
+            CorsLayer::new()
+                .allow_methods([Method::GET, Method::POST])
+                .allow_headers(Any)
+                .allow_origin(Any)
+        } else {
+            // No CORS if disabled
+            CorsLayer::new()
+        };
 
+        // Build our application with routes
         let app = Router::new()
             .route("/api/search", post(search_files))
             .route("/api/status", get(get_status))
@@ -74,10 +116,17 @@ impl WebApiServer {
             .layer(cors)
             .with_state(Arc::new(self));
 
-        let listener = tokio::net::TcpListener::bind("127.0.0.1:8080").await?;
-        println!("FastSearch Web API running on http://127.0.0.1:8080");
+        // Run the server
+        let addr = std::net::SocketAddr::from(([127, 0, 0, 1], self.config.port));
+        info!("Web API server listening on http://{}", addr);
         
-        axum::serve(listener, app).await?;
+        // Print the server URL for easy access
+        println!("FastSearch Web API server running at http://{}", addr);
+        
+        axum::Server::bind(&addr)
+            .serve(app.into_make_service())
+            .await?;
+
         Ok(())
     }
 }

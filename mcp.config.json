@@ -1,0 +1,111 @@
+{
+  "mcpServers": {
+    "mindmap": {
+      "command": "uvx",
+      "args": [
+        "mindmap-mcp-server",
+        "--return-type",
+        "html"
+      ]
+    },
+    "basic-memory": {
+      "command": "py",
+      "args": [
+        "-3.13",
+        "-m",
+        "basic_memory.cli.main",
+        "mcp",
+        "--transport",
+        "stdio"
+      ],
+      "cwd": "D:\\Dev\\repos\\basic-memory",
+      "env": {
+        "LOGURU_LEVEL": "ERROR",
+        "PYTHONUNBUFFERED": "1"
+      }
+    },
+    "filesystem": {
+      "command": "D:\\Dev\\repos\\uv-install\\uv.exe",
+      "args": [
+        "--directory",
+        "D:\\Dev\\repos\\mcp-filesystem",
+        "run",
+        "run_server.py",
+        "C:\\Users\\sandr",
+        "D:\\Dev"
+      ]
+    },  
+    "vboxmcp": {
+      "command": "python",
+      "args": ["-m", "vboxmcp"],
+      "cwd": "D:\\Dev\\repos\\vboxmcp",
+      "env": {
+        "PYTHONPATH": "D:\\Dev\\repos\\vboxmcp\\src",
+        "VBOX_INSTALL_PATH": "C:\\Program Files\\Oracle\\VirtualBox",
+        "VBOX_USER_HOME": "${HOME}\\.config\\VirtualBox"
+      }
+    },
+    "docker-mcp": {
+      "command": "uvx",
+      "args": ["docker-mcp"]
+    },
+    "fetch": {
+      "command": "docker",
+      "args": ["run", "-i", "--rm", "mcp/fetch"]
+    },
+    "microsoft-365": {
+      "command": "npx",
+      "args": ["-y", "@softeria/ms-365-mcp-server"]
+    },
+    "playwright": {
+      "command": "npx",
+      "args": ["-y", "@executeautomation/playwright-mcp-server"],
+      "env": {
+        "HEADLESS": "true",
+        "TIMEOUT": "30000",
+        "BROWSER": "chromium"
+      }
+    },
+    "calibremcp": {
+      "command": "python",
+      "args": ["D:\\Dev\\repos\\calibremcp\\src\\calibre_mcp\\server.py"],
+      "env": {
+        "CALIBRE_LIBRARY_PATH": "L:\\Multimedia Files\\Written Word\\Calibre-Bibliothek IT"
+      }
+    },
+    "plexmcp": {
+      "command": "python",
+      "args": ["D:\\Dev\\repos\\plexmcp\\src\\plex_mcp\\server.py"],
+      "env": {
+        "PLEX_URL": "http://localhost:32400",
+        "PLEX_TOKEN": "WmZfx6fkvYxksyVB4NhW"
+      }
+    },
+    "obsidian-plugin-based": {
+      "command": "C:\\Program Files\\nodejs\\npx.cmd",
+      "args": ["-y", "@huangyihe/obsidian-mcp"],
+      "env": {
+        "OBSIDIAN_VAULT_PATH": "D:\\Obsidian\\Sandra's Vault"
+      }
+    },
+    "github": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "-e",
+        "GITHUB_PERSONAL_ACCESS_TOKEN",
+        "ghcr.io/github/github-mcp-server"
+      ],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": ""
+      }
+    },
+   "pywinauto-mcp": {
+      "command": "python", 
+      "args": ["-m", "pywinauto_mcp.main"],
+      "cwd": "D:\\Dev\\repos\\pywinauto-mcp\\src"
+    }
+  }
+}
