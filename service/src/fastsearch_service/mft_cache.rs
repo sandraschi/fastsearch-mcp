@@ -156,6 +156,7 @@ impl Default for MftCacheConfig {
 
 /// In-memory MFT cache for fast file searches
 #[derive(Debug)]
+#[derive(Clone)]
 pub struct MftCache {
     // Core data structures
     files: RwLock<HashMap<u64, FileEntry>>,
@@ -196,25 +197,35 @@ pub struct CacheStats {
     pub drive_letter: char,
     /// The last USN (Update Sequence Number) processed
     pub last_processed_usn: i64,
+    /// The highest USN seen in the journal
+    pub highest_usn: i64,
+    /// Number of files processed in the last update
+    pub files_processed_in_last_update: usize,
+    /// Number of directories processed in the last update
+    pub dirs_processed_in_last_update: usize,
+    /// Number of errors encountered during processing
+    pub error_count: usize,
+    /// Time taken for the last update in milliseconds
+    pub last_update_duration_ms: u128,
 }
 
 impl std::fmt::Display for CacheStats {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let memory_mb = self.memory_usage_bytes as f64 / (1024.0 * 1024.0);
+        let memory_mb = self.memory_usage_bytes as f64 / 1024.0 / 1024.0;
         let last_update = humantime::format_rfc3339_seconds(self.last_update);
         
         write!(
             f,
-            "MFT Cache Statistics ({}:)\
-            \n  Files:           {}\
-            \n  Files Processed: {}\
-            \n  Memory Usage:    {:.2} MB\
-            \n  Last Updated:    {}",
+            "Cache for {}: {} files ({} processed, {} new), {:.2} MB, USN: {}/{}, last update: {} ({:.2}ms)",
             self.drive_letter,
             self.file_count,
             self.files_processed,
+            self.files_processed_in_last_update,
             memory_mb,
-            last_update
+            self.last_processed_usn,
+            self.highest_usn,
+            last_update,
+            self.last_update_duration_ms as f64
         )
     }
 }
@@ -469,16 +480,26 @@ impl MftCache {
     pub fn stats(&self) -> CacheStats {
         let files = self.files.read();
         let last_update = *self.last_update.read();
-        let files_processed = self.files_processed.load(Ordering::Relaxed);
-        let memory_usage = self.memory_usage.load(Ordering::Relaxed);
+        
+        // Get USN information from the USN monitor if available
+        let (last_processed_usn, highest_usn) = if let Some(monitor) = &*self.usn_monitor.lock() {
+            (monitor.last_processed_usn(), monitor.highest_usn())
+        } else {
+            (0, 0)
+        };
         
         CacheStats {
             file_count: files.len(),
-            files_processed,
-            memory_usage_bytes: memory_usage,
+            files_processed: self.files_processed.load(Ordering::Relaxed),
+            memory_usage_bytes: self.memory_usage.load(Ordering::Relaxed),
             last_update,
             drive_letter: self.drive_letter,
-            last_processed_usn: 0, // TODO: Track last processed USN
+            last_processed_usn,
+            highest_usn,
+            files_processed_in_last_update: 0, // This should be tracked during updates
+            dirs_processed_in_last_update: 0,  // This should be tracked during updates
+            error_count: 0,                    // This should be tracked during processing
+            last_update_duration_ms: 0,        // This should be tracked during updates
         }
     }
     
@@ -886,35 +907,38 @@ fn rebuild_parallel(&self, ntfs: &Ntfs, root: &ntfs::NtfsFile) -> Result<()> {
     top_level_dirs.par_iter()
         .try_for_each_with(tx, |sender, entry| {
             let ntfs = ntfs.clone();
-            let path = Path::new(""); // Root path for top-level directories
             
             if let Ok(file) = entry.to_file(&ntfs) {
+                // Initialize local indices for this directory
+                let mut files = HashMap::new();
+                let mut extension_index = HashMap::new();
+                let mut name_index = HashMap::new();
+                let mut path_index = HashMap::new();
+                let mut fs = ntfs.fs();
+                
                 // Process the directory and its contents
-                if let Err(e) = self.process_directory(&ntfs, &file, path, sender) {
-                    warn!("Error processing directory: {}", e);
+                if let Err(e) = self.process_directory(
+                    &ntfs,
+                    &file,
+                    &mut fs,
+                    "", // Empty path for top-level directories
+                    &mut files,
+                    &mut extension_index,
+                    &mut name_index,
+                    &mut path_index
+                ) {
+                    error!("Error processing directory: {}", e);
+                    return Err(e);
                 }
-                    if let Err(e) = self.process_directory(
-                        &ntfs,
-                        &file,
-                        &mut fs,
-                        &name,
-                        &mut files,
-                        &mut extension_index,
-                        &mut name_index,
-                        &mut path_index
-                    ) {
-                        error!("Error processing directory {}: {}", name, e);
-                        return Err(e);
-                    }
-                    
-                    // Send results back to main thread
-                    if let Err(e) = sender.send((files, extension_index, name_index, path_index)) {
-                        error!("Failed to send directory results: {}", e);
-                        return Err(e.into());
-                    }
+                
+                // Send results back to main thread
+                if let Err(e) = sender.send((files, extension_index, name_index, path_index)) {
+                    error!("Failed to send directory results: {}", e);
+                    return Err(e.into());
                 }
-                Ok(())
-            })?;
+            }
+            Ok(())
+        })?;
         
         // Merge results from all directories
         let mut all_files = HashMap::new();
@@ -948,30 +972,57 @@ fn rebuild_parallel(&self, ntfs: &Ntfs, root: &ntfs::NtfsFile) -> Result<()> {
     
     /// Rebuild cache using sequential processing
     fn rebuild_sequential(&self, ntfs: &Ntfs, root: &ntfs::NtfsFile) -> Result<()> {
-        let mut files = HashMap::new();
+        info!("Starting sequential MFT cache rebuild for drive {}:", self.drive_letter);
+        let start_time = Instant::now();
+        
+        // Initialize local indices with estimated capacity
+        let estimated_files = 1_000_000; // Will resize as needed
+        let mut files = HashMap::with_capacity(estimated_files);
         let mut extension_index = HashMap::new();
         let mut name_index = HashMap::new();
-        let mut path_index = HashMap::new();
+        let mut path_index = HashMap::with_capacity(estimated_files);
         
-        self.process_directory(
+        // Create a new filesystem instance for this operation
+        let mut fs = ntfs.fs();
+        
+        // Reset counters
+        self.files_processed.store(0, Ordering::Relaxed);
+        self.memory_usage.store(0, Ordering::Relaxed);
+        
+        // Process the root directory and its contents
+        match self.process_directory(
             ntfs,
             root,
-            &mut ntfs.fs(),
+            &mut fs,
             "",
             &mut files,
             &mut extension_index,
             &mut name_index,
             &mut path_index,
-        )?;
-        
-        // Update cache atomically
-        *self.files.write() = files;
-        *self.extension_index.write() = extension_index;
-        *self.name_index.write() = name_index;
-        *self.path_index.write() = path_index;
-        *self.last_update.write() = SystemTime::now();
-        
-        Ok(())
+        ) {
+            Ok(_) => {
+                // Update cache atomically
+                *self.files.write() = files;
+                *self.extension_index.write() = extension_index;
+                *self.name_index.write() = name_index;
+                *self.path_index.write() = path_index;
+                *self.last_update.write() = SystemTime::now();
+                
+                let elapsed = start_time.elapsed();
+                info!(
+                    "Completed sequential rebuild in {:.2?} - Files: {}, Memory: {:.2} MB",
+                    elapsed,
+                    self.files_processed.load(Ordering::Relaxed),
+                    self.memory_usage.load(Ordering::Relaxed) as f64 / 1024.0 / 1024.0
+                );
+                
+                Ok(())
+            }
+            Err(e) => {
+                error!("Error during sequential rebuild: {}", e);
+                Err(e).context("Failed to complete sequential MFT cache rebuild")
+            }
+        }
     }
     
     /// Read the MFT into memory

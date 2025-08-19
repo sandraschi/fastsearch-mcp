@@ -1,126 +1,511 @@
-name: Build and Release
+name: Build FastSearch MCP - Dual Package Release
 
 on:
   push:
     tags:
       - 'v*'  # Trigger on version tags (e.g., v1.0.0)
+  workflow_dispatch:  # Allow manual triggering for testing
 
 env:
   CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0  # Disable incremental compilation for CI
+  RUST_BACKTRACE: 1
 
 jobs:
-  build-windows:
-    name: Build Windows Installer
-    runs-on: windows-latest
+  # Build matrix for dual package strategy: MSI + DXT
+  build-packages:
+    name: Build ${{ matrix.package_type }} - ${{ matrix.platform }}
+    runs-on: ${{ matrix.os }}
     
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # MSI Package (Windows service + bridge)
+          - package_type: msi
+            platform: windows-x64
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+            binary_bridge: fastsearch-mcp-bridge.exe
+            binary_service: fastsearch-service.exe
+            output: fastsearch-mcp-setup.msi
+            
+          # DXT Package (Windows)
+          - package_type: dxt
+            platform: windows-x64
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+            binary_bridge: fastsearch-mcp-bridge.exe
+            binary_service: null
+            output: fastsearch-mcp.dxt
+            
+          # DXT Package (Linux) - Cross-platform MCP support
+          - package_type: dxt
+            platform: linux-x64
+            os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            binary_bridge: fastsearch-mcp-bridge
+            binary_service: null
+            output: fastsearch-mcp-linux.dxt
+            
+          # DXT Package (macOS) - Cross-platform MCP support
+          - package_type: dxt
+            platform: macos-x64
+            os: macos-latest
+            target: x86_64-apple-darwin
+            binary_bridge: fastsearch-mcp-bridge
+            binary_service: null
+            output: fastsearch-mcp-macos.dxt
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
       with:
-        fetch-depth: 0  # Needed for version detection
-    
-    - name: Setup Rust
-      uses: actions-rs/toolchain@v1
+        fetch-depth: 0  # Needed for git describe version detection
+
+    - name: Get version from tag
+      shell: bash
+      run: |
+        if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+          VERSION=${GITHUB_REF#refs/tags/}
+        else
+          VERSION=$(git describe --tags --always --dirty)
+        fi
+        echo "VERSION=${VERSION}" >> $GITHUB_ENV
+        echo "Building version: ${VERSION}"
+
+    - name: Setup Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
       with:
-        toolchain: stable
-        target: x86_64-pc-windows-msvc
-        profile: minimal
-        override: true
-    
-    - name: Install WiX Toolset
-      uses: sebastianpopp/install-wix@v1
-    
-    - name: Add WiX to PATH
+        targets: ${{ matrix.target }}
+        components: clippy, rustfmt
+
+    - name: Configure Rust cache
+      uses: Swatinem/rust-cache@v2
+      with:
+        key: ${{ matrix.target }}-${{ matrix.package_type }}
+        cache-on-failure: true
+
+    - name: Install Linux dependencies
+      if: matrix.os == 'ubuntu-latest'
       run: |
-        echo "$env:WIX_PATH"
-        echo "$env:WIX_PATH\bin" | Out-File -FilePath $env:GITHUB_PATH -Append
-    
-    - name: Build release
+        sudo apt-get update
+        sudo apt-get install -y pkg-config libssl-dev
+
+    - name: Install macOS dependencies
+      if: matrix.os == 'macos-latest'
       run: |
-        cargo build --release --all-targets
-        if ($LASTEXITCODE -ne 0) { exit 1 }
-    
-    - name: Create installer
+        brew install pkg-config openssl
+        echo "PKG_CONFIG_PATH=/opt/homebrew/lib/pkgconfig" >> $GITHUB_ENV
+
+    - name: Setup WiX Toolset (MSI only)
+      if: matrix.package_type == 'msi'
       run: |
-        .\build-installer.ps1
-        if ($LASTEXITCODE -ne 0) { exit 1 }
+        # Install WiX toolset (FREE - no licensing required)
+        dotnet tool install --global wix --version 5.*
+        
+    - name: Setup DXT CLI (DXT only)
+      if: matrix.package_type == 'dxt'
+      run: |
+        # Install Anthropic DXT CLI
+        npm install -g @anthropic-ai/dxt
+
+    - name: Build Rust workspace
+      run: |
+        cargo build --release --target ${{ matrix.target }} --verbose
+
+    - name: Verify binaries
+      shell: bash
+      run: |
+        RELEASE_DIR="target/${{ matrix.target }}/release"
+        
+        # Check bridge binary
+        if [[ -f "${RELEASE_DIR}/${{ matrix.binary_bridge }}" ]]; then
+          echo "✅ Bridge binary found: ${{ matrix.binary_bridge }}"
+          ls -la "${RELEASE_DIR}/${{ matrix.binary_bridge }}"
+        else
+          echo "❌ Bridge binary not found: ${{ matrix.binary_bridge }}"
+          exit 1
+        fi
+        
+        # Check service binary (MSI package only)
+        if [[ "${{ matrix.package_type }}" == "msi" && "${{ matrix.binary_service }}" != "null" ]]; then
+          if [[ -f "${RELEASE_DIR}/${{ matrix.binary_service }}" ]]; then
+            echo "✅ Service binary found: ${{ matrix.binary_service }}"
+            ls -la "${RELEASE_DIR}/${{ matrix.binary_service }}"
+          else
+            echo "❌ Service binary not found: ${{ matrix.binary_service }}"
+            exit 1
+          fi
+        fi
+
+    - name: Create MSI Package
+      if: matrix.package_type == 'msi'
+      shell: pwsh
+      run: |
+        # Create MSI build directory
+        New-Item -ItemType Directory -Force -Path "msi-build"
+        
+        # Copy binaries to MSI build directory
+        Copy-Item "target\${{ matrix.target }}\release\${{ matrix.binary_bridge }}" "msi-build\"
+        Copy-Item "target\${{ matrix.target }}\release\${{ matrix.binary_service }}" "msi-build\"
+        
+        # Create basic WiX source file
+        $wxsContent = @"
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Product Id="*" 
+           Name="FastSearch MCP" 
+           Language="1033" 
+           Version="${{ env.VERSION }}.0" 
+           Manufacturer="Sandra Schimanski" 
+           UpgradeCode="12345678-1234-1234-1234-123456789012">
     
-    - name: Upload artifacts
+    <Package InstallerVersion="200" Compressed="yes" InstallScope="perMachine" />
+    
+    <!-- Require elevated privileges for service installation -->
+    <Condition Message="Administrator rights required for Windows service installation.">
+      Privileged
+    </Condition>
+    
+    <MajorUpgrade DowngradeErrorMessage="A newer version is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+    
+    <!-- Installation directory -->
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="ProgramFilesFolder">
+        <Directory Id="INSTALLFOLDER" Name="FastSearchMCP" />
+      </Directory>
+    </Directory>
+    
+    <!-- Components -->
+    <ComponentGroup Id="ProductComponents" Directory="INSTALLFOLDER">
+      <!-- Windows Service -->
+      <Component Id="ServiceComponent" Guid="*">
+        <File Id="ServiceExe" Source="msi-build\${{ matrix.binary_service }}" KeyPath="yes" />
+        <ServiceInstall Id="FastSearchService" 
+                        Name="FastSearchMCP"
+                        DisplayName="FastSearch MCP Service"
+                        Description="High-performance NTFS file search service for Claude Desktop"
+                        Type="ownProcess" 
+                        Start="auto" 
+                        Account="LocalSystem" 
+                        ErrorControl="normal" />
+        <ServiceControl Id="StartService" Name="FastSearchMCP" 
+                        Start="install" Stop="both" Remove="uninstall" />
+      </Component>
+      
+      <!-- MCP Bridge -->
+      <Component Id="BridgeComponent" Guid="*">
+        <File Id="BridgeExe" Source="msi-build\${{ matrix.binary_bridge }}" />
+      </Component>
+    </ComponentGroup>
+    
+    <!-- Features -->
+    <Feature Id="ProductFeature" Title="FastSearch MCP" Level="1">
+      <ComponentGroupRef Id="ProductComponents" />
+    </Feature>
+  </Product>
+</Wix>
+"@
+        
+        # Write WiX source file
+        $wxsContent | Out-File -FilePath "fastsearch-mcp.wxs" -Encoding UTF8
+        
+        # Build MSI with WiX (FREE toolset - professional output)
+        wix build fastsearch-mcp.wxs -o ${{ matrix.output }}
+        
+        # Verify MSI was created
+        if (Test-Path "${{ matrix.output }}") {
+          Write-Host "✅ MSI package created: ${{ matrix.output }}"
+          Get-Item "${{ matrix.output }}" | Format-List
+        } else {
+          Write-Error "❌ MSI package not found: ${{ matrix.output }}"
+          exit 1
+        }
+
+    - name: Create DXT Package
+      if: matrix.package_type == 'dxt'
+      shell: bash
+      run: |
+        # Create DXT structure
+        mkdir -p dxt-build/server
+        
+        # Copy bridge binary to DXT server directory
+        cp "target/${{ matrix.target }}/release/${{ matrix.binary_bridge }}" "dxt-build/server/"
+        
+        # Create DXT manifest.json
+        cat > dxt-build/manifest.json << EOF
+{
+  "dxt_version": "0.1",
+  "name": "fastsearch-mcp",
+  "version": "${{ env.VERSION }}",
+  "description": "Lightning-fast semantic search across all your files using NTFS MFT indexing",
+  "author": {
+    "name": "Sandra Schimanski",
+    "email": "sandra@sandraschi.dev",
+    "url": "https://github.com/sandraschi"
+  },
+  "homepage": "https://github.com/sandraschi/fastsearch-mcp",
+  "license": "MIT",
+  "keywords": ["search", "semantic", "files", "ntfs", "mft", "indexing"],
+  
+  "server": {
+    "type": "binary",
+    "entry_point": "server/${{ matrix.binary_bridge }}",
+    "mcp_config": {
+      "command": "server/${{ matrix.binary_bridge }}",
+      "args": [],
+      "env": {
+        "FASTSEARCH_PIPE_NAME": "fastsearch-mcp",
+        "RUST_LOG": "info"
+      }
+    }
+  },
+  
+  "compatibility": {
+    "claude_desktop": ">=0.10.0",
+    "platforms": ["${{ matrix.platform == 'windows-x64' && 'win32' || (matrix.platform == 'linux-x64' && 'linux' || 'darwin') }}"]
+  },
+  
+  "capabilities": {
+    "tools": true,
+    "resources": false,
+    "prompts": false
+  },
+  
+  "tools": [
+    {
+      "name": "semantic_search",
+      "description": "Search across all indexed files using natural language queries. Supports semantic similarity, exact matches, and complex queries.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Natural language search query (e.g., 'documents about machine learning', 'emails from last week')",
+            "minLength": 1
+          },
+          "max_results": {
+            "type": "integer",
+            "description": "Maximum number of results to return",
+            "default": 10,
+            "minimum": 1,
+            "maximum": 100
+          },
+          "file_types": {
+            "type": "array",
+            "description": "Filter by file extensions (e.g., ['txt', 'md', 'pdf'])",
+            "items": {
+              "type": "string"
+            },
+            "default": []
+          },
+          "modified_after": {
+            "type": "string",
+            "description": "ISO date string - only return files modified after this date",
+            "format": "date-time"
+          }
+        },
+        "required": ["query"]
+      }
+    },
+    {
+      "name": "index_status",
+      "description": "Get current indexing status, statistics, and performance metrics",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "reindex_directory",
+      "description": "Force reindexing of a specific directory or drive",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Directory path to reindex (e.g., 'C:\\\\Users\\\\Sandra\\\\Documents')"
+          },
+          "recursive": {
+            "type": "boolean",
+            "description": "Include subdirectories",
+            "default": true
+          }
+        },
+        "required": ["path"]
+      }
+    },
+    {
+      "name": "search_statistics",
+      "description": "Get detailed search statistics and index health metrics",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    }
+  ],
+  
+  "permissions": {
+    "filesystem": {
+      "read": true,
+      "write": false
+    },
+    "network": {
+      "allowed": false
+    }
+  }
+}
+EOF
+        
+        # Create extension icon (placeholder - 64x64 PNG)
+        # Note: This creates a simple colored square as placeholder
+        convert -size 64x64 xc:#FF6B35 dxt-build/icon.png 2>/dev/null || {
+          # Fallback if ImageMagick not available
+          echo "Warning: Could not create icon.png (ImageMagick not available)"
+        }
+        
+        # Create README for extension
+        cat > dxt-build/README.md << 'EOF'
+# FastSearch MCP Extension
+
+Lightning-fast semantic search across all your files using NTFS MFT indexing.
+
+## Requirements
+
+- **Windows**: FastSearch MCP Service must be installed first via MSI installer
+- **Linux/macOS**: Bridge-only functionality (limited compared to Windows)
+
+## Installation
+
+1. Install this extension via Claude Desktop Extensions panel
+2. The extension will automatically connect to the FastSearch service
+
+## Tools
+
+- **semantic_search**: Natural language file search
+- **index_status**: Check indexing progress and statistics  
+- **reindex_directory**: Force reindexing of specific paths
+- **search_statistics**: Detailed performance metrics
+
+## Support
+
+GitHub: https://github.com/sandraschi/fastsearch-mcp
+EOF
+        
+        # Copy LICENSE
+        cp LICENSE dxt-build/ 2>/dev/null || echo "# MIT License" > dxt-build/LICENSE
+        
+        # Create DXT package (ZIP archive with .dxt extension)
+        cd dxt-build
+        dxt pack --output "../${{ matrix.output }}" || {
+          # Fallback to manual ZIP creation if dxt pack fails
+          echo "DXT CLI failed, creating ZIP manually..."
+          zip -r "../${{ matrix.output }}" .
+        }
+        cd ..
+        
+        # Verify DXT was created
+        if [[ -f "${{ matrix.output }}" ]]; then
+          echo "✅ DXT package created: ${{ matrix.output }}"
+          ls -la "${{ matrix.output }}"
+        else
+          echo "❌ DXT package not found: ${{ matrix.output }}"
+          exit 1
+        fi
+
+    - name: Upload package artifact
       uses: actions/upload-artifact@v4
       with:
-        name: FastSearchMCP-Installer
-        path: |
-          installer/FastSearchMCP-Setup.exe
-          target/release/fastsearch-mcp-bridge.exe
-          target/release/fastsearch.exe
+        name: ${{ matrix.package_type }}-${{ matrix.platform }}
+        path: ${{ matrix.output }}
+        retention-days: 30
+
+  # Create GitHub release if this is a tag push
+  create-release:
+    name: Create GitHub Release
+    needs: build-packages
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
     
+    permissions:
+      contents: write
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Download all package artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: artifacts
+
+    - name: Prepare release files
+      run: |
+        mkdir -p release-files
+        
+        # Copy all package files to release directory
+        find artifacts -name "*.msi" -o -name "*.dxt" | while read file; do
+          cp "$file" release-files/
+        done
+        
+        echo "Release files prepared:"
+        ls -la release-files/
+        
+        # Generate checksums
+        cd release-files
+        sha256sum * > CHECKSUMS.sha256
+        cd ..
+
     - name: Create GitHub Release
-      if: startsWith(github.ref, 'refs/tags/')
       uses: softprops/action-gh-release@v2
       with:
-        files: |
-          installer/FastSearchMCP-Setup.exe
-          target/release/fastsearch-mcp-bridge.exe
-          target/release/fastsearch.exe
+        files: release-files/*
+        draft: false
+        prerelease: false
+        body: |
+          ## FastSearch MCP Release ${{ github.ref_name }}
+          
+          **DUAL PACKAGE INSTALLATION - BOTH REQUIRED FOR FULL FUNCTIONALITY:**
+          
+          ### 1. Windows Service Installation (Required)
+          Download and install: `fastsearch-mcp-setup.msi`
+          - Requires Administrator privileges (UAC prompt)
+          - Installs Windows service for NTFS MFT indexing
+          - Service runs automatically on startup
+          
+          ### 2. Claude Desktop Extension (Required)  
+          Download and install: `fastsearch-mcp.dxt`
+          - Install via Claude Desktop Extensions panel
+          - Provides rich tool integration with parameter validation
+          - Connects to Windows service via named pipe
+          
+          ### Cross-Platform DXT Extensions
+          - `fastsearch-mcp-linux.dxt` - Limited functionality (no NTFS service)
+          - `fastsearch-mcp-macos.dxt` - Limited functionality (no NTFS service)
+          
+          ### Installation Order
+          1. **First**: Install MSI (Windows service with elevated privileges)
+          2. **Second**: Install DXT (Claude Desktop extension)
+          3. **Verify**: Check that both service and extension are running
+          
+          ### Features
+          - Lightning-fast semantic search across all files
+          - NTFS MFT direct reading for maximum performance  
+          - Rich Claude Desktop integration with self-documenting tools
+          - Cross-platform MCP bridge support
+          
+          ### Requirements
+          - Windows 10/11 (x64) for full functionality
+          - Claude Desktop 0.10.0+ with MCP support
+          - Administrator privileges for service installation
+          
+          ### Support
+          - Documentation: [GitHub Repository](https://github.com/sandraschi/fastsearch-mcp)
+          - Issues: [GitHub Issues](https://github.com/sandraschi/fastsearch-mcp/issues)
+        generate_release_notes: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  build-linux:
-    name: Build Linux Binary
-    runs-on: ubuntu-latest
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-    
-    - name: Setup Rust
-      uses: actions-rs/toolchain@v1
-      with:
-        toolchain: stable
-        target: x86_64-unknown-linux-gnu
-        profile: minimal
-        override: true
-    
-    - name: Build release
-      run: |
-        cargo build --release --target x86_64-unknown-linux-gnu
-    
-    - name: Upload artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: FastSearchMCP-Linux
-        path: |
-          target/x86_64-unknown-linux-gnu/release/fastsearch-mcp-bridge
-          target/x86_64-unknown-linux-gnu/release/fastsearch
-
-  build-macos:
-    name: Build macOS Binary
-    runs-on: macos-latest
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-    
-    - name: Setup Rust
-      uses: actions-rs/toolchain@v1
-      with:
-        toolchain: stable
-        target: x86_64-apple-darwin
-        profile: minimal
-        override: true
-    
-    - name: Install dependencies
-      run: |
-        brew install pkg-config
-    
-    - name: Build release
-      run: |
-        cargo build --release --target x86_64-apple-darwin
-    
-    - name: Upload artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: FastSearchMCP-macOS
-        path: |
-          target/x86_64-apple-darwin/release/fastsearch-mcp-bridge
-          target/x86_64-apple-darwin/release/fastsearch
