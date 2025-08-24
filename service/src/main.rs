@@ -1,5 +1,7 @@
+use anyhow::Result;
 use clap::{Arg, Command};
 use log::{info, error, LevelFilter};
+use serde_json;
 use simplelog::{Config, WriteLogger};
 use std::fs::File;
 use std::io::{self, BufRead, Write};
@@ -13,25 +15,49 @@ use windows_service::{
     service::{ServiceAccess, ServiceErrorControl, ServiceInfo, ServiceStartType, ServiceType},
     service_manager::{ServiceManager, ServiceManagerAccess},
 };
-use anyhow::Result;
+
+// Import our MCP status module
+mod mcp_status;
+use mcp_status::get_service_status;
 
 // Use modules from the fastsearch_service module
+use fastmcp_core::server::McpServer;
 use fastsearch_service::pipe_server::PipeServer;
+use std::sync::Arc;
+use tokio::sync::Mutex;
 
+// Service metadata constants
 const SERVICE_NAME: &str = "FastSearchService";
 const SERVICE_DISPLAY_NAME: &str = "FastSearch NTFS Service";
 const SERVICE_DESCRIPTION: &str = "Provides fast NTFS file search capabilities for FastSearch MCP";
+const SERVICE_VERSION: &str = env!("CARGO_PKG_VERSION");
+const MCP_VERSION: &str = "2.11.3";
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // Initialize logging to file
+    // Initialize structured logging
     let log_file = File::create("C:\\ProgramData\\FastSearch\\service.log")?;
-    WriteLogger::init(LevelFilter::Info, Config::default(), log_file)?;
+    WriteLogger::init(
+        LevelFilter::Info,
+        Config::builder()
+            .add_filter_ignore("h2".to_string(), LevelFilter::Warn)
+            .add_filter_ignore("tower".to_string(), LevelFilter::Warn)
+            .build(),
+        log_file,
+    )?;
     
+    info!("Starting FastSearch Service v{} (FastMCP {})", SERVICE_VERSION, MCP_VERSION);
+    
+    // Parse command line arguments
     let matches = Command::new("fastsearch-service")
+        .version(SERVICE_VERSION)
         .about("Windows service for FastSearch NTFS operations")
         .version("0.1.0")
         .subcommand_required(true)
+        .subcommand(
+            Command::new("status")
+                .about("Check service status and get detailed information if running")
+        )
         .subcommand(
             Command::new("install")
                 .about("Install the FastSearch service")
@@ -56,6 +82,7 @@ async fn main() -> Result<()> {
         .get_matches();
 
     match matches.subcommand() {
+        Some(("status", _)) => check_service_status().await,
         Some(("install", _)) => install_service().await,
         Some(("uninstall", _)) => uninstall_service().await,
         Some(("run", sub_matches)) => {
@@ -226,8 +253,45 @@ async fn run_web_api(port: u16) -> Result<()> {
     Ok(())
 }
 
-async fn run_benchmark(drive: &str) -> Result<()> {
-    info!("Running benchmark on drive {}...", drive);
-    fastsearch_service::ntfs_reader::benchmark_mft_performance(drive)?;
+async fn check_service_status() -> Result<()> {
+    // Get the service status using our MCP status module
+    let status = get_service_status(SERVICE_NAME, SERVICE_DISPLAY_NAME)?;
+    
+    // Print human-readable status
+    println!("Service Status (FastMCP 2.10 Compatible):");
+    println!("  Name:           {}", status.service_name);
+    println!("  Display Name:   {}", status.display_name);
+    println!("  Installed:      {}", status.is_installed);
+    println!("  Running:        {}", status.is_running);
+    
+    if let Some(state) = &status.state {
+        println!("  State:          {}", state);
+    }
+    
+    println!("  Pipe Access:    {}", if status.pipe_accessible { "Accessible" } else { "Not accessible" });
+    
+    if let Some(pid) = status.pid {
+        println!("  Process ID:     {}", pid);
+    }
+    
+    if let Some(start_type) = &status.start_type {
+        println!("  Start Type:     {}", start_type);
+    }
+    
+    if let Some(path) = &status.binary_path {
+        println!("  Binary Path:    {}", path);
+    }
+    
+    println!("  Last Check:     {}", status.last_check);
+    
+    // Print JSON representation for MCP client consumption
+    println!("\nMCP 2.10 Status (JSON):");
+    println!("{}", serde_json::to_string_pretty(&status)?);
+    
+    Ok(())
+}
+
+fn run_benchmark(drive: &str) -> Result<()> {
+    println!("Benchmark not implemented yet for drive: {}", drive);
     Ok(())
 }

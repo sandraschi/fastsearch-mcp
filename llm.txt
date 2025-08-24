@@ -1,0 +1,69 @@
+# FastSearch MCP Server
+
+## Overview
+FastSearch MCP Server is a Python implementation of the Model-Controller-Presenter (MCP) 2.11.3 protocol, designed to provide a standardized interface for the FastSearch NTFS search service.
+
+## Key Components
+
+### 1. MCP Server (`mcp_server.py`)
+- Implements the MCP 2.11.3 protocol
+- Handles JSON-RPC 2.0 requests
+- Manages tool registration and execution
+- Provides built-in methods for service management
+
+### 2. Tools System
+Tools are registered with the MCP server and can be called remotely. Each tool should:
+- Be a Python function with type hints
+- Be registered using the `@tool` decorator
+- Return JSON-serializable data
+- Handle errors using `McpError`
+
+### 3. Built-in Tools
+- `mcp.get_capabilities`: List available tools and capabilities
+- `mcp.ping`: Basic health check
+- `mcp.shutdown`: Gracefully shut down the server
+- `fastsearch.search`: Execute a search query
+- `fastsearch.status`: Get service status
+
+## Development
+
+### Adding a New Tool
+1. Create a new function with type hints
+2. Decorate it with `@tool("tool.name")`
+3. Register it with the MCP server
+
+Example:
+```python
+@tool("example.hello")
+async def hello_world(name: str) -> dict:
+    """Say hello to someone."""
+    return {"message": f"Hello, {name}!"}
+```
+
+### Error Handling
+Use `McpError` for expected errors:
+```python
+from fastsearch_mcp import McpError
+
+@tool("example.fail")
+async def fail_example():
+    raise McpError("Something went wrong", code=-32000)
+```
+
+## API Reference
+
+### MCP Server
+- `McpServer(service_pipe=None)`: Create a new MCP server
+- `start(stdin=None, stdout=None)`: Start the server
+- `register_method(name, handler)`: Register a method handler
+- `get_tools()`: List all registered tools
+
+### Decorators
+- `@tool(name)`: Register a function as an MCP tool
+- `@validate_schema(schema)`: Validate input against a JSON schema
+
+## Standards Compliance
+- MCP 2.11.3 Protocol
+- JSON-RPC 2.0
+- PEP 8 Style Guide
+- Type Annotations (PEP 484)

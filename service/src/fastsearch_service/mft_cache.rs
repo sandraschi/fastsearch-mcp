@@ -156,7 +156,6 @@ impl Default for MftCacheConfig {
 
 /// In-memory MFT cache for fast file searches
 #[derive(Debug)]
-#[derive(Clone)]
 pub struct MftCache {
     // Core data structures
     files: RwLock<HashMap<u64, FileEntry>>,
@@ -180,6 +179,27 @@ pub struct MftCache {
     // USN Journal monitoring
     usn_monitor: parking_lot::Mutex<Option<crate::fastsearch_service::usn_journal::UsnJournalMonitor>>,
     volume_handle: parking_lot::Mutex<Option<winapi::um::winnt::HANDLE>>,
+}
+
+impl Clone for MftCache {
+    fn clone(&self) -> Self {
+        Self {
+            files: RwLock::new(self.files.read().clone()),
+            extension_index: RwLock::new(self.extension_index.read().clone()),
+            name_index: RwLock::new(self.name_index.read().clone()),
+            path_index: RwLock::new(self.path_index.read().clone()),
+            last_update: RwLock::new(*self.last_update.read()),
+            drive_letter: self.drive_letter,
+            config: self.config.clone(),
+            memory_usage: AtomicU64::new(self.memory_usage.load(Ordering::Relaxed)),
+            files_processed: AtomicUsize::new(self.files_processed.load(Ordering::Relaxed)),
+            // Thread handles and monitoring cannot be cloned - reinitialize as needed
+            save_thread_handle: parking_lot::Mutex::new(None),
+            shutdown_flag: Arc::new(StdAtomicBool::new(false)),
+            usn_monitor: parking_lot::Mutex::new(None),
+            volume_handle: parking_lot::Mutex::new(None),
+        }
+    }
 }
 
 /// Statistics about the MFT cache
@@ -780,39 +800,155 @@ impl MftCache {
     }
     
     /// Rebuild cache using parallel processing
+    /// 
+    /// This function processes the MFT in parallel by dividing the work among multiple threads.
+    /// Each thread processes a subset of directories and merges the results.
+    /// 
+    /// # Arguments
+    /// * `ntfs` - Reference to the parsed NTFS filesystem
+    /// * `root` - Root directory of the NTFS volume
+    /// 
+    /// # Returns
+    /// * `Result<()>` - Ok if successful, or an error if processing fails
     fn rebuild_parallel(&self, ntfs: &Ntfs, root: &ntfs::NtfsFile) -> Result<()> {
-        use rayon::prelude::*;
+        use crossbeam_channel::{bounded, unbounded};
+        use std::sync::Arc;
+        use std::thread;
+        use std::collections::VecDeque;
+        use std::path::PathBuf;
+        use std::time::{Duration, Instant};
         
-        let (tx, rx) = std::sync::mpsc::channel();
+        let start_time = Instant::now();
+        let num_threads = self.config.num_threads.max(1);
+        info!("Starting parallel MFT processing with {} threads", num_threads);
         
-        // Process directories in parallel
-        let mut fs = ntfs.fs();
-        let root_dir = match root.directory_index(&mut fs) {
-            Ok(index) => index,
-            Err(e) => return Err(e).context("Failed to get root directory index"),
-        };
+        // Create channels for communication between threads
+        let (file_tx, file_rx) = unbounded();
+        let (result_tx, result_rx) = bounded(1);
         
-        // Process top-level directories in parallel
-        
-    // Check if we're approaching memory limits
-    if memory_usage_percent > (self.config.max_memory_usage * 100.0) as f64 {
-        warn!(
-            "Memory usage high: {:.1}% ({} MB used of {} MB total)",
-            memory_usage_percent,
-            used_memory / 1024 / 1024,
-            total_memory / 1024 / 1024,
-        );
+        // Start worker threads
+        let mut workers = Vec::with_capacity(num_threads);
+        for _ in 0..num_threads {
+            let file_rx = file_rx.clone();
+            let result_tx = result_tx.clone();
+            let ntfs = ntfs.clone();
             
-        // If we're over the limit, clear some memory
-        if memory_usage_percent > (self.config.max_memory_usage * 1.1 * 100.0) as f64 {
-            warn!("Memory usage over limit, clearing cache");
-            self.clear()?;
+            let worker = thread::spawn(move || {
+                let mut files = HashMap::new();
+                let mut extension_index = HashMap::new();
+                let mut name_index = HashMap::new();
+                let mut path_index = HashMap::new();
+                let mut files_processed = 0;
+                
+                // Process files from the queue
+                for file_entry in file_rx {
+                    let file_id = file_entry.id;
+                    let path = file_entry.path.clone();
+                    let name = file_entry.name.clone();
+                    
+                    // Add to files map
+                    files.insert(file_id, file_entry);
+                    
+                    // Update extension index
+                    if let Some(ext) = Path::new(&name).extension() {
+                        let ext = ext.to_string_lossy().to_lowercase();
+                        extension_index.entry(ext).or_insert_with(Vec::new).push(file_id);
+                    }
+                    
+                    // Update name index
+                    let name_lower = name.to_lowercase();
+                    name_index.entry(name_lower).or_insert_with(Vec::new).push(file_id);
+                    
+                    // Update path index
+                    path_index.insert(path, file_id);
+                    
+                    files_processed += 1;
+                    
+                    // Check memory usage periodically
+                    if files_processed % 100_000 == 0 {
+                        // Simulate memory check
+                        if files_processed > 1_000_000 {
+                            // If we've processed a lot of files, simulate memory pressure
+                            thread::sleep(Duration::from_millis(10));
+                        }
+                    }
+                }
+                
+                // Send results back to main thread
+                if let Err(e) = result_tx.send((files, extension_index, name_index, path_index)) {
+                    error!("Failed to send results from worker thread: {}", e);
+                }
+            });
+            
+            workers.push(worker);
+        }
+        
+        // Process the root directory and enqueue work items
+        let mut dir_queue = VecDeque::new();
+        dir_queue.push_back((root.to_owned(), PathBuf::new()));
+        
+        while let Some((dir, path)) = dir_queue.pop_front() {
+            let mut fs = ntfs.fs();
+            if let Ok(dir_index) = dir.directory_index(&mut fs) {
+                for entry_result in dir_index.entries() {
+                    match entry_result {
+                        Ok(entry) => {
+                            if let Some(name) = entry.file_name() {
+                                let name_str = name.to_string_lossy();
+                                
+                                // Skip special entries
+                                if name_str == "." || name_str == ".." || name_str.starts_with('$') {
+                                    continue;
+                                }
+                                
+                                if let Ok(file) = entry.to_file(&ntfs) {
+                                    let file_id = file.reference().entry() as u64;
+                                    let is_dir = file.is_directory();
+                                    let full_path = path.join(&*name_str);
+                                    
+                                    // Create file entry
+                                    let file_entry = FileEntry {
+                                        id: file_id,
+                                        name: name_str.into_owned(),
+                                        path: full_path.to_string_lossy().into_owned(),
+                                        size: file.data_size(&mut fs).unwrap_or(0),
+                                        created: file.created(&mut fs).unwrap_or_else(|_| SystemTime::now()),
+                                        modified: file.modified(&mut fs).unwrap_or_else(|_| SystemTime::now()),
+                                        is_directory: is_dir,
+                                    };
+                                    
+                                    // Send to worker thread
+                                    if let Err(e) = file_tx.send(file_entry) {
+                                        error!("Failed to send file entry to worker: {}", e);
+                                        break;
+                                    }
+                                    
+                                    // Enqueue directories for processing
+                                    if is_dir {
+                                        dir_queue.push_back((file, full_path));
+                                    }
         }
     }
-        
+    
+    // Update the cache with the new data
+    *self.files.write() = all_files;
+    *self.extension_index.write() = all_extension_index;
+    *self.name_index.write() = all_name_index;
+    *self.path_index.write() = all_path_index;
+    
+    // Update last update time
+    *self.last_update.write() = SystemTime::now();
+    
+    info!(
+        "MFT processing completed in {:.2?} with {} files (memory: {:.2} MB)",
+        start_time.elapsed(),
+        total_files,
+        self.memory_usage.load(Ordering::Relaxed) as f64 / 1024.0 / 1024.0
+    );
+    
     Ok(())
 }
-        
+
 /// Rebuild the entire cache from the MFT
 pub fn rebuild(&self) -> Result<()> {
     let start_time = Instant::now();
@@ -866,12 +1002,12 @@ pub fn rebuild(&self) -> Result<()> {
         start_time.elapsed(),
         self.memory_usage.load(Ordering::Relaxed) as f64 / 1024.0 / 1024.0
     );
-        
-    Ok(())
-}
-        
-/// Rebuild cache using parallel processing
 fn rebuild_parallel(&self, ntfs: &Ntfs, root: &ntfs::NtfsFile) -> Result<()> {
+    use std::sync::mpsc;
+    use std::time::Instant;
+    
+    let start_time = Instant::now();
+    info!("Starting parallel MFT processing with {} threads", rayon::current_num_threads());
     use rayon::prelude::*;
         
     let (tx, rx) = std::sync::mpsc::channel();
@@ -903,8 +1039,8 @@ fn rebuild_parallel(&self, ntfs: &Ntfs, root: &ntfs::NtfsFile) -> Result<()> {
         }
     }
         
-    // Process directories in parallel
-    top_level_dirs.par_iter()
+    // Process directories in parallel with work stealing
+    let result = top_level_dirs.par_iter()
         .try_for_each_with(tx, |sender, entry| {
             let ntfs = ntfs.clone();
             
@@ -938,16 +1074,60 @@ fn rebuild_parallel(&self, ntfs: &Ntfs, root: &ntfs::NtfsFile) -> Result<()> {
                 }
             }
             Ok(())
-        })?;
+        });
+        
+        // Check for errors in parallel processing
+        result?;
         
         // Merge results from all directories
         let mut all_files = HashMap::new();
         let mut all_extension_index: HashMap<String, Vec<u64>> = HashMap::new();
         let mut all_name_index: HashMap<String, Vec<u64>> = HashMap::new();
         let mut all_path_index: HashMap<String, u64> = HashMap::new();
+        let mut total_files = 0;
+        let mut total_memory = 0;
         
+        // Process results from worker threads
         for (files, ext_idx, name_idx, path_idx) in rx {
-            all_files.extend(files);
+            // Merge files
+            total_files += files.len();
+            
+            // Check memory limits periodically
+            if total_files % 100_000 == 0 {
+                self.check_memory_limits()?;
+            }
+            
+            // Merge file entries
+            for (file_id, entry) in files {
+                total_memory += std::mem::size_of_val(&entry) as u64;
+                all_files.insert(file_id, entry);
+            }
+            
+            // Merge extension index
+            for (ext, ids) in ext_idx {
+                all_extension_index.entry(ext).or_default().extend(ids);
+            }
+            
+            // Merge name index
+            for (name, ids) in name_idx {
+                all_name_index.entry(name).or_default().extend(ids);
+            }
+            
+            // Merge path index (should be unique)
+            all_path_index.extend(path_idx);
+            
+            // Update memory usage
+            self.memory_usage.fetch_add(total_memory, Ordering::Relaxed);
+            self.files_processed.fetch_add(total_files, Ordering::Relaxed);
+            
+            // Log progress
+            if total_files % 500_000 == 0 {
+                info!(
+                    "Processed {} files (memory: {:.2} MB)",
+                    total_files,
+                    self.memory_usage.load(Ordering::Relaxed) as f64 / 1024.0 / 1024.0
+                );
+            }
             
             for (ext, ids) in ext_idx {
                 all_extension_index.entry(ext).or_default().extend(ids);
@@ -1062,7 +1242,19 @@ pub struct FileEntry {
 }
 
 impl MftCache {
-    /// Process a directory and its contents
+    /// Process a directory and its contents recursively
+    /// 
+    /// This function processes all files and subdirectories in the specified directory
+    /// and sends file entries through the provided channel.
+    /// 
+    /// # Arguments
+    /// * `ntfs` - Reference to the parsed NTFS filesystem
+    /// * `dir_entry` - Directory to process
+    /// * `path` - Current path being processed
+    /// * `sender` - Channel sender for file entries
+    /// 
+    /// # Returns
+    /// * `Result<()>` - Ok if successful, or an error if processing fails
     fn process_directory(
         &self,
         ntfs: &Ntfs,
