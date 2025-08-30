@@ -53,10 +53,13 @@ If you prefer to install manually:
 
 1. Copy the contents of the `service\target\release` directory to your desired installation location
 2. Install Python dependencies:
+
    ```
    pip install -r bridge/requirements.txt
    ```
+
 3. Run the service manually:
+
    ```
    fastsearch-service.exe run
    ```
@@ -75,6 +78,7 @@ The service includes a web API that runs on port 8080 by default. You can change
 
 1. Edit the configuration file
 2. Or run the service with a custom port:
+
    ```
    fastsearch-service.exe run --port 9000
    ```
@@ -100,6 +104,7 @@ msiexec /x "C:\Path\To\FastSearchMCP-1.0.0.msi" /qb
 1. Check the service logs at `C:\ProgramData\FastSearch\service.log`
 2. Ensure no other service is using the same port (default: 8080)
 3. Run the service in console mode for detailed error output:
+
    ```
    fastsearch-service.exe run
    ```
@@ -109,6 +114,7 @@ msiexec /x "C:\Path\To\FastSearchMCP-1.0.0.msi" /qb
 1. Ensure all prerequisites are installed
 2. Run PowerShell as Administrator
 3. Check that the Rust toolchain is properly installed:
+
    ```
    rustc --version
    cargo --version

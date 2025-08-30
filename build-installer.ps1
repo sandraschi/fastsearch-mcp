@@ -1,5 +1,5 @@
 # Build script for FastSearch MCP Installer
-# Requires: Rust, WiX Toolset
+# Requires: Visual Studio 2022, WiX Toolset, CMake
 
 param (
     [string]$Configuration = "Release",
@@ -11,7 +11,7 @@ $ErrorActionPreference = "Stop"
 $scriptPath = $PSScriptRoot
 $solutionDir = "$scriptPath\"
 $wixDir = "$scriptPath\wix"
-$targetDir = "$solutionDir\target\$Configuration"
+# Removed Python directory reference as it's no longer needed
 $installerDir = "$solutionDir\$OutputDir"
 
 # Create output directory if it doesn't exist
@@ -22,29 +22,68 @@ if (-not (Test-Path -Path $installerDir)) {
 # Build the project if not skipped
 if (-not $SkipBuild) {
     Write-Host "Building FastSearch MCP in $Configuration mode..." -ForegroundColor Cyan
-    cargo build --$Configuration
     
+    # Build the C++ service
+    Write-Host "Building C++ service..." -ForegroundColor Cyan
+    $buildDir = "$solutionDir\service\build"
+    
+    if (-not (Test-Path -Path $buildDir)) {
+        New-Item -ItemType Directory -Path $buildDir | Out-Null
+    }
+    
+    Push-Location $buildDir
+    
+    # Configure CMake if needed
+    if (-not (Test-Path -Path "CMakeCache.txt")) {
+        cmake .. -G "Visual Studio 17 2022" -A x64
+        if ($LASTEXITCODE -ne 0) {
+            Write-Error "CMake configuration failed"
+            exit $LASTEXITCODE
+        }
+    }
+    
+    # Build the project
+    cmake --build . --config $Configuration
     if ($LASTEXITCODE -ne 0) {
-        Write-Error "Build failed with exit code $LASTEXITCODE"
+        Write-Error "Build failed"
         exit $LASTEXITCODE
     }
+    
+    Pop-Location
 }
 
-# Verify WiX is installed
-$wixPath = "C:\Program Files (x86)\WiX Toolset v3.14\bin"
-if (-not (Test-Path -Path $wixPath)) {
-    $wixPath = "C:\Program Files\WiX Toolset v3.14\bin"
-}
+# Verify prerequisites
+$prerequisites = @(
+    @{ Name = "WiX Toolset"; Path = @("C:\Program Files (x86)\WiX Toolset v3.14\bin", "C:\Program Files\WiX Toolset v3.14\bin"); Url = "https://wixtoolset.org/releases/" },
+    @{ Name = "Visual Studio 2022"; Path = @("C:\Program Files\Microsoft Visual Studio\2022\Community", "C:\Program Files\Microsoft Visual Studio\2022\Professional"); Url = "https://visualstudio.microsoft.com/downloads/" },
+    @{ Name = "CMake"; Path = @("C:\Program Files\CMake\bin"); Url = "https://cmake.org/download/" }
+)
 
-if (-not (Test-Path -Path $wixPath)) {
-    Write-Error "WiX Toolset not found. Please install WiX Toolset v3.14 or later."
-    Write-Host "Download from: https://wixtoolset.org/releases/" -ForegroundColor Yellow
-    exit 1
+foreach ($prereq in $prerequisites) {
+    $found = $false
+    foreach ($path in $prereq.Path) {
+        if (Test-Path -Path $path) {
+            $found = $true
+            if ($prereq.Name -eq "WiX Toolset") {
+                $wixPath = $path
+            }
+            break
+        }
+    }
+    
+    if (-not $found) {
+        Write-Error "$($prereq.Name) not found. Please install $($prereq.Name)."
+        Write-Host "Download from: $($prereq.Url)" -ForegroundColor Yellow
+        exit 1
+    }
 }
 
 # Set environment variables
 $env:Path = "$wixPath;$env:Path"
+$env:Path = "$env:Path;C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin"
+$env:Path = "$env:Path;C:\Program Files\CMake\bin"
 $env:SolutionDir = $solutionDir
+$env:Configuration = $Configuration
 
 # Compile the WiX source
 Write-Host "Compiling installer..." -ForegroundColor Cyan
@@ -52,16 +91,31 @@ $wxsFile = "$wixDir\Product.wxs"
 $wixobjFile = "$installerDir\FastSearchMCP.wixobj"
 $msiFile = "$installerDir\FastSearchMCP.msi"
 
-# Compile WiX source with SolutionDir preprocessor variable
+# Get the service executable path
+$serviceExePath = "$solutionDir\service\build\$Configuration\FastSearchService.exe"
+if (-not (Test-Path -Path $serviceExePath)) {
+    Write-Error "Service executable not found at $serviceExePath"
+    exit 1
+}
+
+# Compile WiX source with preprocessor variables
 $solutionDirEscaped = $solutionDir.Replace('\', '\\')
-candle.exe -nologo -dSolutionDir="$solutionDirEscaped" -out "$wixobjFile" "$wxsFile"
+$serviceDir = (Get-Item $serviceExePath).Directory.FullName.Replace('\', '\\')
+
+candle.exe -nologo `
+    -dSolutionDir="$solutionDirEscaped" `
+    -dServiceDir="$serviceDir" `
+    -dConfiguration=$Configuration `
+    -out "$wixobjFile" "$wxsFile"
+
 if ($LASTEXITCODE -ne 0) {
     Write-Error "WiX compilation failed"
     exit $LASTEXITCODE
 }
 
 # Link the MSI
-light.exe -nologo -out "$msiFile" "$wixobjFile" -ext WixUIExtension
+Write-Host "Linking MSI package..." -ForegroundColor Cyan
+light.exe -nologo -out "$msiFile" "$wixobjFile" -ext WixUIExtension -ext WixUtilExtension
 if ($LASTEXITCODE -ne 0) {
     Write-Error "MSI linking failed"
     exit $LASTEXITCODE

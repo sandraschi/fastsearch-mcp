@@ -15,12 +15,14 @@ This document outlines the future direction and planned features for the FastSea
 ## Short-term Goals (Next 3-6 months)
 
 ### v0.2.0 - Enhanced Search Features
+
 - [ ] Support for file content search
 - [ ] Advanced filtering options (size, date, type)
 - [ ] Search result preview
 - [ ] Improved error handling and logging
 
 ### v0.3.0 - Performance Optimizations
+
 - [ ] Search indexing for faster results
 - [ ] Caching of recent searches
 - [ ] Parallel search across multiple drives
@@ -29,12 +31,14 @@ This document outlines the future direction and planned features for the FastSea
 ## Medium-term Goals (6-12 months)
 
 ### v0.4.0 - Advanced Features
+
 - [ ] Search within archives (ZIP, RAR, etc.)
 - [ ] Document content extraction (PDF, DOCX, etc.)
 - [ ] Custom search scopes and saved searches
 - [ ] Integration with cloud storage providers
 
 ### v0.5.0 - User Experience
+
 - [ ] Interactive search interface
 - [ ] Search history and favorites
 - [ ] Customizable keyboard shortcuts
@@ -43,6 +47,7 @@ This document outlines the future direction and planned features for the FastSea
 ## Long-term Goals (1+ years)
 
 ### v1.0.0 - Production Ready
+
 - [ ] Comprehensive test coverage
 - [ ] Performance benchmarking
 - [ ] Security audit
@@ -50,6 +55,7 @@ This document outlines the future direction and planned features for the FastSea
 - [ ] Multi-language support
 
 ### Future Possibilities
+
 - [ ] Machine learning for search ranking
 - [ ] Natural language search queries
 - [ ] Integration with IDEs and code editors

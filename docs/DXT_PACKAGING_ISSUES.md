@@ -44,6 +44,7 @@ def install_dependencies(lib_dir: Path, requirements_file: Path):
 ## Technical Details
 
 ### DXT Package Structure (CORRECT)
+
 ```
 tapo-camera-mcp.dxt (ZIP archive)
 ├── manifest.json              # Claude Desktop config
@@ -58,6 +59,7 @@ tapo-camera-mcp.dxt (ZIP archive)
 ```
 
 ### Current Issue: Missing lib/ Dependencies
+
 ```
 current-extension/
 ├── manifest.json             ✅ Correct
@@ -71,11 +73,13 @@ current-extension/
 ## Error Manifests As
 
 **Claude Desktop Logs:**
+
 ```
 C:\Users\sandr\AppData\Local\Programs\Python\Python313\python.exe: can't open file 'C:\\Users\\sandr\\AppData\\Local\\AnthropicClaude\\app-0.12.55\\main.py': [Errno 2] No such file or directory
 ```
 
 **Import Errors:**
+
 ```python
 ❌ Import error: No module named 'fastmcp'
 ❌ Import error: No module named 'pytapo'
@@ -86,15 +90,18 @@ C:\Users\sandr\AppData\Local\Programs\Python\Python313\python.exe: can't open fi
 ## Current Solutions Being Tested
 
 ### 1. Fixed Build Scripts Created
+
 - `dxt_build_fixed.py` - Proper dependency installation
 - `dxt_build_robust.py` - Multiple installation strategies
 - `test_pip_basic.py` - Dependency testing
 
 ### 2. Dependency Version Fixes
+
 **Original (WRONG):** `pytapo>=4.0.0` (doesn't exist)  
 **Fixed:** `pytapo>=3.3.0` (actual latest version)
 
 ### 3. Build Process Improvements
+
 - ✅ Install dependencies to `lib/` during build
 - ✅ Create proper `main.py` with `sys.path` setup
 - ✅ Use `requirements-core.txt` (runtime deps only)
@@ -109,7 +116,8 @@ C:\Users\sandr\AppData\Local\Programs\Python\Python313\python.exe: can't open fi
 **Problem:** DXT documentation and examples are incomplete
 **Result:** Developers create broken extensions that fail on deployment
 
-### Common Mistakes in DXT Building:
+### Common Mistakes in DXT Building
+
 1. **No dependency bundling** - Most examples skip this step
 2. **Incorrect entry points** - Wrong `sys.path` setup
 3. **Missing runtime dependencies** - Dev vs runtime confusion
@@ -119,7 +127,8 @@ C:\Users\sandr\AppData\Local\Programs\Python\Python313\python.exe: can't open fi
 
 ## Commands to Fix This Issue
 
-### Run Diagnostic Tests:
+### Run Diagnostic Tests
+
 ```powershell
 # Test each dependency individually
 python test_pip_basic.py
@@ -128,7 +137,8 @@ python test_pip_basic.py
 python dxt_build_robust.py
 ```
 
-### Expected Results:
+### Expected Results
+
 - **Working DXT:** 2-5MB (with bundled dependencies)
 - **Broken DXT:** <100KB (source only)
 
@@ -137,16 +147,19 @@ python dxt_build_robust.py
 ## Broader DXT Issues Discovered
 
 ### 1. Documentation Gaps
+
 - Anthropic DXT docs don't cover dependency bundling properly
 - Most GitHub examples are incomplete
 - No clear "production ready" DXT examples
 
 ### 2. Build Tool Issues  
+
 - `dxt` CLI tool doesn't handle Python dependencies
 - No validation of dependency installation
 - Build succeeds even when broken
 
 ### 3. Developer Experience Problems
+
 - DXT drops successfully but fails silently
 - Error messages are cryptic (wrong paths)
 - No clear debugging workflow
@@ -156,6 +169,7 @@ python dxt_build_robust.py
 ## Recommended DXT Best Practices
 
 ### 1. Always Bundle Dependencies
+
 ```python
 # REQUIRED in every DXT build script
 def install_dependencies(lib_dir: Path):
@@ -167,6 +181,7 @@ def install_dependencies(lib_dir: Path):
 ```
 
 ### 2. Proper Entry Point Setup
+
 ```python
 # main.py MUST include lib in sys.path
 sys.path.insert(0, os.path.join(current_dir, 'lib'))
@@ -174,6 +189,7 @@ sys.path.insert(0, os.path.join(current_dir, 'src'))
 ```
 
 ### 3. Validate Before Packaging
+
 ```python
 # Test imports before creating DXT
 try:
@@ -189,13 +205,15 @@ except ImportError as e:
 ## Status Updates
 
 ### 2025-08-12 19:15 - Active Debugging
+
 - ✅ Root cause identified (missing dependency bundling)
 - ✅ Fixed build scripts created  
 - ✅ Version issues resolved (pytapo 4.0.0 → 3.3.0)
 - 🔄 Testing robust build process
 - ⏳ Waiting for successful DXT creation
 
-### Next Steps:
+### Next Steps
+
 1. Get robust build working with proper dependencies
 2. Test resulting DXT in Claude Desktop
 3. Document working DXT build pattern for ecosystem

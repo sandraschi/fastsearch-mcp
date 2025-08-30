@@ -1,6 +1,6 @@
+//! Shared types for FastSearch MCP
+
 use serde::{Serialize, Deserialize};
-use std::time::{SystemTime, UNIX_EPOCH};
-use chrono::{DateTime, Utc};
 
 /// Search request following FastMCP 2.11.3 standards
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -182,25 +182,32 @@ pub struct ServiceHealth {
     
     /// Additional health metrics
     pub metrics: serde_json::Value,
-}
+    
+    /// Average search time in milliseconds
     #[serde(skip_serializing_if = "Option::is_none")]
     pub avg_search_time_ms: Option<u32>,
     
+    /// Total number of searches performed
     #[serde(skip_serializing_if = "Option::is_none")]
     pub total_searches: Option<u64>,
     
+    /// Cache hit rate as a percentage (0.0 to 1.0)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cache_hit_rate: Option<f32>,
     
+    /// Memory usage in MB
     #[serde(skip_serializing_if = "Option::is_none")]
     pub memory_usage_mb: Option<u32>,
     
+    /// Service uptime in seconds
     #[serde(skip_serializing_if = "Option::is_none")]
     pub uptime_seconds: Option<u64>,
     
+    /// Whether the service is running
     #[serde(skip_serializing_if = "Option::is_none")]
     pub service_running: Option<bool>,
     
+    /// Whether NTFS mode is enabled
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ntfs_mode: Option<bool>,
 }

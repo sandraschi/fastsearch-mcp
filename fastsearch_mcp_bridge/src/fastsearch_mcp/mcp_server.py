@@ -187,7 +187,7 @@ class McpServer:
         self._tool_registry.register(wrapped_handler, name=name)
         return wrapped_handler
     
-    async def start(self, stdin=None, stdout=None) -> None:
+    async def start(self, stdin=None, stdout=None):
         """Start the MCP server.
         
         Args:

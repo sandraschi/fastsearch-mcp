@@ -37,13 +37,17 @@ Due to the elevated privileges required by the service, we use a two-part packag
 
 1. Open a PowerShell console as Administrator
 2. Navigate to the installer directory:
+
    ```powershell
    cd d:\Dev\repos\fastsearch-mcp\installer
    ```
+
 3. Run the build script:
+
    ```powershell
    .\build_installer.ps1
    ```
+
 4. The installer will be created at `d:\Dev\repos\fastsearch-mcp\dist\FastSearchMCP-Setup.msi`
 
 ### Installation
@@ -62,23 +66,27 @@ Due to the elevated privileges required by the service, we use a two-part packag
 ### Building the DXT Package
 
 1. Build the bridge component:
+
    ```powershell
    cd d:\Dev\repos\fastsearch-mcp\bridge
    cargo build --release
    ```
 
 2. Create a directory for the DXT package:
+
    ```powershell
    $dxtDir = "d:\Dev\repos\fastsearch-mcp\dxt-package"
    New-Item -ItemType Directory -Path $dxtDir -Force
    ```
 
 3. Copy the bridge binary:
+
    ```powershell
    Copy-Item "d:\Dev\repos\fastsearch-mcp\bridge\target\release\fastsearch-mcp-bridge.exe" -Destination $dxtDir
    ```
 
 4. Create a `manifest.json` file in the DXT directory:
+
    ```json
    {
      "name": "fastsearch-mcp-bridge",
@@ -119,6 +127,7 @@ Due to the elevated privileges required by the service, we use a two-part packag
    ```
 
 5. Build the DXT package:
+
    ```powershell
    cd $dxtDir
    dxt pack
@@ -132,16 +141,19 @@ Due to the elevated privileges required by the service, we use a two-part packag
 ## Troubleshooting
 
 ### Service Not Starting
+
 - Verify the service is installed: `Get-Service -Name "FastSearchService"`
 - Check the Windows Event Viewer for error messages
 - Ensure the service account has the necessary permissions
 
 ### Bridge Cannot Connect to Service
+
 - Verify the service is running
 - Check the named pipe: `\\.\pipe\fastsearch-mcp`
 - Ensure the user account has permission to access the named pipe
 
 ### DXT Package Fails to Load
+
 - Verify the manifest.json is valid
 - Check that the bridge executable is in the package
 - Ensure the entry point in the manifest matches the executable name
@@ -155,11 +167,13 @@ Due to the elevated privileges required by the service, we use a two-part packag
 ## Maintenance
 
 ### Updating the Service
+
 1. Build the new service binary
 2. Update the MSI package version
 3. Distribute the updated MSI
 
 ### Updating the Bridge
+
 1. Build the new bridge binary
 2. Update the DXT package version
 3. Distribute the updated DXT package

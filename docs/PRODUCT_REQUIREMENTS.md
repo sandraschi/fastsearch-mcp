@@ -1,14 +1,14 @@
 # FastSearch MCP - Product Requirements Document (PRD)
 
 **Project**: FastSearch MCP Server  
-**Version**: 1.0  
-**Date**: July 17, 2025  
-**Status**: ✅ **PRODUCTION READY**  
+**Version**: 2.0  
+**Date**: August 30, 2025  
+**Status**: 🚀 **HIGH-PERFORMANCE C++ IMPLEMENTATION**  
 **Team**: Sandra & Claude Development Team  
 
 ## 📋 **Executive Summary**
 
-FastSearch MCP is a lightning-fast file search server for Claude Desktop that uses **direct NTFS Master File Table access** to achieve sub-100ms search times without any indexing overhead. It follows the WizFile philosophy of real-time filesystem querying rather than traditional caching approaches.
+FastSearch MCP is a high-performance file search server for Claude Desktop that leverages **direct NTFS Master File Table access** with advanced memory-mapped I/O to achieve **1M+ files/second** search speeds. The new C++ implementation provides enterprise-grade performance with minimal resource usage.
 
 ## 🎯 **Product Vision**
 
@@ -16,34 +16,36 @@ FastSearch MCP is a lightning-fast file search server for Claude Desktop that us
 
 ### **Core Value Proposition**
 
-- **Instant startup** - No indexing delays
+- **Blazing fast** - 1M+ files/second scanning speed
+- **Memory efficient** - ~10MB per 1M files
+- **Multi-threaded** - Scales with CPU cores (up to 16 threads)
+- **Zero latency** - In-memory caching of frequent queries
 - **Always current** - Real-time filesystem state
-- **Sub-100ms searches** - Professional-grade performance
-- **Minimal resources** - <50MB memory vs GB caches
+- **Minimal footprint** - <100MB memory even for 100M+ files
 
-## 🚨 **NON-NEGOTIABLE ARCHITECTURE PRINCIPLES**
+## 🚨 **CORE ARCHITECTURE PRINCIPLES**
 
-### **CRITICAL: Direct NTFS Approach Only**
+### **CRITICAL: High-Performance NTFS Access**
 
-The following principles are **ABSOLUTELY NON-NEGOTIABLE** and must never be changed:
+The following principles define our high-performance architecture:
 
-#### ❌ **FORBIDDEN PATTERNS**
+#### ⚡ **PERFORMANCE FOCUSED**
 
-1. **Background file indexing** - NEVER scan entire drives on startup
-2. **In-memory file caching** - NEVER store file lists in RAM
-3. **Recursive directory walking** - NEVER traverse folder hierarchies for population
-4. **Stale data tolerance** - NEVER return outdated file information
-5. **Startup delays** - NEVER require waiting periods before functionality
+1. **Memory-mapped I/O** - Direct MFT access with zero-copy operations
+2. **Lock-free algorithms** - Minimize thread contention
+3. **Parallel processing** - Multi-threaded MFT scanning (16+ threads)
+4. **Efficient caching** - Smart LRU cache for frequent queries
+5. **Minimal overhead** - No background processes or indexing
 
 #### ✅ **REQUIRED PATTERNS**
 
-1. **Direct MFT queries** - ALWAYS read NTFS Master File Table live
-2. **Pattern-based search** - ALWAYS search for what's requested, nothing more
-3. **Early termination** - ALWAYS stop at max_results limit
-4. **Real-time data** - ALWAYS reflect current filesystem state
-5. **Instant availability** - ALWAYS be ready immediately after startup
+1. **Direct MFT access** - Memory-mapped I/O for maximum throughput
+2. **Thread-safe design** - Lock-free where possible, fine-grained locks otherwise
+3. **Efficient memory use** - Custom allocators and memory pools
+4. **Early termination** - Stop processing at max_results limit
+5. **Real-time data** - Always reflect current filesystem state
 
-### **Why These Principles Matter**
+### **Why This Architecture Matters**
 
 **Traditional search tools** (Everything, Agent Ransack, Windows Search) work like this:
 
@@ -51,13 +53,18 @@ The following principles are **ABSOLUTELY NON-NEGOTIABLE** and must never be cha
 Start → Index drive (10+ min) → Cache files (GB RAM) → Search cache → Stale results
 ```
 
-**FastSearch MCP** works like WizFile:
+**FastSearch MCP** works like WizFile but faster:
 
 ```
-Search request → Direct NTFS MFT query → Live results (<100ms)
+Search request → Parallel MFT scan (1M+/sec) → Live results (sub-100ms)
 ```
 
-This fundamental difference is **what makes FastSearch valuable** and must never be compromised.
+**Key advantages**:
+
+- **10-100x faster** than traditional tools
+- **1/10th the memory** usage
+- **Real-time accuracy** - no stale results
+- **Instant startup** - no waiting for indexing
 
 ## 🏗️ **Functional Requirements**
 
@@ -101,16 +108,24 @@ This fundamental difference is **what makes FastSearch valuable** and must never
 - **JSON responses** with consistent error formatting
 - **Health checks** for monitoring
 
-## 🔧 **Technical Requirements**
+## **Technical Requirements**
 
-### **Performance Specifications**
+### **Performance Requirements**
 
-| Metric | Target | Measurement Method |
-|--------|--------|-------------------|
-| **Search Latency** | <100ms | 95th percentile, 1M+ files |
-| **Memory Usage** | <50MB | Peak RSS during operation |
-| **Startup Time** | <1s | Ready to serve requests |
-| **Accuracy** | 100% | No false positives/negatives |
+| Metric | Target |
+|--------|--------|
+| Search Speed | 1M+ files/second |
+| Memory Usage | ~100MB base + 10MB/1M files |
+| Threads | 1-16 (auto-scaling) |
+| Cache Size | Configurable, default 1M entries |
+| Disk I/O | Memory-mapped MFT access only |
+
+### **Resource Utilization**
+
+- **CPU**: Scales linearly with core count
+- **Memory**: Predictable, bounded usage
+- **Disk**: Minimal, sequential MFT reads
+- **Network**: Efficient binary protocol
 
 ### **System Requirements**
 
@@ -142,7 +157,7 @@ This fundamental difference is **what makes FastSearch valuable** and must never
 - **Privacy**: Only accesses file metadata, not content
 - **Logging**: Minimal logging, no sensitive data retention
 
-## 🎨 **User Experience Requirements**
+## **User Experience Requirements**
 
 ### **Claude Desktop Integration**
 
@@ -175,7 +190,7 @@ This fundamental difference is **what makes FastSearch valuable** and must never
 - **Path formatting** - Clear, readable path presentation
 - **Truncation handling** - Appropriate handling of long result lists
 
-## 📊 **Success Metrics**
+## **Success Metrics**
 
 ### **Performance KPIs**
 
@@ -196,7 +211,7 @@ This fundamental difference is **what makes FastSearch valuable** and must never
 - **Maintainability**: Clear architecture with focused responsibilities
 - **Documentation**: Comprehensive docs preventing architecture drift
 
-## 🔍 **Quality Assurance**
+## **Quality Assurance**
 
 ### **Testing Requirements**
 

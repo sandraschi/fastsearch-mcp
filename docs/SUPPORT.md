@@ -41,11 +41,13 @@ A: FastSearch MCP uses direct NTFS MFT access for faster searches and runs as a 
 
 **Q: What are the system requirements?**  
 A: FastSearch MCP requires:
+
 - Windows 10/11 (64-bit)
 - Python 3.8 or later
 - Rust toolchain (for service compilation)
 
 **Q: How do I install the latest version?**  
+
 ```bash
 pip install --upgrade fastsearch-mcp
 ```
@@ -53,6 +55,7 @@ pip install --upgrade fastsearch-mcp
 ### Usage
 
 **Q: How do I search for files?**  
+
 ```python
 from fastsearch_mcp import FastSearch
 
@@ -68,11 +71,13 @@ A: Content search is planned for a future release. Follow our [ROADMAP](ROADMAP.
 ### Common Issues
 
 **Search not returning results**
+
 - Verify the service is running
 - Check if the paths you're searching are accessible
 - Ensure you have proper permissions
 
 **Installation fails**
+
 - Make sure you have the required build tools installed
 - Check that your Python version is compatible
 - Review the installation logs for specific error messages
@@ -80,10 +85,12 @@ A: Content search is planned for a future release. Follow our [ROADMAP](ROADMAP.
 ### Getting Logs
 
 Service logs are available in the following location:
+
 - Windows: `%LOCALAPPDATA%\FastSearch\logs\`
 - Linux/macOS: `~/.local/share/fastsearch/logs/`
 
 Enable debug logging:
+
 ```bash
 export FASTSEARCH_LOG_LEVEL=debug
 fastsearch-mcp

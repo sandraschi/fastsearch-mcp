@@ -1,66 +1,68 @@
-# Build script for FastSearch MCP components
+# Build all components of FastSearch MCP
 
-# Function to build a specific component
-function Build-Component {
-    param (
-        [string]$componentName,
-        [string]$componentPath
-    )
-    
-    Write-Host "Building $componentName..." -ForegroundColor Cyan
-    Set-Location -Path $componentPath
-    
-    $buildOutput = cargo build --release 2>&1
-    
-    if ($LASTEXITCODE -eq 0) {
-        Write-Host "$componentName built successfully!" -ForegroundColor Green
-        return $true
-    } else {
-        Write-Host "Failed to build $componentName :(" -ForegroundColor Red
-        $buildOutput | ForEach-Object { Write-Host $_ -ForegroundColor Red }
-        return $false
+# Store the current directory to return to later
+$originalDir = Get-Location
+
+try {
+    # Build C++ Service
+    Write-Host "Building C++ Service..." -ForegroundColor Cyan
+
+    # Create build directory if it doesn't exist
+    $buildDir = "service\build"
+    if (-not (Test-Path $buildDir)) {
+        New-Item -ItemType Directory -Path $buildDir | Out-Null
     }
+
+    # Configure and build the service
+    Set-Location $buildDir
+    cmake .. -G "Visual Studio 17 2022" -A x64
+    cmake --build . --config Release
+
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to build C++ service"
+    }
+
+    # Build Python Bridge
+    Write-Host "`nBuilding Python Bridge..." -ForegroundColor Cyan
+    Set-Location "$originalDir\fastsearch_mcp_bridge"
+
+    # Create virtual environment if it doesn't exist
+    if (-not (Test-Path ".venv")) {
+        python -m venv .venv
+    }
+
+    # Activate virtual environment and install dependencies
+    .\.venv\Scripts\Activate.ps1
+    pip install -r requirements.txt
+
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to install Python dependencies"
+    }
+
+    Write-Host "`nBuild completed successfully!" -ForegroundColor Green
+    Write-Host "Service executable: $originalDir\service\build\bin\Release\FastSearchService.exe" -ForegroundColor Green
+    Write-Host "Python bridge is ready in: $originalDir\fastsearch_mcp_bridge" -ForegroundColor Green
 }
-
-# Main build process
-Write-Host "Starting FastSearch MCP build process..." -ForegroundColor Yellow
-
-# Build shared library first
-if (-not (Build-Component -componentName "Shared Library" -componentPath "shared")) {
+catch {
+    Write-Error "Build failed: $_"
     exit 1
 }
-
-# Build the service
-if (-not (Build-Component -componentName "Service" -componentPath "service")) {
-    exit 1
+finally {
+    # Always return to the original directory
+    Set-Location $originalDir
 }
-
-# Build the bridge
-if (-not (Build-Component -componentName "Bridge" -componentPath "bridge")) {
-    exit 1
-}
-
-# Check if all binaries were created
-$bridgeBinary = ".\bridge\target\release\fastsearch-mcp-bridge.exe"
-$serviceBinary = ".\service\target\release\fastsearch-service.exe"
-
-if ((Test-Path $bridgeBinary) -and (Test-Path $serviceBinary)) {
-    Write-Host "\nBuild completed successfully!" -ForegroundColor Green
-    Write-Host "- Bridge: $((Get-Item $bridgeBinary).FullName)" -ForegroundColor Cyan
-    Write-Host "- Service: $((Get-Item $serviceBinary).FullName)" -ForegroundColor Cyan
+if ($allSuccessful) {
+    Write-Host "`nAll components set up successfully!" -ForegroundColor Green
     
-    # Copy binaries to bin directory
-    if (-not (Test-Path ".\bin")) {
-        New-Item -ItemType Directory -Path ".\bin" | Out-Null
+    # Create bin directory if it doesn't exist
+    $binDir = Join-Path -Path $PSScriptRoot -ChildPath "bin"
+    if (-not (Test-Path $binDir)) {
+        New-Item -ItemType Directory -Path $binDir | Out-Null
+        Write-Host "Created bin directory at: $binDir" -ForegroundColor Cyan
     }
     
-    Copy-Item -Path $bridgeBinary -Destination ".\bin\" -Force
-    Copy-Item -Path $serviceBinary -Destination ".\bin\" -Force
-    
-    Write-Host "\nBinaries copied to .\bin\" -ForegroundColor Green
+    exit 0
 } else {
-    Write-Host "\nBuild completed with missing binaries." -ForegroundColor Yellow
-    if (-not (Test-Path $bridgeBinary)) { Write-Host "- Missing: $bridgeBinary" -ForegroundColor Red }
-    if (-not (Test-Path $serviceBinary)) { Write-Host "- Missing: $serviceBinary" -ForegroundColor Red }
+    Write-Host "`nFailed to set up all components" -ForegroundColor Red
     exit 1
 }

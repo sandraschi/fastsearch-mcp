@@ -10,6 +10,7 @@
 FastSearch MCP is **NOT** a standard MCP server. It requires a **unique dual-component architecture** that cannot function without both parts:
 
 ### **Component 1: Windows Service (Elevated)**
+
 - **Binary**: `fastsearch-service.exe` 
 - **Privileges**: **MUST run elevated** (Administrator rights)
 - **Purpose**: Direct NTFS MFT reading, in-memory database building
@@ -17,6 +18,7 @@ FastSearch MCP is **NOT** a standard MCP server. It requires a **unique dual-com
 - **Lifecycle**: Windows service (auto-start, crash recovery)
 
 ### **Component 2: MCP Bridge (User-level)**
+
 - **Binary**: `fastsearch-mcp-bridge.exe`
 - **Privileges**: Normal user context (no elevation)
 - **Purpose**: stdio MCP protocol interface to Claude Desktop
@@ -28,11 +30,13 @@ FastSearch MCP is **NOT** a standard MCP server. It requires a **unique dual-com
 ## 📦 **DUAL PACKAGE RELEASE STRATEGY**
 
 ### **Package 1: MSI Installer** 
+
 **File**: `fastsearch-mcp-setup.msi`  
 **Purpose**: Professional Windows service deployment with UAC elevation  
 **Target**: System-level installation with elevated privileges  
 
 **Contents**:
+
 ```
 MSI Package Contents:
 ├── fastsearch-service.exe       # Windows service binary
@@ -43,6 +47,7 @@ MSI Package Contents:
 ```
 
 **MSI Responsibilities**:
+
 - ✅ Request UAC elevation (one-time only)
 - ✅ Install service binary to `Program Files\FastSearchMCP\`
 - ✅ Register Windows service with auto-start
@@ -52,11 +57,13 @@ MSI Package Contents:
 - ✅ Handle service upgrades and downgrades
 
 ### **Package 2: DXT Extension**
+
 **File**: `fastsearch-mcp.dxt`  
 **Purpose**: Claude Desktop extension with rich tool integration  
 **Target**: User-level Claude Desktop extensions  
 
 **Contents**:
+
 ```
 fastsearch-mcp.dxt (ZIP archive):
 ├── manifest.json                # DXT specification with tool declarations
@@ -68,6 +75,7 @@ fastsearch-mcp.dxt (ZIP archive):
 ```
 
 **DXT Responsibilities**:
+
 - ✅ Self-documenting tools with parameter schemas
 - ✅ Professional extension metadata 
 - ✅ Enable/disable tool controls in Claude Desktop
@@ -80,6 +88,7 @@ fastsearch-mcp.dxt (ZIP archive):
 ### **MSI Installer Requirements**
 
 **WiX Toolset Configuration** (FREE - no licensing fees, only phone support costs $500/month via FireGiant):
+
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
@@ -112,6 +121,7 @@ fastsearch-mcp.dxt (ZIP archive):
 ```
 
 **MSI Build Process**:
+
 1. Compile `fastsearch-service.exe` for Windows x64
 2. Generate WiX source files with proper GUIDs
 3. Use WiX toolset to create MSI package
@@ -121,6 +131,7 @@ fastsearch-mcp.dxt (ZIP archive):
 ### **DXT Extension Requirements**
 
 **Manifest.json Specification**:
+
 ```json
 {
   "dxt_version": "0.1",
@@ -256,6 +267,7 @@ fastsearch-mcp.dxt (ZIP archive):
 ```
 
 **DXT Build Process**:
+
 1. Compile `fastsearch-mcp-bridge.exe` for Windows x64
 2. Create DXT directory structure
 3. Generate manifest.json with proper tool schemas
@@ -265,7 +277,8 @@ fastsearch-mcp.dxt (ZIP archive):
 
 ## 🏗️ **CI/CD GITHUB ACTIONS STRATEGY**
 
-### **Build Matrix Configuration**:
+### **Build Matrix Configuration**
+
 ```yaml
 name: Build FastSearch MCP Dual Packages
 
@@ -390,6 +403,7 @@ jobs:
 ## 🧪 **LOCAL TESTING STRATEGY**
 
 ### **Phase 1: Local Development Testing**
+
 ```powershell
 # Build both binaries locally
 cargo build --release
@@ -411,6 +425,7 @@ dxt pack --output ..\..\fastsearch-mcp.dxt
 ```
 
 ### **Phase 2: Clean VM Testing**
+
 - Fresh Windows 11 VM
 - Install MSI first, verify service
 - Install DXT second, verify Claude integration
@@ -418,6 +433,7 @@ dxt pack --output ..\..\fastsearch-mcp.dxt
 - Test uninstall procedures
 
 ### **Phase 3: GitHub Actions Testing**
+
 - Push to test branch with workflow
 - Verify both packages build correctly
 - Download artifacts and test locally
@@ -428,6 +444,7 @@ dxt pack --output ..\..\fastsearch-mcp.dxt
 **IMPORTANT**: The WiX Toolset is **completely FREE** for all commercial and non-commercial usage. The "$500/month Open Source Maintenance Fee" mentioned in WiX documentation is **ONLY** for FireGiant's phone support services, not for using the toolset itself.
 
 **What's FREE**:
+
 - ✅ WiX Toolset (complete installer framework)
 - ✅ Command-line tools (`wix build`, `heat`, etc.)
 - ✅ GitHub Actions integration (`dotnet tool install --global wix`)
@@ -435,6 +452,7 @@ dxt pack --output ..\..\fastsearch-mcp.dxt
 - ✅ All documentation and online resources
 
 **What Costs $500/month**:
+
 - 📞 FireGiant phone support (who needs phone support for XML configuration?!)
 - 📞 Priority issue responses
 - 📞 Direct developer consultation
@@ -443,25 +461,29 @@ dxt pack --output ..\..\fastsearch-mcp.dxt
 
 ## ⚠️ **CRITICAL IMPLEMENTATION NOTES**
 
-### **Security Considerations**:
+### **Security Considerations**
+
 - Service runs as LocalSystem (required for NTFS MFT access)
 - Named pipe permissions must allow user access to service
 - Bridge validates all service responses before sending to Claude
 - No network access required (fully local)
 
-### **Error Handling Requirements**:
+### **Error Handling Requirements**
+
 - Bridge must gracefully handle service unavailable
 - Service must handle bridge disconnections
 - Clear error messages for missing components
 - Proper logging for debugging
 
-### **Performance Requirements**:
+### **Performance Requirements**
+
 - Service startup: < 10 seconds
 - Bridge startup: < 2 seconds  
 - Search response: < 500ms for typical queries
 - Memory usage: < 500MB for service under normal load
 
-### **Compatibility Requirements**:
+### **Compatibility Requirements**
+
 - Windows 10 1903+ (required for modern named pipe features)
 - x64 architecture only
 - Claude Desktop 0.10.0+ (DXT support)
@@ -470,6 +492,7 @@ dxt pack --output ..\..\fastsearch-mcp.dxt
 ## 🚀 **WINDSURF IMPLEMENTATION TASKS**
 
 ### **Task 1: MSI Package Creation**
+
 1. **Setup WiX project structure** in `packaging/msi/`
 2. **Create fastsearch-mcp.wxs** with service installation logic
 3. **Add proper GUIDs** for all components
@@ -477,6 +500,7 @@ dxt pack --output ..\..\fastsearch-mcp.dxt
 5. **Test MSI creation** locally with WiX toolset
 
 ### **Task 2: DXT Package Creation** 
+
 1. **Create DXT manifest** in `packaging/dxt/manifest.json`
 2. **Add tool schemas** with proper parameter validation
 3. **Create extension icon** (64x64 PNG)
@@ -484,6 +508,7 @@ dxt pack --output ..\..\fastsearch-mcp.dxt
 5. **Validate DXT** with `dxt validate` command
 
 ### **Task 3: CI/CD Integration**
+
 1. **Add WiX toolset** to GitHub Actions
 2. **Add DXT CLI** to GitHub Actions  
 3. **Update build matrix** for dual packages
@@ -491,6 +516,7 @@ dxt pack --output ..\..\fastsearch-mcp.dxt
 5. **Create release workflow** with proper artifact handling
 
 ### **Task 4: Documentation**
+
 1. **Update README.md** with dual installation instructions
 2. **Create INSTALLATION.md** with detailed steps
 3. **Add troubleshooting guide** for common issues

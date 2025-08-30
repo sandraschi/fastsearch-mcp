@@ -41,6 +41,7 @@ This document outlines the process for creating new releases of FastSearch MCP.
 ### Creating a Release
 
 1. **Verify Dependencies**
+
    ```bash
    # Install/update build dependencies
    pip install --upgrade pip setuptools wheel twine
@@ -48,6 +49,7 @@ This document outlines the process for creating new releases of FastSearch MCP.
    ```
 
 2. **Run Pre-release Checks**
+
    ```bash
    # Run linters and type checking
    pre-commit run --all-files
@@ -57,6 +59,7 @@ This document outlines the process for creating new releases of FastSearch MCP.
    ```
 
 3. **Build Python Package**
+
    ```bash
    # Build source distribution and wheel
    python -m build
@@ -66,12 +69,14 @@ This document outlines the process for creating new releases of FastSearch MCP.
    ```
 
 4. **Build Rust Service (Windows)**
+
    ```bash
    cd service
    cargo build --release
    ```
 
 5. **Generate DXT Package**
+
    ```bash
    # Ensure DXT manifest is valid
    dxt validate
@@ -81,6 +86,7 @@ This document outlines the process for creating new releases of FastSearch MCP.
    ```
 
 6. **Commit Changes**
+
    ```bash
    git add .
    git commit -m "Prepare release vX.Y.Z"
@@ -88,6 +94,7 @@ This document outlines the process for creating new releases of FastSearch MCP.
    ```
 
 7. **Create and Push Tag**
+
    ```bash
    # Create an annotated tag
    git tag -a vX.Y.Z -m "Release vX.Y.Z"

@@ -1,17 +1,19 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi"
+     xmlns:util="http://schemas.microsoft.com/wix/UtilExtension">
   <Product Id="*" 
            Name="FastSearch MCP" 
            Manufacturer="FastSearch" 
-           Version="1.0.0" 
+           Version="2.0.0"
            UpgradeCode="3298de23-b4e3-481e-91f7-ddcb238b95b4"
            Language="1033">
     
-    <Package InstallerVersion="200" 
+    <Package InstallerVersion="500" 
              Compressed="yes" 
              InstallScope="perMachine"
-             Description="FastSearch MCP - Fast file search with MCP integration"
-             Comments="FastSearch MCP is a high-performance file search tool with MCP integration" />
+             Description="FastSearch MCP - High-performance NTFS file search"
+             Comments="FastSearch MCP provides lightning-fast file search using direct NTFS MFT access"
+             InstallPrivileges="elevated" />
              
     <MajorUpgrade DowngradeErrorMessage="A newer version of FastSearch MCP is already installed." />
     <Media Id="1" Cabinet="media1.cab" EmbedCab="yes" />
@@ -28,37 +30,47 @@
 
     <!-- Application files -->
     <Feature Id="ProductFeature" Title="FastSearch MCP" Level="1">
-      <ComponentRef Id="PythonPackage" />
-      <ComponentRef Id="PythonModule" />
-      <ComponentRef Id="LauncherScript" />
+      <ComponentRef Id="ServiceBinary" />
       <ComponentRef Id="ServiceInstall" />
-      <ComponentRef Id="ReadmeFile" />
-      <ComponentRef Id="LicenseFile" />
+      <ComponentRef Id="Documentation" />
+      <ComponentRef Id="StartMenuShortcuts" />
     </Feature>
 
     <!-- UI Configuration -->
     <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
-    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Launch FastSearch Service" />
-    <Property Id="WixShellExecTarget" Value="[#FastSearchMCPBridgeExe]" />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Start FastSearch Service" />
+    <Property Id="WixShellExecTarget" Value="[#FastSearchServiceExe]" />
     
-    <!-- Custom Actions for Python Package Installation -->
-    <CustomAction Id="InstallPythonPackage" 
-                 FileKey="LauncherBat" 
-                 ExeCommand='-m pip install --upgrade .' 
+    <!-- Service Configuration -->
+    <Property Id="SERVICENAME" Value="FastSearchService" />
+    <Property Id="SERVICEDISPLAYNAME" Value="FastSearch MCP Service" />
+    <Property Id="SERVICEDESCRIPTION" Value="Provides high-performance NTFS file search capabilities" />
+    
+    <!-- Service Control -->
+    <CustomAction Id="StartService" 
+                 FileKey="FastSearchServiceExe" 
+                 ExeCommand='start' 
                  Execute="deferred" 
-                 Return="check" 
+                 Return="ignore" 
                  Impersonate="no" />
     
-    <CustomAction Id="UninstallPythonPackage" 
-                 FileKey="LauncherBat" 
-                 ExeCommand='-m pip uninstall -y fastsearch-mcp' 
+    <CustomAction Id="StopService" 
+                 FileKey="FastSearchServiceExe" 
+                 ExeCommand='stop' 
                  Execute="deferred" 
-                 Return="check" 
+                 Return="ignore" 
                  Impersonate="no" />
     
     <InstallExecuteSequence>
-      <Custom Action="InstallPythonPackage" After="InstallFiles">NOT Installed</Custom>
-      <Custom Action="UninstallPythonPackage" Before="RemoveFiles">REMOVE~="ALL"</Custom>
+      <!-- Stop service during uninstall -->
+      <Custom Action="StopService" Before="RemoveFiles">
+        (NOT UPGRADINGPRODUCTCODE) AND (REMOVE~="ALL")
+      </Custom>
+      
+      <!-- Start service after install -->
+      <Custom Action="StartService" After="InstallFinalize">
+        NOT Installed AND NOT WIX_UPGRADE_DETECTED
+      </Custom>
     </InstallExecuteSequence>
 
     <!-- UI Configuration -->
@@ -68,45 +80,87 @@
     <WixVariable Id="WixUIDialogBmp" Value="wix\\dialogbg.bmp" />
     
     <!-- Custom Actions -->
-    <CustomAction Id="LaunchApplication" 
-                  FileKey="FastSearchMCPBridgeExe" 
-                  ExeCommand="" 
+    <CustomAction Id="LaunchServiceControl" 
+                  FileKey="FastSearchServiceExe" 
+                  ExeCommand="help" 
                   Return="asyncNoWait" />
                   
     <UI>
       <Publish Dialog="ExitDialog" 
                Control="Finish" 
                Event="DoAction" 
-               Value="LaunchApplication">WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 AND NOT Installed</Publish>
+               Value="LaunchServiceControl">WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 AND NOT Installed</Publish>
     </UI>
 
     <!-- Files -->
     <DirectoryRef Id="INSTALLFOLDER">
-      <!-- Python Package -->
-      <Component Id="PythonPackage" Guid="*">
-        <File Id="SetupPy" Source="..\\setup.py" KeyPath="yes" />
-        <File Id="PyProjectToml" Source="..\\pyproject.toml" />
-        <File Id="ReadmeMd" Source="..\\README.md" />
+      <!-- Service Binary -->
+      <Component Id="ServiceBinary" Guid="*">
+        <File Id="FastSearchServiceExe" 
+              Source="$(var.SolutionDir)service\build\$(var.Configuration)\FastSearchService.exe" 
+              KeyPath="yes" />
+        
+        <!-- Service Installation -->
+        <ServiceInstall 
+          Id="ServiceInstaller" 
+          Type="ownProcess"
+          Vital="yes"
+          Name="$(var.SERVICENAME)"
+          DisplayName="$(var.SERVICEDISPLAYNAME)"
+          Description="$(var.SERVICEDESCRIPTION)"
+          Start="auto"
+          Account="LocalSystem"
+          ErrorControl="normal"
+          Interactive="no">
+          <ServiceDependency Id="tcpip" />
+        </ServiceInstall>
+        
+        <ServiceControl 
+          Id="StartService" 
+          Name="$(var.SERVICENAME)" 
+          Start="install" 
+          Stop="both" 
+          Remove="uninstall" 
+          Wait="yes" />
       </Component>
       
-      <!-- Python Module -->
-      <Directory Id="PythonModuleDir" Name="fastsearch_mcp">
-        <Component Id="PythonModule" Guid="*">
-          <File Id="McpServerPy" Source="..\\fastsearch_mcp\\mcp_server.py" KeyPath="yes" />
-          <File Id="MainInitPy" Source="..\\fastsearch_mcp\\__init__.py" />
-          <File Id="MainPy" Source="..\\fastsearch_mcp\\__main__.py" />
-          <File Id="DecoratorsPy" Source="..\\fastsearch_mcp\\decorators.py" />
-        </Component>
-      </Directory>
+      <!-- Service Configuration -->
+      <Component Id="ServiceConfig" Guid="*">
+        <File Id="ServiceConfigFile" Source="..\\service\\config\\service_config.json" KeyPath="yes" />
+        <util:XmlFile Id="UpdateServiceConfig" 
+                     File="[#ServiceConfigFile]" 
+                     Action="setValue" 
+                     Name="LogLevel" 
+                     Value="Info" 
+                     ElementPath="//Configuration/Logging" />
+      </Component>
       
-      <!-- Launcher Script -->
-      <Component Id="LauncherScript" Guid="*">
-        <File Id="LauncherBat" Source="..\\launch_fastsearch_mcp.py" KeyPath="yes">
-          <Shortcut Id="startmenuBridge" 
+      <!-- Start Menu Shortcuts -->
+      <Component Id="StartMenuShortcuts" Guid="*">
+        <Shortcut Id="StartMenuServiceControl" 
+                 Name="Service Control" 
+                 Description="Manage FastSearch Service"
+                 Target="[SystemFolder]cmd.exe"
+                 Arguments="/k &quot;$(var.SERVICENAME) help&quot;"
+                 WorkingDirectory="INSTALLFOLDER" />
+        <Shortcut Id="StartMenuReadme" 
+                 Name="Readme" 
+                 Target="[INSTALLFOLDER]README.md" />
+        <RegistryValue Root="HKCU" 
+                      Key="Software\FastSearch\MCP" 
+                      Name="Installed" 
+                      Type="integer" 
+                      Value="1" 
+                      KeyPath="yes" />
+      </Component>
+      
+      <!-- Service Control Script -->
+      <Component Id="ServiceControlScript" Guid="*">
+        <File Id="ServiceControlBat" Source="..\\service\\scripts\\service_control.bat" KeyPath="yes">
+          <Shortcut Id="StartMenuServiceControl" 
                    Directory="ApplicationProgramsFolder" 
-                   Name="FastSearch MCP Bridge" 
+                   Name="FastSearch Service Control" 
                    WorkingDirectory="INSTALLFOLDER"
-                   Arguments="--service-pipe \\.\pipe\fastsearch-service"
                    Icon="mainicon.ico"
                    Advertise="yes" />
         </File>

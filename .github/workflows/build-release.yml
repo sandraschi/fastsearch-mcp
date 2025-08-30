@@ -150,272 +150,37 @@ jobs:
         Copy-Item "target\${{ matrix.target }}\release\${{ matrix.binary_bridge }}" "msi-build\"
         Copy-Item "target\${{ matrix.target }}\release\${{ matrix.binary_service }}" "msi-build\"
         
-        # Create basic WiX source file
-        $wxsContent = @"
-<?xml version="1.0" encoding="UTF-8"?>
-<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
-  <Product Id="*" 
-           Name="FastSearch MCP" 
-           Language="1033" 
-           Version="${{ env.VERSION }}.0" 
-           Manufacturer="Sandra Schimanski" 
-           UpgradeCode="12345678-1234-1234-1234-123456789012">
-    
-    <Package InstallerVersion="200" Compressed="yes" InstallScope="perMachine" />
-    
-    <!-- Require elevated privileges for service installation -->
-    <Condition Message="Administrator rights required for Windows service installation.">
-      Privileged
-    </Condition>
-    
-    <MajorUpgrade DowngradeErrorMessage="A newer version is already installed." />
-    <MediaTemplate EmbedCab="yes" />
-    
-    <!-- Installation directory -->
-    <Directory Id="TARGETDIR" Name="SourceDir">
-      <Directory Id="ProgramFilesFolder">
-        <Directory Id="INSTALLFOLDER" Name="FastSearchMCP" />
-      </Directory>
-    </Directory>
-    
-    <!-- Components -->
-    <ComponentGroup Id="ProductComponents" Directory="INSTALLFOLDER">
-      <!-- Windows Service -->
-      <Component Id="ServiceComponent" Guid="*">
-        <File Id="ServiceExe" Source="msi-build\${{ matrix.binary_service }}" KeyPath="yes" />
-        <ServiceInstall Id="FastSearchService" 
-                        Name="FastSearchMCP"
-                        DisplayName="FastSearch MCP Service"
-                        Description="High-performance NTFS file search service for Claude Desktop"
-                        Type="ownProcess" 
-                        Start="auto" 
-                        Account="LocalSystem" 
-                        ErrorControl="normal" />
-        <ServiceControl Id="StartService" Name="FastSearchMCP" 
-                        Start="install" Stop="both" Remove="uninstall" />
-      </Component>
-      
-      <!-- MCP Bridge -->
-      <Component Id="BridgeComponent" Guid="*">
-        <File Id="BridgeExe" Source="msi-build\${{ matrix.binary_bridge }}" />
-      </Component>
-    </ComponentGroup>
-    
-    <!-- Features -->
-    <Feature Id="ProductFeature" Title="FastSearch MCP" Level="1">
-      <ComponentGroupRef Id="ProductComponents" />
-    </Feature>
-  </Product>
-</Wix>
-"@
+        # Create MSI package using the script
+        .\scripts\create_msi_package.ps1 `
+          -Version "${{ github.ref_name }}" `
+          -Platform "${{ matrix.platform }}" `
+          -OutputDir "msi-package" `
+          -ProjectDir "." `
+          -WixBinDir "wix"
         
-        # Write WiX source file
-        $wxsContent | Out-File -FilePath "fastsearch-mcp.wxs" -Encoding UTF8
-        
-        # Build MSI with WiX (FREE toolset - professional output)
-        wix build fastsearch-mcp.wxs -o ${{ matrix.output }}
+        # Move MSI to artifacts directory
+        New-Item -ItemType Directory -Force -Path "artifacts" | Out-Null
+        Move-Item -Path "msi-package\FastSearchMCP-${{ github.ref_name }}-${{ matrix.platform }}.msi" -Destination "${{ matrix.output }}"
         
         # Verify MSI was created
         if (Test-Path "${{ matrix.output }}") {
-          Write-Host "✅ MSI package created: ${{ matrix.output }}"
+          Write-Host "✅ MSI package created: ${{ github.ref_name }}"
           Get-Item "${{ matrix.output }}" | Format-List
-        } else {
-          Write-Error "❌ MSI package not found: ${{ matrix.output }}"
-          exit 1
         }
 
     - name: Create DXT Package
       if: matrix.package_type == 'dxt'
       shell: bash
       run: |
-        # Create DXT structure
-        mkdir -p dxt-build/server
-        
-        # Copy bridge binary to DXT server directory
-        cp "target/${{ matrix.target }}/release/${{ matrix.binary_bridge }}" "dxt-build/server/"
-        
-        # Create DXT manifest.json
-        cat > dxt-build/manifest.json << EOF
-{
-  "dxt_version": "0.1",
-  "name": "fastsearch-mcp",
-  "version": "${{ env.VERSION }}",
-  "description": "Lightning-fast semantic search across all your files using NTFS MFT indexing",
-  "author": {
-    "name": "Sandra Schimanski",
-    "email": "sandra@sandraschi.dev",
-    "url": "https://github.com/sandraschi"
-  },
-  "homepage": "https://github.com/sandraschi/fastsearch-mcp",
-  "license": "MIT",
-  "keywords": ["search", "semantic", "files", "ntfs", "mft", "indexing"],
-  
-  "server": {
-    "type": "binary",
-    "entry_point": "server/${{ matrix.binary_bridge }}",
-    "mcp_config": {
-      "command": "server/${{ matrix.binary_bridge }}",
-      "args": [],
-      "env": {
-        "FASTSEARCH_PIPE_NAME": "fastsearch-mcp",
-        "RUST_LOG": "info"
-      }
-    }
-  },
-  
-  "compatibility": {
-    "claude_desktop": ">=0.10.0",
-    "platforms": ["${{ matrix.platform == 'windows-x64' && 'win32' || (matrix.platform == 'linux-x64' && 'linux' || 'darwin') }}"]
-  },
-  
-  "capabilities": {
-    "tools": true,
-    "resources": false,
-    "prompts": false
-  },
-  
-  "tools": [
-    {
-      "name": "semantic_search",
-      "description": "Search across all indexed files using natural language queries. Supports semantic similarity, exact matches, and complex queries.",
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "query": {
-            "type": "string",
-            "description": "Natural language search query (e.g., 'documents about machine learning', 'emails from last week')",
-            "minLength": 1
-          },
-          "max_results": {
-            "type": "integer",
-            "description": "Maximum number of results to return",
-            "default": 10,
-            "minimum": 1,
-            "maximum": 100
-          },
-          "file_types": {
-            "type": "array",
-            "description": "Filter by file extensions (e.g., ['txt', 'md', 'pdf'])",
-            "items": {
-              "type": "string"
-            },
-            "default": []
-          },
-          "modified_after": {
-            "type": "string",
-            "description": "ISO date string - only return files modified after this date",
-            "format": "date-time"
-          }
-        },
-        "required": ["query"]
-      }
-    },
-    {
-      "name": "index_status",
-      "description": "Get current indexing status, statistics, and performance metrics",
-      "parameters": {
-        "type": "object",
-        "properties": {},
-        "additionalProperties": false
-      }
-    },
-    {
-      "name": "reindex_directory",
-      "description": "Force reindexing of a specific directory or drive",
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "path": {
-            "type": "string",
-            "description": "Directory path to reindex (e.g., 'C:\\\\Users\\\\Sandra\\\\Documents')"
-          },
-          "recursive": {
-            "type": "boolean",
-            "description": "Include subdirectories",
-            "default": true
-          }
-        },
-        "required": ["path"]
-      }
-    },
-    {
-      "name": "search_statistics",
-      "description": "Get detailed search statistics and index health metrics",
-      "parameters": {
-        "type": "object",
-        "properties": {},
-        "additionalProperties": false
-      }
-    }
-  ],
-  
-  "permissions": {
-    "filesystem": {
-      "read": true,
-      "write": false
-    },
-    "network": {
-      "allowed": false
-    }
-  }
-}
-EOF
-        
-        # Create extension icon (placeholder - 64x64 PNG)
-        # Note: This creates a simple colored square as placeholder
-        convert -size 64x64 xc:#FF6B35 dxt-build/icon.png 2>/dev/null || {
-          # Fallback if ImageMagick not available
-          echo "Warning: Could not create icon.png (ImageMagick not available)"
-        }
-        
-        # Create README for extension
-        cat > dxt-build/README.md << 'EOF'
-# FastSearch MCP Extension
-
-Lightning-fast semantic search across all your files using NTFS MFT indexing.
-
-## Requirements
-
-- **Windows**: FastSearch MCP Service must be installed first via MSI installer
-- **Linux/macOS**: Bridge-only functionality (limited compared to Windows)
-
-## Installation
-
-1. Install this extension via Claude Desktop Extensions panel
-2. The extension will automatically connect to the FastSearch service
-
-## Tools
-
-- **semantic_search**: Natural language file search
-- **index_status**: Check indexing progress and statistics  
-- **reindex_directory**: Force reindexing of specific paths
-- **search_statistics**: Detailed performance metrics
-
-## Support
-
-GitHub: https://github.com/sandraschi/fastsearch-mcp
-EOF
-        
-        # Copy LICENSE
-        cp LICENSE dxt-build/ 2>/dev/null || echo "# MIT License" > dxt-build/LICENSE
-        
-        # Create DXT package (ZIP archive with .dxt extension)
-        cd dxt-build
-        dxt pack --output "../${{ matrix.output }}" || {
-          # Fallback to manual ZIP creation if dxt pack fails
-          echo "DXT CLI failed, creating ZIP manually..."
-          zip -r "../${{ matrix.output }}" .
-        }
-        cd ..
-        
-        # Verify DXT was created
-        if [[ -f "${{ matrix.output }}" ]]; then
-          echo "✅ DXT package created: ${{ matrix.output }}"
-          ls -la "${{ matrix.output }}"
-        else
-          echo "❌ DXT package not found: ${{ matrix.output }}"
-          exit 1
-        fi
+        # Make the script executable
+        chmod +x scripts/create_dxt_package.sh
+        # Run the script with required parameters
+        ./scripts/create_dxt_package.sh \
+          "${{ matrix.platform }}" \
+          "${{ github.ref_name }}" \
+          "${{ matrix.binary_bridge }}" \
+          "${{ matrix.target }}" \
+          "${{ matrix.output }}"
 
     - name: Upload package artifact
       uses: actions/upload-artifact@v4

@@ -37,11 +37,6 @@ def parse_args(args=None):
 
 async def async_main(args: argparse.Namespace):
     """Async entry point for the MCP server."""
-    # Configure logging
-    logging.basicConfig(
-        level=args.log_level,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    )
     logger = logging.getLogger("fastsearch_mcp")
     
     # Set up signal handlers
@@ -52,8 +47,10 @@ async def async_main(args: argparse.Namespace):
         logger.info(f"Received signal {signame}, shutting down...")
         shutdown_event.set()
     
+    # Register signal handlers
+    loop = asyncio.get_running_loop()
     for sig in (signal.SIGINT, signal.SIGTERM):
-        signal.signal(sig, signal_handler)
+        loop.add_signal_handler(sig, signal_handler, sig)
     
     # Create and start the MCP server
     server = McpServer(service_pipe=args.service_pipe)
@@ -63,22 +60,33 @@ async def async_main(args: argparse.Namespace):
         server_task = asyncio.create_task(server.start())
         
         # Wait for shutdown signal or server task completion
-        await asyncio.wait(
+        done, pending = await asyncio.wait(
             [shutdown_event.wait(), server_task],
             return_when=asyncio.FIRST_COMPLETED
         )
         
         # If we're here because of the shutdown event, cancel the server task
         if not server_task.done():
+            logger.info("Shutting down server...")
             server_task.cancel()
             try:
                 await server_task
             except asyncio.CancelledError:
                 pass
     
+    except asyncio.CancelledError:
+        logger.info("Server task was cancelled")
+        return 0
     except Exception as e:
         logger.exception("Fatal error in MCP server")
         return 1
+    finally:
+        # Clean up signal handlers
+        for sig in (signal.SIGINT, signal.SIGTERM):
+            try:
+                loop.remove_signal_handler(sig)
+            except Exception as e:
+                logger.debug(f"Error removing signal handler for {sig}: {e}")
     
     logger.info("MCP server shutdown complete")
     return 0
@@ -89,13 +97,25 @@ def main(args: Optional[argparse.Namespace] = None):
     if args is None:
         args = parse_args()
     
+    # Configure logging
+    logging.basicConfig(
+        level=args.log_level,
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    )
+    logger = logging.getLogger("fastsearch_mcp")
+    
     try:
-        return asyncio.run(async_main(args))
+        # Get the current event loop (FastMCP's loop)
+        loop = asyncio.get_event_loop()
+        
+        # Run the async main function in the existing loop
+        return loop.run_until_complete(async_main(args))
+        
     except KeyboardInterrupt:
-        print("\nShutdown requested, exiting...")
+        logger.info("Shutdown requested, exiting...")
         return 0
     except Exception as e:
-        print(f"Error: {e}", file=sys.stderr)
+        logger.error(f"Error: {e}", exc_info=True)
         return 1
 
 

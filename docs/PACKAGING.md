@@ -22,11 +22,13 @@ The DXT package will include:
 ## Building the Package
 
 1. Ensure all dependencies are installed:
+
    ```powershell
    cargo build --release
    ```
 
 2. Run the packaging script:
+
    ```powershell
    .\package.ps1
    ```

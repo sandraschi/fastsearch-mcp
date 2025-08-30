@@ -11,6 +11,11 @@ authors = [
     { name = "Your Name", email = "your.email@example.com" },
 ]
 license = { text = "MIT" }
+dependencies = [
+    "pywin32>=306; platform_system=='Windows'",
+    "psutil>=5.9.0",
+    "fastmcp>=0.1.0"
+]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",

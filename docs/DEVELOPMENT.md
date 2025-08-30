@@ -25,12 +25,14 @@ This guide provides detailed instructions for setting up a development environme
 ## Getting Started
 
 1. **Clone the repository**
+
    ```bash
    git clone https://github.com/yourusername/fastsearch-mcp.git
    cd fastsearch-mcp
    ```
 
 2. **Set up Python environment**
+
    ```bash
    # Install Poetry if you haven't already
    pip install poetry
@@ -43,11 +45,13 @@ This guide provides detailed instructions for setting up a development environme
    ```
 
 3. **Install pre-commit hooks**
+
    ```bash
    pre-commit install
    ```
 
 4. **Set up Rust toolchain (for service development)**
+
    ```bash
    # Install Rust if you haven't already
    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
@@ -81,6 +85,7 @@ fastsearch-mcp/
 ## Development Workflow
 
 1. **Create a new branch**
+
    ```bash
    git checkout -b feature/your-feature-name
    ```
@@ -91,6 +96,7 @@ fastsearch-mcp/
    - Update documentation as needed
 
 3. **Run tests and checks**
+
    ```bash
    # Run Python tests
    pytest
@@ -103,12 +109,14 @@ fastsearch-mcp/
    ```
 
 4. **Commit your changes**
+
    ```bash
    git add .
    git commit -m "feat: add new feature"
    ```
 
 5. **Push your changes**
+
    ```bash
    git push -u origin feature/your-feature-name
    ```

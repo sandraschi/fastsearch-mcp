@@ -3,22 +3,18 @@
 # Change to the service directory
 Set-Location -Path $PSScriptRoot\service
 
-# Build the service in release mode
-Write-Host "Building FastSearch MCP Service..."
-$buildOutput = cargo build --release 2>&1
+# Build the Python service
+Write-Host "Setting up FastSearch MCP Service..."
+
+# Install Python dependencies
+$pythonDir = "$PSScriptRoot\service\src\fastsearch_service_python"
+Write-Host "Installing Python dependencies..."
+pip install -r "$pythonDir\requirements.txt"
 
 if ($LASTEXITCODE -eq 0) {
-    Write-Host "Build successful!" -ForegroundColor Green
-    
-    # Show where the binary was created
-    $binaryPath = "$PSScriptRoot\service\target\release\fastsearch-service.exe"
-    if (Test-Path $binaryPath) {
-        Write-Host "Binary created at: $binaryPath" -ForegroundColor Cyan
-    } else {
-        Write-Host "Warning: Could not find the built binary at expected location." -ForegroundColor Yellow
-    }
+    Write-Host "Setup completed successfully!" -ForegroundColor Green
+    exit 0
 } else {
-    Write-Host "Build failed with errors:" -ForegroundColor Red
-    $buildOutput | ForEach-Object { Write-Host $_ -ForegroundColor Red }
+    Write-Host "Setup failed with errors:" -ForegroundColor Red
     exit 1
 }

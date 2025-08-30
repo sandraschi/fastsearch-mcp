@@ -1,4 +1,4 @@
-""
+"""
 FastSearch MCP - Command Line Interface
 
 This module provides the entry point for the DXT package.

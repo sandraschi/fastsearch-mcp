@@ -40,13 +40,11 @@ $env:Path = "$wixPath;$env:Path"
 
 # Step 1: Clean previous builds
 Write-Host "`n🧹 Cleaning previous builds..." -ForegroundColor Yellow
-cargo clean
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+# Python cleanup steps will go here
 
 # Step 2: Build release
-Write-Host "`n🔨 Building release..." -ForegroundColor Yellow
-cargo build --release --all-targets
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+Write-Host "`n🔨 Building Python package..." -ForegroundColor Yellow
+# Python build steps will go here
 
 # Step 3: Create installer
 Write-Host "`n📦 Creating installer..." -ForegroundColor Yellow
@@ -87,7 +85,7 @@ if ($DryRun) {
     # This would be the actual release process
     Write-Host "`n🚀 Creating release tag v$TestVersion..." -ForegroundColor Cyan
     
-    # Update version in Cargo.toml if needed
+    # Update version in setup.py if needed
     # Create tag
     # Push to GitHub
     

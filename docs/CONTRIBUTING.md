@@ -21,11 +21,14 @@ This project and everyone participating in it is governed by our [Code of Conduc
 
 1. **Fork** the repository on GitHub
 2. **Clone** your fork locally
+
    ```bash
    git clone https://github.com/yourusername/fastsearch-mcp.git
    cd fastsearch-mcp
    ```
+
 3. Set up the development environment:
+
    ```bash
    # Install Python dependencies
    pip install -e .[dev]
@@ -37,6 +40,7 @@ This project and everyone participating in it is governed by our [Code of Conduc
 ## Development Workflow
 
 1. Create a new branch for your feature/fix:
+
    ```bash
    git checkout -b feature/your-feature-name
    ```
@@ -44,16 +48,19 @@ This project and everyone participating in it is governed by our [Code of Conduc
 2. Make your changes following the code style guidelines
 
 3. Run tests to ensure nothing is broken
+
    ```bash
    pytest
    ```
 
 4. Commit your changes with a descriptive message:
+
    ```bash
    git commit -m "Add feature: your feature description"
    ```
 
 5. Push your branch to your fork:
+
    ```bash
    git push origin feature/your-feature-name
    ```
