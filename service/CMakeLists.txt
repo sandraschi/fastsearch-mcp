@@ -34,7 +34,7 @@ if(WIN32)
 endif()
 
 # Add the service executable
-add_executable(FastSearchService
+add_executable(FastSearchServiceNew
     src/fastsearch_service.cpp
     include/fastsearch_service.h
 )
@@ -45,7 +45,7 @@ if(WIN32)
     add_compile_definitions(UNICODE _UNICODE)
     
     # Link Windows libraries
-    target_link_libraries(FastSearchService
+    target_link_libraries(FastSearchServiceNew
         PRIVATE
             advapi32.lib
             shell32.lib
@@ -59,7 +59,7 @@ if(WIN32)
 endif()
 
 # Installation
-install(TARGETS FastSearchService
+install(TARGETS FastSearchServiceNew
     RUNTIME DESTINATION bin
     CONFIGURATIONS Release
 )

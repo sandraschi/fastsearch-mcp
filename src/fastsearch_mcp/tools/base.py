@@ -6,7 +6,7 @@ import inspect
 import json
 from dataclasses import asdict, dataclass, field
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Type, TypeVar, Union
+from typing import Any, Callable, Dict, List, Optional, Set, Type, TypeVar, Union
 
 from fastsearch_mcp.logging_config import get_logger
 
@@ -55,6 +55,9 @@ class ToolDefinition:
     return_type: Type = type(None)
     return_description: str = ""
     requires_elevation: bool = False
+    tags: Optional[Set[str]] = None
+    enabled: bool = True
+    exclude_args: Optional[List[str]] = None
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to a dictionary for JSON serialization."""
@@ -65,7 +68,10 @@ class ToolDefinition:
             'parameters': [p.to_dict() for p in self.parameters],
             'return_type': self.return_type.__name__,
             'return_description': self.return_description,
-            'requires_elevation': self.requires_elevation
+            'requires_elevation': self.requires_elevation,
+            'tags': list(self.tags) if self.tags else [],
+            'enabled': self.enabled,
+            'exclude_args': self.exclude_args or []
         }
 
 
@@ -75,14 +81,9 @@ class BaseTool(abc.ABC):
     def __init_subclass__(cls, **kwargs):
         """Register the tool when a subclass is created."""
         super().__init_subclass__(**kwargs)
-        if not inspect.isabstract(cls):
-            ToolRegistry.register_tool(cls())
+        # Tool registration is now handled by the @tool decorator
     
-    @classmethod
-    @abc.abstractmethod
-    def get_definition(cls) -> ToolDefinition:
-        """Return the tool's definition."""
-        raise NotImplementedError
+    # get_definition method will be added by the @tool decorator
     
     @abc.abstractmethod
     async def execute(self, **kwargs) -> Any:
@@ -162,7 +163,10 @@ def tool(
     parameters: Optional[List[ToolParameter]] = None,
     return_type: Type = type(None),
     return_description: str = "",
-    requires_elevation: bool = False
+    requires_elevation: bool = False,
+    tags: Optional[Set[str]] = None,
+    enabled: bool = True,
+    exclude_args: Optional[List[str]] = None
 ) -> Callable[[Type[T]], Type[T]]:
     """Decorator to register a tool with its definition.
     
@@ -174,6 +178,9 @@ def tool(
         return_type: Type of the return value
         return_description: Description of the return value
         requires_elevation: Whether the tool requires elevated privileges
+        tags: Set of tags for categorizing the tool
+        enabled: Whether the tool is enabled
+        exclude_args: List of argument names to exclude from tool schema
     """
     if parameters is None:
         parameters = []
@@ -187,25 +194,20 @@ def tool(
             parameters=parameters,
             return_type=return_type,
             return_description=return_description,
-            requires_elevation=requires_elevation
+            requires_elevation=requires_elevation,
+            tags=tags,
+            enabled=enabled,
+            exclude_args=exclude_args
         )
         
         # Add the get_definition method to the class
-        @classmethod
         def get_definition(cls) -> ToolDefinition:
             return definition
             
-        cls.get_definition = get_definition
+        cls.get_definition = classmethod(get_definition)
         
-        # Register the tool when the class is created
-        original_init_subclass = cls.__init_subclass__
-        
-        def __init_subclass__(cls, **kwargs):
-            original_init_subclass(**kwargs)
-            if not inspect.isabstract(cls):
-                ToolRegistry.register_tool(cls())
-                
-        cls.__init_subclass__ = classmethod(__init_subclass__)
+        # Register the tool in the registry
+        ToolRegistry.register_tool(cls())
         
         return cls
     

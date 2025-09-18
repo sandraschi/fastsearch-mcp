@@ -11,8 +11,8 @@
     <Package InstallerVersion="500" 
              Compressed="yes" 
              InstallScope="perMachine"
-             Description="FastSearch MCP - High-performance NTFS file search"
-             Comments="FastSearch MCP provides lightning-fast file search using direct NTFS MFT access"
+             Description="FastSearch MCP - High-performance NTFS file search with Claude Desktop integration"
+             Comments="FastSearch MCP provides lightning-fast file search using direct NTFS MFT access via C++ service with Python MCP bridge"
              InstallPrivileges="elevated" />
              
     <MajorUpgrade DowngradeErrorMessage="A newer version of FastSearch MCP is already installed." />
@@ -30,8 +30,10 @@
 
     <!-- Application files -->
     <Feature Id="ProductFeature" Title="FastSearch MCP" Level="1">
-      <ComponentRef Id="ServiceBinary" />
+      <ComponentRef Id="CppServiceBinary" />
+      <ComponentRef Id="PythonMCPBridge" />
       <ComponentRef Id="ServiceInstall" />
+      <ComponentRef Id="PowerShellScripts" />
       <ComponentRef Id="Documentation" />
       <ComponentRef Id="StartMenuShortcuts" />
     </Feature>
@@ -39,24 +41,23 @@
     <!-- UI Configuration -->
     <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
     <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Start FastSearch Service" />
-    <Property Id="WixShellExecTarget" Value="[#FastSearchServiceExe]" />
     
     <!-- Service Configuration -->
-    <Property Id="SERVICENAME" Value="FastSearchService" />
+    <Property Id="SERVICENAME" Value="FastSearchMCP" />
     <Property Id="SERVICEDISPLAYNAME" Value="FastSearch MCP Service" />
-    <Property Id="SERVICEDESCRIPTION" Value="Provides high-performance NTFS file search capabilities" />
+    <Property Id="SERVICEDESCRIPTION" Value="Provides high-performance NTFS file search capabilities using direct MFT access" />
     
     <!-- Service Control -->
     <CustomAction Id="StartService" 
                  FileKey="FastSearchServiceExe" 
-                 ExeCommand='start' 
+                 ExeCommand='--start' 
                  Execute="deferred" 
                  Return="ignore" 
                  Impersonate="no" />
     
     <CustomAction Id="StopService" 
                  FileKey="FastSearchServiceExe" 
-                 ExeCommand='stop' 
+                 ExeCommand='--stop' 
                  Execute="deferred" 
                  Return="ignore" 
                  Impersonate="no" />
@@ -81,8 +82,8 @@
     
     <!-- Custom Actions -->
     <CustomAction Id="LaunchServiceControl" 
-                  FileKey="FastSearchServiceExe" 
-                  ExeCommand="help" 
+                  FileKey="ServiceControlScript" 
+                  ExeCommand="" 
                   Return="asyncNoWait" />
                   
     <UI>
@@ -94,13 +95,47 @@
 
     <!-- Files -->
     <DirectoryRef Id="INSTALLFOLDER">
-      <!-- Service Binary -->
-      <Component Id="ServiceBinary" Guid="*">
+      <!-- C++ Service Binary -->
+      <Component Id="CppServiceBinary" Guid="*">
         <File Id="FastSearchServiceExe" 
-              Source="$(var.SolutionDir)service\build\$(var.Configuration)\FastSearchService.exe" 
+              Source="$(var.SolutionDir)service\build\bin\Release\FastSearchServiceNew.exe" 
               KeyPath="yes" />
-        
-        <!-- Service Installation -->
+      </Component>
+      
+      <!-- Python MCP Bridge -->
+      <Component Id="PythonMCPBridge" Guid="*">
+        <File Id="MCPBridgePy" 
+              Source="$(var.SolutionDir)src\fastsearch_mcp\server.py" 
+              KeyPath="yes" />
+        <File Id="MCPBridgeInit" 
+              Source="$(var.SolutionDir)src\fastsearch_mcp\__init__.py" />
+        <File Id="ServiceClientPy" 
+              Source="$(var.SolutionDir)src\fastsearch_mcp\service_client.py" />
+        <File Id="LoggingConfigPy" 
+              Source="$(var.SolutionDir)src\fastsearch_mcp\logging_config.py" />
+        <File Id="UtilsInit" 
+              Source="$(var.SolutionDir)src\fastsearch_mcp\utils\__init__.py" />
+        <File Id="FileUtilsPy" 
+              Source="$(var.SolutionDir)src\fastsearch_mcp\utils\file_utils.py" />
+      </Component>
+      
+      <!-- PowerShell Management Scripts -->
+      <Component Id="PowerShellScripts" Guid="*">
+        <File Id="InstallServicePs1" 
+              Source="$(var.SolutionDir)install-service.ps1" 
+              KeyPath="yes" />
+        <File Id="FixServicePs1" 
+              Source="$(var.SolutionDir)fix-service.ps1" />
+        <File Id="TestServicePs1" 
+              Source="$(var.SolutionDir)test-service.ps1" />
+        <File Id="TestServiceStartupPs1" 
+              Source="$(var.SolutionDir)test-service-startup.ps1" />
+        <File Id="TestWindowsServicePs1" 
+              Source="$(var.SolutionDir)test-windows-service.ps1" />
+      </Component>
+      
+      <!-- Service Installation -->
+      <Component Id="ServiceInstall" Guid="*">
         <ServiceInstall 
           Id="ServiceInstaller" 
           Type="ownProcess"
@@ -124,15 +159,11 @@
           Wait="yes" />
       </Component>
       
-      <!-- Service Configuration -->
-      <Component Id="ServiceConfig" Guid="*">
-        <File Id="ServiceConfigFile" Source="..\\service\\config\\service_config.json" KeyPath="yes" />
-        <util:XmlFile Id="UpdateServiceConfig" 
-                     File="[#ServiceConfigFile]" 
-                     Action="setValue" 
-                     Name="LogLevel" 
-                     Value="Info" 
-                     ElementPath="//Configuration/Logging" />
+      <!-- Service Control Script -->
+      <Component Id="ServiceControlScript" Guid="*">
+        <File Id="ServiceControlBat" 
+              Source="$(var.SolutionDir)service-control.bat" 
+              KeyPath="yes" />
       </Component>
       
       <!-- Start Menu Shortcuts -->
@@ -140,8 +171,7 @@
         <Shortcut Id="StartMenuServiceControl" 
                  Name="Service Control" 
                  Description="Manage FastSearch Service"
-                 Target="[SystemFolder]cmd.exe"
-                 Arguments="/k &quot;$(var.SERVICENAME) help&quot;"
+                 Target="[INSTALLFOLDER]service-control.bat"
                  WorkingDirectory="INSTALLFOLDER" />
         <Shortcut Id="StartMenuReadme" 
                  Name="Readme" 
@@ -154,61 +184,17 @@
                       KeyPath="yes" />
       </Component>
       
-      <!-- Service Control Script -->
-      <Component Id="ServiceControlScript" Guid="*">
-        <File Id="ServiceControlBat" Source="..\\service\\scripts\\service_control.bat" KeyPath="yes">
-          <Shortcut Id="StartMenuServiceControl" 
-                   Directory="ApplicationProgramsFolder" 
-                   Name="FastSearch Service Control" 
-                   WorkingDirectory="INSTALLFOLDER"
-                   Icon="mainicon.ico"
-                   Advertise="yes" />
-        </File>
-      </Component>
-      
       <!-- Documentation -->
-      <Component Id="ReadmeFile" Guid="*">
+      <Component Id="Documentation" Guid="*">
         <File Id="Readme" 
-              Source="..\\README.md" 
+              Source="$(var.SolutionDir)README.md" 
               KeyPath="yes" />
-        <Shortcut Id="startmenuReadme" 
-                 Directory="ApplicationProgramsFolder" 
-                 Name="Readme" 
-                 WorkingDirectory="INSTALLFOLDER"
-                 Advertise="yes" />
-      </Component>
-      
-      <!-- License -->
-      <Component Id="LicenseFile" Guid="*">
         <File Id="License" 
-              Source="..\\LICENSE" 
-              KeyPath="yes" />
-      </Component>
-      
-      <!-- Windows Service -->
-      <Component Id="ServiceInstall" Guid="*">
-        <File Id="FastSearchService" 
-              Source="..\\service\\target\\release\\fastsearch.exe" 
-              KeyPath="yes" />
-        <ServiceInstall Id="FastSearchService" 
-                       Name="FastSearchService" 
-                       DisplayName="FastSearch MCP Service"
-                       Description="Provides lightning-fast file search using NTFS MFT"
-                       Start="auto" 
-                       Type="ownProcess"
-                       Vital="yes"
-                       ErrorControl="normal"
-                       Account="LocalSystem"
-                       Arguments="--run-as-service"
-                       Interactive="no">
-          <ServiceDependency Id="tcpip" />
-        </ServiceInstall>
-        <ServiceControl Id="StartService" 
-                       Name="FastSearchService" 
-                       Start="install" 
-                       Stop="both" 
-                       Remove="uninstall" 
-                       Wait="yes" />
+              Source="$(var.SolutionDir)LICENSE" />
+        <File Id="Changelog" 
+              Source="$(var.SolutionDir)docs\CHANGELOG.md" />
+        <File Id="ServiceStatus" 
+              Source="$(var.SolutionDir)docs\SERVICE_DEVELOPMENT_STATUS.md" />
       </Component>
     </DirectoryRef>
   </Product>

@@ -11,53 +11,77 @@ from typing import Iterator, List, Optional, Pattern
 
 
 def find_files(
-    pattern: str,
-    root_dir: str = ".",
-    max_results: int = 100,
-    case_sensitive: bool = False
-) -> List[str]:
+    root_dir: str,
+    include: str = "*",
+    exclude: Optional[str] = None,
+    max_size: Optional[int] = None,
+    skip_binary: bool = True,
+    max_results: int = 100
+) -> Iterator[Path]:
     """
-    Find files matching a pattern using direct NTFS MFT access.
+    Find files matching patterns using directory tree walk (fallback implementation).
     
     Args:
-        pattern: Glob pattern to match files
         root_dir: Root directory to search in
+        include: Include pattern (glob)
+        exclude: Exclude pattern (glob)
+        max_size: Maximum file size in bytes
+        skip_binary: Whether to skip binary files
         max_results: Maximum number of results to return
-        case_sensitive: Whether the search should be case sensitive
         
     Returns:
-        List of matching file paths
+        Iterator of matching file paths
     """
-    # Convert glob pattern to regex
-    regex_pattern = _glob_to_regex(pattern)
-    if not case_sensitive:
-        regex_pattern = re.compile(regex_pattern.pattern, re.IGNORECASE)
-    
-    results = []
     root_path = Path(root_dir)
+    if not root_path.exists():
+        return
     
+    # Convert glob patterns to regex
+    include_regex = _glob_to_regex(include)
+    exclude_regex = _glob_to_regex(exclude) if exclude else None
+    
+    count = 0
     try:
-        # Use os.walk for now - in production this would use NTFS MFT
+        # Use os.walk for directory traversal (fallback implementation)
         for root, dirs, files in os.walk(root_path):
+            # Skip excluded directories
+            if exclude_regex:
+                dirs[:] = [d for d in dirs if not exclude_regex.search(d)]
+            
             for file in files:
-                if len(results) >= max_results:
-                    break
+                if count >= max_results:
+                    return
                     
                 file_path = Path(root) / file
-                if regex_pattern.search(str(file_path)):
-                    results.append(str(file_path))
+                
+                # Check file size limit
+                if max_size:
+                    try:
+                        if file_path.stat().st_size > max_size:
+                            continue
+                    except OSError:
+                        continue
+                
+                # Check if file matches include pattern
+                if include_regex.search(file_path.name):
+                    # Skip binary files if requested
+                    if skip_binary and is_binary_file(str(file_path)):
+                        continue
+                    
+                    yield file_path
+                    count += 1
                     
     except Exception as e:
-        # Log error but don't fail completely
         print(f"Error searching files: {e}")
-    
-    return results
 
 
 def search_in_file(
     file_path: str,
     pattern: str,
-    case_sensitive: bool = False
+    case_sensitive: bool = False,
+    whole_word: bool = False,
+    context_lines: int = 0,
+    max_matches: int = 100
 ) -> List[dict]:
     """
     Search for a pattern within a file.
@@ -66,6 +90,9 @@ def search_in_file(
         file_path: Path to the file to search
         pattern: Pattern to search for
         case_sensitive: Whether the search should be case sensitive
+        whole_word: Whether to match whole words only
+        context_lines: Number of context lines to include around matches
+        max_matches: Maximum number of matches to return
         
     Returns:
         List of matches with line numbers and content
@@ -74,21 +101,57 @@ def search_in_file(
     
     try:
         with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-            for line_num, line in enumerate(f, 1):
-                if case_sensitive:
-                    if pattern in line:
-                        matches.append({
-                            'line': line_num,
-                            'content': line.strip(),
-                            'file': file_path
-                        })
+            lines = f.readlines()
+            
+            for line_num, line in enumerate(lines, 1):
+                if len(matches) >= max_matches:
+                    break
+                    
+                # Prepare the search text
+                search_text = line
+                search_pattern = pattern
+                
+                if not case_sensitive:
+                    search_text = search_text.lower()
+                    search_pattern = search_pattern.lower()
+                
+                # Check for matches
+                if whole_word:
+                    # Use word boundaries for whole word matching
+                    import re
+                    word_pattern = r'\b' + re.escape(search_pattern) + r'\b'
+                    if re.search(word_pattern, search_text):
+                        match_found = True
+                    else:
+                        match_found = False
                 else:
-                    if pattern.lower() in line.lower():
-                        matches.append({
-                            'line': line_num,
-                            'content': line.strip(),
-                            'file': file_path
-                        })
+                    match_found = search_pattern in search_text
+                
+                if match_found:
+                    # Find the position of the match
+                    start_pos = search_text.find(search_pattern)
+                    end_pos = start_pos + len(search_pattern)
+                    
+                    # Get context lines
+                    context = []
+                    if context_lines > 0:
+                        start_line = max(1, line_num - context_lines)
+                        end_line = min(len(lines), line_num + context_lines)
+                        for i in range(start_line - 1, end_line):
+                            context.append({
+                                'line': i + 1,
+                                'content': lines[i].rstrip()
+                            })
+                    
+                    matches.append({
+                        'line': line_num,
+                        'start': start_pos,
+                        'end': end_pos,
+                        'match': pattern,
+                        'line_content': line.rstrip(),
+                        'context': context
+                    })
+                    
     except Exception as e:
         print(f"Error searching in file {file_path}: {e}")
     

@@ -3,7 +3,7 @@
 
 param(
     [Parameter(Mandatory=$false)]
-    [ValidateSet("install", "uninstall", "start", "stop", "status", "help")]
+    [ValidateSet("install", "uninstall", "start", "stop", "status", "diagnose", "help")]
     [string]$Action = "help"
 )
 
@@ -11,7 +11,7 @@ param(
 $ServiceName = "FastSearchMCP"
 $ServiceDisplayName = "FastSearch MCP Service"
 $ServiceDescription = "Provides fast file search capabilities using direct NTFS MFT access"
-$ServiceExecutable = "service\build\bin\Release\FastSearchService.exe"
+$ServiceExecutable = "service\build\bin\Release\FastSearchServiceNew.exe"
 $ServicePath = Resolve-Path $ServiceExecutable -ErrorAction SilentlyContinue
 
 # Colors for output
@@ -37,7 +37,7 @@ function Test-Administrator {
 function Test-ServiceExists {
     param([string]$ServiceName)
     $service = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
-    return $service -ne $null
+    return $null -ne $service
 }
 
 function Get-ServiceStatus {
@@ -85,8 +85,16 @@ function Install-Service {
     # Install the service
     Write-ColorOutput "Installing service from: $ServicePath" $InfoColor
     try {
-        & $ServicePath --install
-        if ($LASTEXITCODE -eq 0) {
+        $output = & $ServicePath --install 2>&1
+        $exitCode = $LASTEXITCODE
+        
+        # Check for error messages in output
+        if ($output -match "failed|error|Error") {
+            Write-ColorOutput "⚠️  Service installation warnings:" $WarningColor
+            Write-ColorOutput $output $WarningColor
+        }
+        
+        if ($exitCode -eq 0) {
             Write-ColorOutput "✅ Service installed successfully!" $SuccessColor
             Write-ColorOutput "Service Name: $ServiceName" $InfoColor
             Write-ColorOutput "Display Name: $ServiceDisplayName" $InfoColor
@@ -94,7 +102,8 @@ function Install-Service {
             return $true
         }
         else {
-            Write-ColorOutput "❌ Service installation failed (exit code: $LASTEXITCODE)" $ErrorColor
+            Write-ColorOutput "❌ Service installation failed (exit code: $exitCode)" $ErrorColor
+            Write-ColorOutput $output $ErrorColor
             return $false
         }
     }
@@ -130,13 +139,22 @@ function Uninstall-Service {
     
     # Uninstall the service
     try {
-        & $ServicePath --uninstall
-        if ($LASTEXITCODE -eq 0) {
+        $output = & $ServicePath --uninstall 2>&1
+        $exitCode = $LASTEXITCODE
+        
+        # Check for error messages in output
+        if ($output -match "failed|error|Error") {
+            Write-ColorOutput "⚠️  Service uninstallation warnings:" $WarningColor
+            Write-ColorOutput $output $WarningColor
+        }
+        
+        if ($exitCode -eq 0) {
             Write-ColorOutput "✅ Service uninstalled successfully!" $SuccessColor
             return $true
         }
         else {
-            Write-ColorOutput "❌ Service uninstallation failed (exit code: $LASTEXITCODE)" $ErrorColor
+            Write-ColorOutput "❌ Service uninstallation failed (exit code: $exitCode)" $ErrorColor
+            Write-ColorOutput $output $ErrorColor
             return $false
         }
     }
@@ -146,7 +164,7 @@ function Uninstall-Service {
     }
 }
 
-function Start-Service {
+function Start-FastSearchService {
     Write-ColorOutput "Starting FastSearch MCP Service..." $InfoColor
     
     # Check if service exists
@@ -177,7 +195,7 @@ function Start-Service {
     }
 }
 
-function Stop-Service {
+function Stop-FastSearchService {
     Write-ColorOutput "Stopping FastSearch MCP Service..." $InfoColor
     
     # Check if service exists
@@ -236,6 +254,52 @@ function Show-ServiceStatus {
     }
 }
 
+function Resolve-ServiceIssues {
+    Write-ColorOutput "Diagnosing FastSearch MCP Service Issues..." $InfoColor
+    Write-ColorOutput "=============================================" $InfoColor
+    
+    # Check if service exists but is in a bad state
+    $service = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
+    if ($service) {
+        Write-ColorOutput "Service exists with status: $($service.Status)" $InfoColor
+        
+        if ($service.Status -eq "Stopped") {
+            Write-ColorOutput "Attempting to start service..." $InfoColor
+            try {
+                Start-Service -Name $ServiceName
+                Start-Sleep -Seconds 3
+                $newStatus = Get-Service -Name $ServiceName
+                Write-ColorOutput "Service status after start: $($newStatus.Status)" $InfoColor
+            }
+            catch {
+                Write-ColorOutput "Failed to start service: $($_.Exception.Message)" $ErrorColor
+            }
+        }
+    }
+    
+    # Check for orphaned service entries
+    Write-ColorOutput "`nChecking for service registry entries..." $InfoColor
+    try {
+        $regPath = "HKLM:\SYSTEM\CurrentControlSet\Services\$ServiceName"
+        if (Test-Path $regPath) {
+            Write-ColorOutput "✅ Service registry entry exists" $SuccessColor
+        }
+        else {
+            Write-ColorOutput "❌ Service registry entry not found" $ErrorColor
+        }
+    }
+    catch {
+        Write-ColorOutput "❌ Cannot access service registry: $($_.Exception.Message)" $ErrorColor
+    }
+    
+    # Suggest solutions
+    Write-ColorOutput "`nRecommended solutions:" $InfoColor
+    Write-ColorOutput "1. Wait 30 seconds and try again (Windows cleanup delay)" $InfoColor
+    Write-ColorOutput "2. Restart Windows to clear service state" $InfoColor
+    Write-ColorOutput "3. Use sc.exe to manually delete: sc delete $ServiceName" $InfoColor
+    Write-ColorOutput "4. Check Windows Event Log for detailed error messages" $InfoColor
+}
+
 function Show-Help {
     Write-ColorOutput "FastSearch MCP Service Installer" $InfoColor
     Write-ColorOutput "===============================" $InfoColor
@@ -248,6 +312,7 @@ function Show-Help {
     Write-ColorOutput "  start      - Start the service" $InfoColor
     Write-ColorOutput "  stop       - Stop the service" $InfoColor
     Write-ColorOutput "  status     - Show service status" $InfoColor
+    Write-ColorOutput "  diagnose   - Diagnose service installation issues" $InfoColor
     Write-ColorOutput "  help       - Show this help" $InfoColor
     Write-ColorOutput ""
     Write-ColorOutput "Examples:" $InfoColor
@@ -270,13 +335,16 @@ switch ($Action.ToLower()) {
         Uninstall-Service
     }
     "start" {
-        Start-Service
+        Start-FastSearchService
     }
     "stop" {
-        Stop-Service
+        Stop-FastSearchService
     }
     "status" {
         Show-ServiceStatus
+    }
+    "diagnose" {
+        Resolve-ServiceIssues
     }
     "help" {
         Show-Help

@@ -4,9 +4,9 @@
      xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
 
   <Bundle Name="FastSearch MCP" 
-          Version="1.0.0.0" 
+          Version="2.0.0.0" 
           Manufacturer="FastSearch" 
-          UpgradeCode="YOUR-UPGRADE-CODE-HERE"
+          UpgradeCode="3298de23-b4e3-481e-91f7-ddcb238b95b4"
           IconSourceFile="$(var.SolutionDir)assets\icon.ico">
     
     <BootstrapperApplicationRef Id="WixStandardBootstrapperApplication.RtlLicense">
@@ -22,28 +22,76 @@
         />
     </BootstrapperApplicationRef>
 
-    <!-- Check for .NET 6.0 or later -->
+    <!-- Check for Python 3.8 or later -->
     <util:RegistrySearch 
       Root="HKLM"
-      Key="SOFTWARE\dotnet\Setup\InstalledVersions\x64\sharedhost"
-      Value="Version"
-      Variable="DotNetVersion"
-      Result="value"
+      Key="SOFTWARE\Python\PythonCore\3.8\InstallPath"
+      Value=""
+      Variable="PythonPath"
+      Result="exists"
+      Format="raw" />
+
+    <util:RegistrySearch 
+      Root="HKLM"
+      Key="SOFTWARE\Python\PythonCore\3.9\InstallPath"
+      Value=""
+      Variable="PythonPath39"
+      Result="exists"
+      Format="raw" />
+
+    <util:RegistrySearch 
+      Root="HKLM"
+      Key="SOFTWARE\Python\PythonCore\3.10\InstallPath"
+      Value=""
+      Variable="PythonPath310"
+      Result="exists"
+      Format="raw" />
+
+    <util:RegistrySearch 
+      Root="HKLM"
+      Key="SOFTWARE\Python\PythonCore\3.11\InstallPath"
+      Value=""
+      Variable="PythonPath311"
+      Result="exists"
+      Format="raw" />
+
+    <util:RegistrySearch 
+      Root="HKLM"
+      Key="SOFTWARE\Python\PythonCore\3.12\InstallPath"
+      Value=""
+      Variable="PythonPath312"
+      Result="exists"
       Format="raw" />
 
     <Chain>
-      <!-- Install .NET 6.0 Desktop Runtime if needed -->
-      <ExePackage Id="DotNetDesktopRuntime"
-                  DisplayName="Microsoft .NET 6.0 Desktop Runtime"
+      <!-- Install Python 3.8+ if needed -->
+      <ExePackage Id="PythonInstaller"
+                  DisplayName="Python 3.8+ Runtime"
                   Cache="yes"
                   Compressed="yes"
                   PerMachine="yes"
                   Permanent="yes"
                   Vital="yes"
-                  SourceFile="$(var.SolutionDir)redist\windowsdesktop-runtime-6.0.0-win-x64.exe"
-                  DownloadUrl="https://download.visualstudio.microsoft.com/download/pr/5e3f1a1c-5b3a-47c0-9d70-2c0d9caf9c3c/1b5e0d1f7b3c5b5e5f7a9b0d3e5f7a9b0/windowsdesktop-runtime-6.0.0-win-x64.exe"
-                  InstallCommand="/install /quiet /norestart"
-                  DetectCondition="DotNetVersion >= v6.0.0">
+                  SourceFile="$(var.SolutionDir)redist\python-3.11.0-amd64.exe"
+                  DownloadUrl="https://www.python.org/ftp/python/3.11.0/python-3.11.0-amd64.exe"
+                  InstallCommand="/quiet InstallAllUsers=1 PrependPath=1 Include_test=0"
+                  DetectCondition="PythonPath OR PythonPath39 OR PythonPath310 OR PythonPath311 OR PythonPath312">
+        <ExitCode Behavior="success" Value="0" />
+        <ExitCode Behavior="error" Value="3010" /> <!-- Reboot required -->
+      </ExePackage>
+
+      <!-- Install Visual C++ Redistributable -->
+      <ExePackage Id="VCRedist"
+                  DisplayName="Microsoft Visual C++ Redistributable"
+                  Cache="yes"
+                  Compressed="yes"
+                  PerMachine="yes"
+                  Permanent="yes"
+                  Vital="yes"
+                  SourceFile="$(var.SolutionDir)redist\vc_redist.x64.exe"
+                  DownloadUrl="https://aka.ms/vs/17/release/vc_redist.x64.exe"
+                  InstallCommand="/quiet /norestart"
+                  DetectCondition="VersionNT >= v6.0">
         <ExitCode Behavior="success" Value="0" />
         <ExitCode Behavior="error" Value="3010" /> <!-- Reboot required -->
       </ExePackage>

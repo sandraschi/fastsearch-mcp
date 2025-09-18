@@ -832,6 +832,21 @@ VOID SvcStop() {
 
 // Entry point for the service
 VOID WINAPI SvcMain(DWORD dwArgc, LPTSTR* lpszArgv) {
+    // Register the handler function for the service
+    gSvcStatusHandle = RegisterServiceCtrlHandler(SVCNAME, SvcCtrlHandler);
+    
+    if (!gSvcStatusHandle) {
+        SvcReportEvent((LPTSTR)TEXT("RegisterServiceCtrlHandler"));
+        return;
+    }
+    
+    // These SERVICE_STATUS members remain as set here
+    gSvcStatus.dwServiceType = SERVICE_WIN32_OWN_PROCESS;
+    gSvcStatus.dwServiceSpecificExitCode = 0;
+    
+    // Report initial status to the SCM
+    ReportSvcStatus(SERVICE_START_PENDING, NO_ERROR, 3000);
+    
     // Initialize global critical section
     InitializeCriticalSectionAndSpinCount(&gCS, 4000);
     
@@ -841,7 +856,20 @@ VOID WINAPI SvcMain(DWORD dwArgc, LPTSTR* lpszArgv) {
     EnablePrivilege(SE_RESTORE_NAME);
     EnablePrivilege(SE_MANAGE_VOLUME_NAME);
     
-    // Start the named pipe server in a separate thread
+    // Report that the service is starting
+    ReportSvcStatus(SERVICE_START_PENDING, NO_ERROR, 3000);
+    
+    // Create the service stop event first
+    ghSvcStopEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+    if (ghSvcStopEvent == NULL) {
+        ReportSvcStatus(SERVICE_STOPPED, GetLastError(), 0);
+        return;
+    }
+    
+    // Start the named pipe server
+    StartPipeServer();
+    
+    // Start the named pipe server thread
     HANDLE hPipeThread = CreateThread(
         NULL,              // Default security
         0,                 // Default stack size
@@ -853,8 +881,12 @@ VOID WINAPI SvcMain(DWORD dwArgc, LPTSTR* lpszArgv) {
     
     if (hPipeThread == NULL) {
         SvcReportEvent((LPTSTR)TEXT("CreateThread(PipeServerThread)"));
+        ReportSvcStatus(SERVICE_STOPPED, GetLastError(), 0);
         return;
     }
+    
+    // Report that the service is starting
+    ReportSvcStatus(SERVICE_START_PENDING, NO_ERROR, 3000);
     
     // Initialize volume handles and MFT processing with memory-mapped I/O
     HANDLE hVolume = CreateFile(TEXT("\\\\.\\C:$"), 
@@ -982,6 +1014,35 @@ VOID WINAPI SvcMain(DWORD dwArgc, LPTSTR* lpszArgv) {
         }
     }
     CloseHandle(hVolume);
+    
+    // Report that the service is now running
+    ReportSvcStatus(SERVICE_RUNNING, NO_ERROR, 0);
+    
+    // Start the service worker thread
+    HANDLE hWorkerThread = CreateThread(
+        NULL,              // Default security
+        0,                 // Default stack size
+        ServiceWorkerThread, // Thread function
+        NULL,              // Thread parameter
+        0,                 // Start immediately
+        NULL               // Thread ID
+    );
+    
+    if (hWorkerThread == NULL) {
+        ReportSvcStatus(SERVICE_STOPPED, GetLastError(), 0);
+        return;
+    }
+    
+    // Wait for the service stop event
+    WaitForSingleObject(ghSvcStopEvent, INFINITE);
+    
+    // Clean up
+    CloseHandle(ghSvcStopEvent);
+    CloseHandle(hWorkerThread);
+    CloseHandle(hPipeThread);
+    
+    // Report that the service is stopping
+    ReportSvcStatus(SERVICE_STOPPED, NO_ERROR, 0);
 }
 
 // Service worker thread

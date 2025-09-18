@@ -84,8 +84,23 @@ class FileContentSearchTool(BaseTool):
     
     async def execute(self, **kwargs) -> Dict[str, Any]:
         """Execute the file content search."""
+        # Extract the parameters we need
+        search_pattern = kwargs.get('search_pattern', '')
+        search_dir = kwargs.get('search_dir', '.')
+        file_pattern = kwargs.get('file_pattern', '*')
+        exclude_dirs = kwargs.get('exclude_dirs', [])
+        case_sensitive = kwargs.get('case_sensitive', False)
+        whole_word = kwargs.get('whole_word', False)
+        max_results = kwargs.get('max_results', 100)
+        context_lines = kwargs.get('context_lines', 2)
+        max_file_size_mb = kwargs.get('max_file_size_mb', 10)
+        skip_binary = kwargs.get('skip_binary', True)
+        
         return await asyncio.get_event_loop().run_in_executor(
-            None, self._search_sync, **kwargs
+            None, self._search_sync,
+            search_pattern, search_dir, file_pattern, exclude_dirs,
+            case_sensitive, whole_word, max_results, context_lines,
+            max_file_size_mb, skip_binary
         )
     
     def _search_sync(
@@ -115,15 +130,8 @@ class FileContentSearchTool(BaseTool):
             }
         
         # Convert file pattern to regex for find_files
-        file_regex = (
-            file_pattern
-            .replace(".", "\\.")
-            .replace("*", ".*")
-            .replace("?", ".")
-            .replace(",", "|")
-            .replace("{", "(")
-            .replace("}", ")")
-        )
+        # Use the original pattern directly since find_files handles glob patterns
+        file_regex = file_pattern
         
         # Convert exclude_dirs to regex pattern
         exclude_pattern = "|\\.".join(
@@ -133,11 +141,12 @@ class FileContentSearchTool(BaseTool):
         
         # Find all matching files
         files = list(find_files(
-            root_dir=search_path,
+            root_dir=str(search_path),
             include=file_regex,
             exclude=exclude_pattern,
             max_size=max_file_size_mb * 1024 * 1024,
-            skip_binary=skip_binary
+            skip_binary=skip_binary,
+            max_results=max_results * 10  # Find more files than needed for content search
         ))
         
         if not files:

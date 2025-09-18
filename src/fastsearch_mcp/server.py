@@ -29,69 +29,53 @@ class FastSearchServer:
     
     def _setup_tools(self) -> None:
         """Register all available tools with the FastMCP app."""
-        from fastmcp.tools import Tool
         from .service_client import is_service_running
+        from .tools import AVAILABLE_TOOLS
         
         # Check if C++ service is running
         service_running = is_service_running()
         if not service_running:
             logger.warning("FastSearch C++ service is not running. Tools will use fallback implementation.")
         
-        # Create file search tool that uses C++ service
-        file_search_tool = Tool(
-            key="file_search",
-            name="file_search",
-            title="File Search",
-            description="Search for files using direct NTFS MFT access via C++ service",
-            parameters={
-                "pattern": {
-                    "type": "string",
-                    "description": "Search pattern (glob or regex)"
-                },
-                "directory": {
-                    "type": "string", 
-                    "description": "Directory to search in",
-                    "default": "."
-                },
-                "max_results": {
-                    "type": "integer",
-                    "description": "Maximum number of results",
-                    "default": 100
-                }
-            }
-        )
+        # Register all tools from the tools directory
+        registered_count = 0
+        for tool_class in AVAILABLE_TOOLS:
+            try:
+                # Get the tool definition
+                tool_def = tool_class.get_definition()
+                
+                # Create tool instance
+                tool_instance = tool_class()
+                
+                # Import tool wrappers
+                from .tool_wrappers import TOOL_WRAPPERS
+                
+                # Get the appropriate wrapper for this tool
+                wrapper_creator = TOOL_WRAPPERS.get(tool_def.name)
+                if wrapper_creator:
+                    wrapper_func = wrapper_creator(tool_instance)
+                else:
+                    # Fallback for unknown tools
+                    async def fallback_wrapper():
+                        """Fallback wrapper for unknown tools"""
+                        return await tool_instance.execute()
+                    wrapper_func = fallback_wrapper
+                
+                # Register the wrapper function with FastMCP 2.12
+                self.app.tool(
+                    name=tool_def.name,
+                    description=tool_def.description,
+                    tags={tool_def.category.value.lower().replace(" ", "_")},
+                    enabled=True
+                )(wrapper_func)
+                
+                registered_count += 1
+                logger.info(f"Registered tool: {tool_def.name}")
+                
+            except Exception as e:
+                logger.error(f"Failed to register tool {tool_class.__name__}: {e}")
         
-        # Create service status tool
-        status_tool = Tool(
-            key="service_status",
-            name="service_status",
-            title="Service Status",
-            description="Get the status of the FastSearch C++ service",
-            parameters={}
-        )
-        
-        # Create help tool
-        help_tool = Tool(
-            key="help",
-            name="help", 
-            title="Help",
-            description="Get help for available tools",
-            parameters={
-                "tool_name": {
-                    "type": "string",
-                    "description": "Name of tool to get help for (optional)",
-                    "default": None
-                }
-            }
-        )
-        
-        try:
-            self.app.add_tool(file_search_tool)
-            self.app.add_tool(status_tool)
-            self.app.add_tool(help_tool)
-            logger.info("Registered FastMCP 2.12 tools: file_search, service_status, help")
-        except Exception as e:
-            logger.error(f"Failed to register tools: {e}")
+        logger.info(f"Successfully registered {registered_count} tools from tools directory")
     
     async def start(self, transport: str = "stdio") -> None:
         """Start the FastSearch MCP server."""
@@ -112,6 +96,10 @@ class FastSearchServer:
         except Exception as e:
             logger.error(f"Server error: {e}", exc_info=True)
             raise
+    
+    def get_app(self) -> FastMCP:
+        """Get the FastMCP app instance."""
+        return self.app
     
     def run(self, transport: str = "stdio") -> None:
         """Run the server (blocking)."""

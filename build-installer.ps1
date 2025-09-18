@@ -1,5 +1,5 @@
 # Build script for FastSearch MCP Installer
-# Requires: Visual Studio 2022, WiX Toolset, CMake
+# Requires: Visual Studio 2022, WiX Toolset, CMake, Python 3.8+
 
 param (
     [string]$Configuration = "Release",
@@ -11,7 +11,6 @@ $ErrorActionPreference = "Stop"
 $scriptPath = $PSScriptRoot
 $solutionDir = "$scriptPath\"
 $wixDir = "$scriptPath\wix"
-# Removed Python directory reference as it's no longer needed
 $installerDir = "$solutionDir\$OutputDir"
 
 # Create output directory if it doesn't exist
@@ -50,102 +49,134 @@ if (-not $SkipBuild) {
     }
     
     Pop-Location
-}
-
-# Verify prerequisites
-$prerequisites = @(
-    @{ Name = "WiX Toolset"; Path = @("C:\Program Files (x86)\WiX Toolset v3.14\bin", "C:\Program Files\WiX Toolset v3.14\bin"); Url = "https://wixtoolset.org/releases/" },
-    @{ Name = "Visual Studio 2022"; Path = @("C:\Program Files\Microsoft Visual Studio\2022\Community", "C:\Program Files\Microsoft Visual Studio\2022\Professional"); Url = "https://visualstudio.microsoft.com/downloads/" },
-    @{ Name = "CMake"; Path = @("C:\Program Files\CMake\bin"); Url = "https://cmake.org/download/" }
-)
-
-foreach ($prereq in $prerequisites) {
-    $found = $false
-    foreach ($path in $prereq.Path) {
-        if (Test-Path -Path $path) {
-            $found = $true
-            if ($prereq.Name -eq "WiX Toolset") {
-                $wixPath = $path
-            }
-            break
+    
+    # Verify C++ service binary exists
+    $serviceExe = "$buildDir\bin\$Configuration\FastSearchServiceNew.exe"
+    if (-not (Test-Path -Path $serviceExe)) {
+        Write-Error "C++ service binary not found: $serviceExe"
+        exit 1
+    }
+    
+    Write-Host "✅ C++ service built successfully" -ForegroundColor Green
+    
+    # Verify Python MCP bridge files exist
+    Write-Host "Verifying Python MCP bridge files..." -ForegroundColor Cyan
+    $pythonFiles = @(
+        "$solutionDir\src\fastsearch_mcp\server.py",
+        "$solutionDir\src\fastsearch_mcp\__init__.py",
+        "$solutionDir\src\fastsearch_mcp\service_client.py"
+    )
+    
+    foreach ($file in $pythonFiles) {
+        if (-not (Test-Path -Path $file)) {
+            Write-Error "Required Python file not found: $file"
+            exit 1
         }
     }
     
-    if (-not $found) {
-        Write-Error "$($prereq.Name) not found. Please install $($prereq.Name)."
-        Write-Host "Download from: $($prereq.Url)" -ForegroundColor Yellow
-        exit 1
+    Write-Host "✅ Python MCP bridge files verified" -ForegroundColor Green
+    
+    # Verify PowerShell scripts exist
+    Write-Host "Verifying PowerShell management scripts..." -ForegroundColor Cyan
+    $psFiles = @(
+        "$solutionDir\install-service.ps1",
+        "$solutionDir\fix-service.ps1",
+        "$solutionDir\service-control.bat"
+    )
+    
+    foreach ($file in $psFiles) {
+        if (-not (Test-Path -Path $file)) {
+            Write-Error "Required PowerShell script not found: $file"
+            exit 1
+        }
     }
+    
+    Write-Host "✅ PowerShell management scripts verified" -ForegroundColor Green
 }
 
-# Set environment variables
-$env:Path = "$wixPath;$env:Path"
-$env:Path = "$env:Path;C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin"
-$env:Path = "$env:Path;C:\Program Files\CMake\bin"
-$env:SolutionDir = $solutionDir
-$env:Configuration = $Configuration
-
-# Compile the WiX source
-Write-Host "Compiling installer..." -ForegroundColor Cyan
-$wxsFile = "$wixDir\Product.wxs"
-$wixobjFile = "$installerDir\FastSearchMCP.wixobj"
-$msiFile = "$installerDir\FastSearchMCP.msi"
-
-# Get the service executable path
-$serviceExePath = "$solutionDir\service\build\$Configuration\FastSearchService.exe"
-if (-not (Test-Path -Path $serviceExePath)) {
-    Write-Error "Service executable not found at $serviceExePath"
+# Check for WiX Toolset
+Write-Host "Checking for WiX Toolset..." -ForegroundColor Cyan
+try {
+    $wixVersion = & candle.exe -? 2>&1 | Select-String "WiX Toolset"
+    if ($wixVersion) {
+        Write-Host "✅ WiX Toolset found: $wixVersion" -ForegroundColor Green
+    } else {
+        Write-Error "WiX Toolset not found. Please install WiX Toolset v3.11 or later."
+        exit 1
+    }
+} catch {
+    Write-Error "WiX Toolset not found. Please install WiX Toolset v3.11 or later."
     exit 1
 }
 
-# Compile WiX source with preprocessor variables
-$solutionDirEscaped = $solutionDir.Replace('\', '\\')
-$serviceDir = (Get-Item $serviceExePath).Directory.FullName.Replace('\', '\\')
+# Build the MSI installer
+Write-Host "Building MSI installer..." -ForegroundColor Cyan
+Push-Location $wixDir
 
-candle.exe -nologo `
-    -dSolutionDir="$solutionDirEscaped" `
-    -dServiceDir="$serviceDir" `
-    -dConfiguration=$Configuration `
-    -out "$wixobjFile" "$wxsFile"
-
-if ($LASTEXITCODE -ne 0) {
-    Write-Error "WiX compilation failed"
-    exit $LASTEXITCODE
+# Compile WiX source files
+$wixFiles = @("Product.wxs", "Bundle.wxs")
+foreach ($wixFile in $wixFiles) {
+    Write-Host "Compiling $wixFile..." -ForegroundColor Yellow
+    & candle.exe "$wixFile" -dSolutionDir="$solutionDir" -dConfiguration="$Configuration"
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "Failed to compile $wixFile"
+        Pop-Location
+        exit $LASTEXITCODE
+    }
 }
 
 # Link the MSI
-Write-Host "Linking MSI package..." -ForegroundColor Cyan
-light.exe -nologo -out "$msiFile" "$wixobjFile" -ext WixUIExtension -ext WixUtilExtension
+Write-Host "Linking MSI installer..." -ForegroundColor Yellow
+& light.exe "Product.wixobj" -o "$installerDir\FastSearchMCP.msi" -ext WixUIExtension -ext WixUtilExtension
 if ($LASTEXITCODE -ne 0) {
-    Write-Error "MSI linking failed"
+    Write-Error "Failed to link MSI installer"
+    Pop-Location
     exit $LASTEXITCODE
 }
 
-# Create a bootstrapper (optional, requires WiX Bal extension)
-$bundleWxs = "$wixDir\Bundle.wxs"
-if (Test-Path $bundleWxs) {
-    Write-Host "Creating bootstrapper..." -ForegroundColor Cyan
-    $bundleObj = "$installerDir\Bundle.wixobj"
-    $bundleExe = "$installerDir\FastSearchMCP-Setup.exe"
-    
-    candle.exe -nologo -out "$bundleObj" "$bundleWxs"
-    if ($LASTEXITCODE -ne 0) {
-        Write-Error "Bootstrapper compilation failed"
-        exit $LASTEXITCODE
-    }
-    
-    light.exe -nologo -out "$bundleExe" "$bundleObj" -ext WixBalExtension -ext WixUIExtension
-    if ($LASTEXITCODE -ne 0) {
-        Write-Error "Bootstrapper linking failed"
-        exit $LASTEXITCODE
-    }
+# Link the Bundle (EXE installer)
+Write-Host "Linking Bundle installer..." -ForegroundColor Yellow
+& light.exe "Bundle.wixobj" -o "$installerDir\FastSearchMCP.exe" -ext WixUIExtension -ext WixUtilExtension -ext WixBalExtension
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "Failed to link Bundle installer"
+    Pop-Location
+    exit $LASTEXITCODE
 }
 
-Write-Host "`nInstallation package created successfully!" -ForegroundColor Green
-Write-Host "MSI Installer: $msiFile" -ForegroundColor Yellow
-if (Test-Path $bundleExe) {
-    Write-Host "Bootstrapper: $bundleExe" -ForegroundColor Yellow
+Pop-Location
+
+# Verify installer files were created
+$msiFile = "$installerDir\FastSearchMCP.msi"
+$exeFile = "$installerDir\FastSearchMCP.exe"
+
+if (Test-Path -Path $msiFile) {
+    $msiSize = (Get-Item $msiFile).Length
+    Write-Host "✅ MSI installer created: $msiFile ($([math]::Round($msiSize/1MB, 2)) MB)" -ForegroundColor Green
+} else {
+    Write-Error "MSI installer not created"
+    exit 1
 }
 
-# Open the output directory
-explorer $installerDir
+if (Test-Path -Path $exeFile) {
+    $exeSize = (Get-Item $exeFile).Length
+    Write-Host "✅ Bundle installer created: $exeFile ($([math]::Round($exeSize/1MB, 2)) MB)" -ForegroundColor Green
+} else {
+    Write-Error "Bundle installer not created"
+    exit 1
+}
+
+Write-Host ""
+Write-Host "🎉 FastSearch MCP Installer Build Complete!" -ForegroundColor Green
+Write-Host ""
+Write-Host "Installers created:"
+Write-Host "  📦 MSI: $msiFile" -ForegroundColor Cyan
+Write-Host "  📦 EXE: $exeFile" -ForegroundColor Cyan
+Write-Host ""
+Write-Host "The EXE installer includes:"
+Write-Host "  • Python 3.8+ Runtime (if needed)"
+Write-Host "  • Visual C++ Redistributable"
+Write-Host "  • FastSearch MCP Service (C++ + Python MCP Bridge)"
+Write-Host "  • PowerShell Management Scripts"
+Write-Host "  • Documentation"
+Write-Host ""
+Write-Host "Ready for distribution! 🚀" -ForegroundColor Green

@@ -7,15 +7,23 @@ from typing import Dict, List, Any
 from .base import BaseTool, ToolCategory, ToolParameter, tool
 
 
+@tool(
+    name="help",
+    description="Get help for available tools",
+    category=ToolCategory.SYSTEM,
+    parameters=[
+        ToolParameter(
+            name="tool_name",
+            type=str,
+            description="Optional name of a specific tool to get help for",
+            required=False
+        )
+    ],
+    return_type=Dict[str, Any],
+    return_description="Dictionary containing tool documentation"
+)
 class HelpTool(BaseTool):
     """Help tool for FastSearch MCP."""
-    
-    def __init__(self):
-        super().__init__(
-            name="help",
-            description="Get help for available tools",
-            category=ToolCategory.SYSTEM
-        )
     
     async def execute(self, tool_name: str = None) -> Dict[str, Any]:
         """
