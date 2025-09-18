@@ -553,6 +553,65 @@ int _tmain(int argc, TCHAR* argv[]) {
     InitializeCriticalSection(&gIndexCS);
     InitializeCriticalSection(&gAttrCacheCS);
     
+    // Handle command line arguments
+    if (argc > 1) {
+        if (_tcscmp(argv[1], TEXT("--install")) == 0) {
+            printf("Installing FastSearch MCP Service...\n");
+            SvcInstall();
+            DeleteCriticalSection(&gAttrCacheCS);
+            DeleteCriticalSection(&gIndexCS);
+            DeleteCriticalSection(&gCS);
+            return 0;
+        }
+        else if (_tcscmp(argv[1], TEXT("--uninstall")) == 0) {
+            printf("Uninstalling FastSearch MCP Service...\n");
+            SvcUninstall();
+            DeleteCriticalSection(&gAttrCacheCS);
+            DeleteCriticalSection(&gIndexCS);
+            DeleteCriticalSection(&gCS);
+            return 0;
+        }
+        else if (_tcscmp(argv[1], TEXT("--start")) == 0) {
+            printf("Starting FastSearch MCP Service...\n");
+            SvcStart();
+            DeleteCriticalSection(&gAttrCacheCS);
+            DeleteCriticalSection(&gIndexCS);
+            DeleteCriticalSection(&gCS);
+            return 0;
+        }
+        else if (_tcscmp(argv[1], TEXT("--stop")) == 0) {
+            printf("Stopping FastSearch MCP Service...\n");
+            SvcStop();
+            DeleteCriticalSection(&gAttrCacheCS);
+            DeleteCriticalSection(&gIndexCS);
+            DeleteCriticalSection(&gCS);
+            return 0;
+        }
+        else if (_tcscmp(argv[1], TEXT("--help")) == 0 || _tcscmp(argv[1], TEXT("-h")) == 0) {
+            printf("FastSearch MCP Service\n");
+            printf("Usage: %s [command]\n", argv[0]);
+            printf("Commands:\n");
+            printf("  --install    Install the service (requires UAC)\n");
+            printf("  --uninstall  Uninstall the service (requires UAC)\n");
+            printf("  --start      Start the service\n");
+            printf("  --stop       Stop the service\n");
+            printf("  --help       Show this help\n");
+            printf("  (no args)    Run as service\n");
+            DeleteCriticalSection(&gAttrCacheCS);
+            DeleteCriticalSection(&gIndexCS);
+            DeleteCriticalSection(&gCS);
+            return 0;
+        }
+        else {
+            printf("Unknown command: %s\n", argv[1]);
+            printf("Use --help for usage information\n");
+            DeleteCriticalSection(&gAttrCacheCS);
+            DeleteCriticalSection(&gIndexCS);
+            DeleteCriticalSection(&gCS);
+            return 1;
+        }
+    }
+    
     // Initialize service
     SERVICE_TABLE_ENTRY DispatchTable[] = {
         { (LPWSTR)SVCNAME, (LPSERVICE_MAIN_FUNCTION)SvcMain },
@@ -623,6 +682,149 @@ VOID SvcInstall() {
     SERVICE_DESCRIPTION sd;
     sd.lpDescription = (LPWSTR)SVC_DESCRIPTION;
     ChangeServiceConfig2(schService, SERVICE_CONFIG_DESCRIPTION, &sd);
+
+    CloseServiceHandle(schService);
+    CloseServiceHandle(schSCManager);
+}
+
+// Uninstall the service
+VOID SvcUninstall() {
+    SC_HANDLE schSCManager;
+    SC_HANDLE schService;
+
+    // Get a handle to the SCM database
+    schSCManager = OpenSCManager(
+        NULL,                    // local computer
+        NULL,                    // ServicesActive database
+        SC_MANAGER_ALL_ACCESS);  // full access rights
+
+    if (NULL == schSCManager) {
+        printf("OpenSCManager failed (%d)\n", GetLastError());
+        return;
+    }
+
+    // Open the service
+    schService = OpenService(
+        schSCManager,            // SCM database
+        SVCNAME,                 // name of service
+        DELETE);                 // need DELETE access
+
+    if (schService == NULL) {
+        printf("OpenService failed (%d)\n", GetLastError());
+        CloseServiceHandle(schSCManager);
+        return;
+    }
+
+    // Delete the service
+    if (DeleteService(schService)) {
+        printf("Service uninstalled successfully\n");
+    }
+    else {
+        printf("DeleteService failed (%d)\n", GetLastError());
+    }
+
+    CloseServiceHandle(schService);
+    CloseServiceHandle(schSCManager);
+}
+
+// Start the service
+VOID SvcStart() {
+    SC_HANDLE schSCManager;
+    SC_HANDLE schService;
+
+    // Get a handle to the SCM database
+    schSCManager = OpenSCManager(
+        NULL,                    // local computer
+        NULL,                    // ServicesActive database
+        SC_MANAGER_ALL_ACCESS);  // full access rights
+
+    if (NULL == schSCManager) {
+        printf("OpenSCManager failed (%d)\n", GetLastError());
+        return;
+    }
+
+    // Open the service
+    schService = OpenService(
+        schSCManager,            // SCM database
+        SVCNAME,                 // name of service
+        SERVICE_START);          // need START access
+
+    if (schService == NULL) {
+        printf("OpenService failed (%d)\n", GetLastError());
+        CloseServiceHandle(schSCManager);
+        return;
+    }
+
+    // Start the service
+    if (StartService(schService, 0, NULL)) {
+        printf("Service started successfully\n");
+    }
+    else {
+        printf("StartService failed (%d)\n", GetLastError());
+    }
+
+    CloseServiceHandle(schService);
+    CloseServiceHandle(schSCManager);
+}
+
+// Stop the service
+VOID SvcStop() {
+    SC_HANDLE schSCManager;
+    SC_HANDLE schService;
+    SERVICE_STATUS_PROCESS ssp;
+
+    // Get a handle to the SCM database
+    schSCManager = OpenSCManager(
+        NULL,                    // local computer
+        NULL,                    // ServicesActive database
+        SC_MANAGER_ALL_ACCESS);  // full access rights
+
+    if (NULL == schSCManager) {
+        printf("OpenSCManager failed (%d)\n", GetLastError());
+        return;
+    }
+
+    // Open the service
+    schService = OpenService(
+        schSCManager,            // SCM database
+        SVCNAME,                 // name of service
+        SERVICE_STOP | SERVICE_QUERY_STATUS); // need STOP and QUERY access
+
+    if (schService == NULL) {
+        printf("OpenService failed (%d)\n", GetLastError());
+        CloseServiceHandle(schSCManager);
+        return;
+    }
+
+    // Send a stop control request to the service
+    if (ControlService(schService, SERVICE_CONTROL_STOP, (LPSERVICE_STATUS)&ssp)) {
+        printf("Service stop request sent\n");
+        
+        // Wait for the service to stop
+        DWORD dwStartTime = GetTickCount();
+        DWORD dwTimeout = 30000; // 30-second time-out
+
+        while (ssp.dwCurrentState != SERVICE_STOPPED) {
+            Sleep(ssp.dwWaitHint);
+            if (ssp.dwCurrentState == SERVICE_STOPPED)
+                break;
+            if ((GetTickCount() - dwStartTime) > dwTimeout) {
+                printf("Service stop timed out\n");
+                break;
+            }
+            if (!QueryServiceStatusEx(schService, SC_STATUS_PROCESS_INFO, (LPBYTE)&ssp, sizeof(SERVICE_STATUS_PROCESS), NULL)) {
+                printf("QueryServiceStatusEx failed (%d)\n", GetLastError());
+                break;
+            }
+        }
+        
+        if (ssp.dwCurrentState == SERVICE_STOPPED) {
+            printf("Service stopped successfully\n");
+        }
+    }
+    else {
+        printf("ControlService failed (%d)\n", GetLastError());
+    }
 
     CloseServiceHandle(schService);
     CloseServiceHandle(schSCManager);

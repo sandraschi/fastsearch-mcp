@@ -1,6 +1,6 @@
-[workspace]
+﻿[workspace]
 members = [
-    "../bridge",
+    "../fastsearch_mcp_bridge",
     "../shared"
 ]
 resolver = "2"

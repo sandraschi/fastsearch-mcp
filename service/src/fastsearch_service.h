@@ -251,6 +251,9 @@ BOOL SendResponse(HANDLE hPipe, LPCVOID pData, DWORD cbData);
 
 // Service control
 void SvcInstall();
+void SvcUninstall();
+void SvcStart();
+void SvcStop();
 void WINAPI SvcCtrlHandler(DWORD dwCtrl);
 void WINAPI SvcMain(DWORD dwArgc, LPTSTR* lpszArgv);
 void ReportSvcStatus(DWORD dwCurrentState, DWORD dwWin32ExitCode, DWORD dwWaitHint);
