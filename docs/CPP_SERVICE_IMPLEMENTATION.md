@@ -2,233 +2,181 @@
 
 ## Overview
 
-The FastSearch MCP service is a high-performance C++ Windows service that provides lightning-fast file search capabilities by directly accessing the NTFS Master File Table (MFT). This document details the architecture, performance characteristics, and implementation details.
+The FastSearch MCP service is a minimal Windows service written in C++17. Its sole responsibility is to respond to search requests by streaming results directly from the NTFS Master File Table (MFT). The service performs no background indexing, caching, or directory walking.
 
-## Key Features
+---
 
-- **Blazing Fast**: 1M+ files/second scanning speed
-- **Memory Efficient**: ~10MB per 1M files
-- **Multi-Threaded**: Scales with CPU cores (up to 16 threads)
-- **Zero Latency**: In-memory caching of frequent queries
-- **Always Current**: Real-time filesystem state
-- **Minimal Footprint**: <100MB memory even for 100M+ files
+## Key Characteristics
 
-## Architecture
+- **Direct NTFS access:** uses Windows APIs and the `ntfs` support library to enumerate MFT records live.
+- **On-demand processing:** the service wakes only when the named pipe receives a request and shuts down the scan as soon as `max_results` is satisfied.
+- **Privilege separation:** runs as `LocalSystem`, while the Python bridge runs unprivileged. All IPC happens through `\\.\pipe\FastSearchMCP`.
+- **Structured diagnostics:** every critical step logs to the Windows Event Log to aid debugging (especially Event ID 7034 crashes).
+- **No caching:** results are streamed immediately. Any suggestion to add caches or precomputed indexes must be rejected.
 
-### Core Components
+---
 
-1. **Service Layer**
-   - Windows Service control and management
-   - Named pipe server for IPC
-   - Service installation and configuration
-
-2. **NTFS Engine**
-   - Direct MFT access via memory-mapped I/O
-   - Multi-threaded record processing
-   - Advanced caching with LRU eviction
-
-3. **Cache System**
-   - MFT record cache (1M+ entries)
-   - File name index for fast lookups
-   - Attribute cache for common operations
-
-### Performance Optimizations
-
-1. **Memory-Mapped I/O**
-   - Direct MFT access with zero-copy operations
-   - Efficient memory usage with custom allocators
-
-2. **Parallel Processing**
-   - Work-stealing thread pool
-   - Lock-free algorithms where possible
-   - Fine-grained locking for thread safety
-
-3. **Smart Caching**
-   - LRU cache with TTL
-   - Prefetching of adjacent records
-   - Adaptive cache sizing
-
-## Implementation Details
-
-### Service Entry Point
+## Service Entry Point
 
 ```cpp
 int wmain(int argc, wchar_t* argv[]) {
     FastSearchService service;
-    
+
     if (argc > 1) {
-        // Handle command line (install/uninstall/debug)
-        return HandleCommandLine(argc, argv, service);
+        return HandleCommandLine(argc, argv, service); // install/uninstall/debug
     }
-    
-    // Run as service
-    SERVICE_TABLE_ENTRY serviceTable[] = {
+
+    SERVICE_TABLE_ENTRY service_table[] = {
         { SERVICE_NAME, ServiceMain },
-        { NULL, NULL }
+        { nullptr, nullptr }
     };
-    
-    StartServiceCtrlDispatcher(serviceTable);
+
+    if (!StartServiceCtrlDispatcher(service_table)) {
+        SvcLogMessage(EventLogLevel::Error, L"StartServiceCtrlDispatcher failed", GetLastError());
+    }
     return 0;
 }
 ```
 
-### MFT Scanning
+- `HandleCommandLine` supports `--install`, `--uninstall`, and `--debug` for manual testing.
+- In service mode we register control handlers, initialise logging, and spin up the worker thread that listens on the named pipe.
+
+---
+
+## Named Pipe Listener
 
 ```cpp
-void ScanMFT(const std::wstring& volumePath) {
-    // Open volume handle
-    HANDLE hVolume = OpenVolume(volumePath);
-    
-    // Memory map the MFT
-    MappedFile mftMap(hVolume, L"$MFT");
-    
-    // Process MFT records in parallel
-    ThreadPool pool(std::thread::hardware_concurrency());
-    
-    // Process records in chunks
-    for (size_t i = 0; i < recordCount; i += CHUNK_SIZE) {
-        pool.enqueue([=] {
-            ProcessRecordChunk(mftMap, i, std::min(CHUNK_SIZE, recordCount - i));
-        });
+void FastSearchService::Run() {
+    while (!shutdown_requested_) {
+        PipeServer pipe(pipe_name_);
+        if (!pipe.WaitForClient(connect_timeout_)) {
+            continue; // Loop until a client connects
+        }
+
+        auto request = pipe.ReadRequest();
+        if (!request) {
+            continue;
+        }
+
+        ProcessRequest(*request, pipe);
     }
-    
-    // Wait for completion
-    pool.wait();
 }
 ```
 
-### Cache Implementation
+- The pipe is created with security descriptors that restrict access to the active user session.
+- Messages are newline-delimited JSON. Each response is streamed as a sequence of JSON frames so the bridge can start rendering results immediately.
+
+---
+
+## Processing a Search Request
 
 ```cpp
-class LRUCache {
-    using ListType = std::list<std::pair<Key, Value>>;
-    using MapType = std::unordered_map<Key, typename ListType::iterator>;
-    
-    ListType items;
-    MapType cacheMap;
-    size_t maxSize;
-    
-public:
-    void put(const Key& key, Value value) {
-        auto it = cacheMap.find(key);
-        if (it != cacheMap.end()) {
-            items.erase(it->second);
-            cacheMap.erase(it);
+void FastSearchService::ProcessRequest(const SearchRequest& req, PipeServer& pipe) {
+    auto volume = OpenVolume(req.drive);
+    if (!volume) {
+        pipe.SendError(req.id, L"Failed to open volume", volume.error());
+        return;
+    }
+
+    NtfsScanner scanner(volume.value());
+    PatternMatcher matcher(req.pattern, req.path_filter);
+
+    size_t emitted = 0;
+    for (const auto& record : scanner) {
+        if (!matcher.Matches(record)) {
+            continue;
         }
-        
-        items.push_front({key, std::move(value)});
-        cacheMap[key] = items.begin();
-        
-        if (cacheMap.size() > maxSize) {
-            auto last = items.end();
-            last--;
-            cacheMap.erase(last->first);
-            items.pop_back();
+
+        pipe.SendResult(req.id, record.ToDto());
+        if (++emitted >= req.max_results) {
+            break; // hard stop honours architecture rules
         }
     }
-    
-    std::optional<Value> get(const Key& key) {
-        auto it = cacheMap.find(key);
-        if (it == cacheMap.end()) {
-            return std::nullopt;
-        }
-        
-        // Move to front
-        items.splice(items.begin(), items, it->second);
-        return it->second->second;
-    }
-};
+
+    pipe.SendComplete(req.id, emitted);
+}
 ```
 
-## Performance Metrics
+- `NtfsScanner` lazily iterates MFT records with buffers sized for streaming.
+- `PatternMatcher` optimises literal matches and uses compiled regex only when necessary.
+- Results are translated into lightweight DTO structs (`path`, `size`, timestamps, attributes) before serialisation.
 
-| Operation | Performance |
-|-----------|-------------|
-| Initial Scan | 1,000,000+ files/second |
-| Cached Access | 10,000,000+ files/second |
-| Memory Usage | ~100MB base + ~10MB per 1M files |
-| Threads | Auto-scales with CPU cores (up to 16) |
-| Cache Size | Configurable, default 1M entries |
+---
 
-## Building from Source
+## Error Handling & Logging
+
+```cpp
+void SvcLogMessage(EventLogLevel level, const std::wstring& message, DWORD error) {
+    const wchar_t* strings[] = { message.c_str() };
+    ReportEventW(
+        event_source_,
+        static_cast<WORD>(level),
+        0,
+        BASE_EVENT_ID + static_cast<DWORD>(level),
+        nullptr,
+        1,
+        sizeof(error),
+        strings,
+        &error);
+}
+```
+
+Key checkpoints that log `Information` or `Error` events:
+1. Service control registration
+2. Privilege escalation attempts (`SeBackupPrivilege`)
+3. Named pipe creation and connection
+4. Volume handle acquisition
+5. Search completion or failure
+
+Logs are read via `read-service-logs.ps1` or the Windows Event Viewer (`Applications and Services Logs/FastSearchMCP`).
+
+---
+
+## Building the Service
 
 ### Prerequisites
-
-- Visual Studio 2022
+- Visual Studio 2022 (Build Tools or full IDE)
 - Windows 10/11 SDK
 - CMake 3.20+
 
-### Build Steps
+### Steps
 
 ```powershell
-# Configure
-mkdir build
-cd build
-cmake .. -G "Visual Studio 17 2022" -A x64
-
-# Build
-cmake --build . --config Release
-
-# Install (admin required)
-cmake --install . --prefix "install"
+cd service
+cmake -S . -B build -G "Visual Studio 17 2022" -A x64
+cmake --build build --config Release
 ```
 
-## Service Management
+The resulting binary lives at `service\build\bin\Release\FastSearchServiceNew.exe`.
 
-### Install Service
+---
+
+## Installing / Managing the Service
 
 ```powershell
-# Requires admin privileges
-.\FastSearchService.exe install
-Start-Service FastSearchService
+# Elevated PowerShell
+.\install-service.ps1 install
+.\install-service.ps1 start
+.\install-service.ps1 status
+
+# Cleanup
+.\install-service.ps1 stop
+.\install-service.ps1 uninstall
 ```
 
-### Uninstall Service
+Troubleshooting scripts:
+- `debug-service-startup.ps1` – validates privileges, paths, registry entries, and event logs.
+- `test-service-comprehensive.ps1` – automated smoke tests for install/start/log/pipe connectivity.
+- `capture-service-debug.ps1` – optional live tracing for development (never enabled by default).
 
-```powershell
-# Requires admin privileges
-Stop-Service FastSearchService -Force
-.\FastSearchService.exe uninstall
-```
+---
 
-## Debugging
+## Current Focus Areas
 
-### Event Log
+1. **Startup stability:** resolving the Event ID 7034 crash observed on some machines. Enhanced logging has been added around privilege enablement and pipe initialisation.
+2. **Pipe contract hardening:** ensuring back-pressure and error frames are handled gracefully when the bridge disconnects mid-search.
+3. **Integration testing:** end-to-end tests that require elevation are being expanded; see `tests/test_fastsearch.py`.
 
-All service messages are written to the Windows Event Log under:
+---
 
-- Source: FastSearchService
-- Event ID: 1000-1999 (Information), 2000-2999 (Warning), 3000+ (Error)
-
-### Debug Output
-
-Enable debug logging by setting the following registry key:
-
-```reg
-[HKLM\SYSTEM\CurrentControlSet\Services\FastSearchService\Parameters]
-"Debug"=dword:00000001
-"LogLevel"=dword:00000004  # 0=Error, 1=Warn, 2=Info, 3=Debug, 4=Trace
-```
-
-## Troubleshooting
-
-### Common Issues
-
-1. **Access Denied**
-   - Ensure the service is running as SYSTEM
-   - Verify volume handles are properly closed
-   - Check security descriptors on named pipes
-
-2. **Performance Issues**
-   - Check for disk I/O bottlenecks
-   - Monitor thread contention
-   - Verify cache hit rates
-
-3. **Memory Usage**
-   - Adjust cache size if needed
-   - Check for memory leaks
-   - Monitor handle usage
-
-## License
-
-MIT License - See [LICENSE](LICENSE) for details.
+The service must remain lean. Any proposal to add indexing, caching, or long-lived data structures contradicts the core FastSearch value proposition and must be rejected.

@@ -1,125 +1,100 @@
 # FastSearch MCP - Installation Guide
 
+FastSearch MCP consists of a privileged C++ Windows service and an unprivileged Python MCP bridge. Follow the steps below to build, install, and verify the stack on Windows.
+
 ## Prerequisites
 
-- Windows 10/11 (64-bit)
-- [Rust](https://www.rust-lang.org/tools/install) (latest stable version)
-- [Python 3.8+](https://www.python.org/downloads/)
-- [WiX Toolset v3.11+](https://wixtoolset.org/releases/) (for creating the installer)
-- Administrator privileges (for installation)
+- Windows 10/11 (64-bit) with NTFS volumes
+- Administrator access (required once to install the service)
+- [Python 3.10+](https://www.python.org/downloads/)
+- [Visual Studio 2022 Build Tools](https://aka.ms/vs/17/release/vs_BuildTools.exe) with the **Desktop development with C++** workload
+- [CMake 3.20+](https://cmake.org/download/)
+- [WiX Toolset v3.11+](https://wixtoolset.org/releases/) (only if you plan to build an MSI installer)
 
-## Building from Source
+> **Note:** Ensure `cmake`, `python`, and the Visual Studio build tools are available in your `PATH` before continuing.
+
+## Build the Project
 
 ### 1. Clone the Repository
 
-```bash
+```powershell
 git clone https://github.com/yourusername/fastsearch-mcp.git
 cd fastsearch-mcp
 ```
 
-### 2. Build the Service
-
-Run the build script to compile the Rust service:
+### 2. Set Up the Python Environment
 
 ```powershell
-.\build.ps1
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install -r requirements-dev.txt
+pip install -e .
 ```
 
-### 3. Create Installer
-
-Create a Windows Installer (MSI) package:
+### 3. Build the C++ Service
 
 ```powershell
-.\create-installer.ps1 -Version 1.0.0
+cd service
+cmake -S . -B build -G "Visual Studio 17 2022" -A x64
+cmake --build build --config Release
+cd ..
 ```
 
-The installer will be created in the `dist` directory.
+The compiled service binary is generated at `service\build\bin\Release\FastSearchServiceNew.exe`.
 
-## Installation
+## Install and Manage the Service
 
-### Using the Installer
-
-1. Double-click the `FastSearchMCP-1.0.0.msi` file
-2. Follow the on-screen instructions
-3. The installer will:
-   - Install the FastSearch service
-   - Set up the Python bridge
-   - Create Start Menu shortcuts
-   - Add the service to Windows Services
-
-### Manual Installation
-
-If you prefer to install manually:
-
-1. Copy the contents of the `service\target\release` directory to your desired installation location
-2. Install Python dependencies:
-
-   ```
-   pip install -r bridge/requirements.txt
-   ```
-
-3. Run the service manually:
-
-   ```
-   fastsearch-service.exe run
-   ```
-
-## Configuration
-
-After installation, you can configure the service by editing the configuration file at:
-
-```
-%PROGRAMFILES%\FastSearch MCP\config\fastsearch-mcp-config.json
-```
-
-### Web API
-
-The service includes a web API that runs on port 8080 by default. You can change this by:
-
-1. Edit the configuration file
-2. Or run the service with a custom port:
-
-   ```
-   fastsearch-service.exe run --port 9000
-   ```
-
-## Uninstallation
-
-### Using Windows Add/Remove Programs
-
-1. Open Windows Settings
-2. Go to Apps > Apps & features
-3. Find "FastSearch MCP" and click Uninstall
-
-### Using Command Line
+### Install (Requires Elevated PowerShell)
 
 ```powershell
-msiexec /x "C:\Path\To\FastSearchMCP-1.0.0.msi" /qb
+.\install-service.ps1 install
 ```
+
+### Start / Stop / Status
+
+```powershell
+.\install-service.ps1 start
+.\install-service.ps1 status
+.\install-service.ps1 stop
+```
+
+### Uninstall
+
+```powershell
+.\install-service.ps1 uninstall
+```
+
+> Use `.\install-service.ps1 diagnose` or `.\debug-service-startup.ps1` whenever the service fails to start. These scripts collect event logs, check privileges, and highlight missing dependencies.
+
+## Run the MCP Bridge (User Mode)
+
+With the virtual environment activated:
+
+```powershell
+python start_server.py
+```
+
+Claude Desktop can now attach to FastSearch MCP using the command defined in `mcp.config.json`.
 
 ## Troubleshooting
 
-### Service Won't Start
+| Symptom | Suggested Action |
+|---------|------------------|
+| Service fails immediately with Event ID 7034 | Run `.\debug-service-startup.ps1 -Verbose` to display each initialisation step and consult the Windows Event Viewer (`Applications and Services Logs → FastSearchMCP`). |
+| Bridge reports “service unavailable” | Confirm the service is running (`.\install-service.ps1 status`) and that the named pipe `\\.\pipe\FastSearchMCP` exists. |
+| “Access denied” errors when opening volumes | Verify the service is installed under `LocalSystem` and that the process has `SeBackupPrivilege`. Reinstall from an elevated shell if necessary. |
+| Python fallback is always used | Ensure the service is running and reachable; the bridge falls back when the pipe handshake fails or the service returns an error response. |
 
-1. Check the service logs at `C:\ProgramData\FastSearch\service.log`
-2. Ensure no other service is using the same port (default: 8080)
-3. Run the service in console mode for detailed error output:
+## Optional: Build the MSI Installer
 
-   ```
-   fastsearch-service.exe run
-   ```
+If you need a distributable installer:
 
-### Build Issues
+```powershell
+.\create-installer.ps1 -Version <version>
+```
 
-1. Ensure all prerequisites are installed
-2. Run PowerShell as Administrator
-3. Check that the Rust toolchain is properly installed:
-
-   ```
-   rustc --version
-   cargo --version
-   ```
+The generated MSI is placed in the `dist` directory.
 
 ## Support
 
-For issues and feature requests, please open an issue on our [GitHub repository](https://github.com/yourusername/fastsearch-mcp).
+For additional help, open an issue on the [GitHub repository](https://github.com/yourusername/fastsearch-mcp/issues) or follow the diagnostic workflow in `docs/SERVICE_IMPROVEMENTS.md`.

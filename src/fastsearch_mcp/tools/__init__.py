@@ -1,35 +1,37 @@
 """
-FastSearch MCP Tools - FastMCP 2.12 compliant tool implementations.
+FastSearch MCP Tools - FastMCP 2.13 compliant tool implementations.
 
 This module provides all the tools available in the FastSearch MCP server,
-organized according to FastMCP 2.12 patterns and conventions.
+organized according to FastMCP 2.13 patterns and conventions.
 """
 
 from .base import BaseTool
-from .file_search import FileContentSearchTool
 from .disk_analyzer import DiskAnalyzerTool
 from .duplicate_finder import DuplicateFileFinderTool
+from .file_search import FileContentSearchTool
+from .help import HelpTool
 from .integrity_checker import FileIntegrityCheckerTool
 from .resource_monitor import SystemResourceMonitorTool
 from .service_manager import (
-    ListServicesTool,
+    GetServiceLogsTool,
     GetServiceTool,
-    StartServiceTool,
-    StopServiceTool,
+    ListServicesTool,
     RestartServiceTool,
     SetServiceStartupTypeTool,
-    GetServiceLogsTool,
+    StartServiceTool,
+    StopServiceTool,
 )
-from .help import HelpTool
+from .service_status import ServiceStatusTool
 
-# Tool registry for FastMCP 2.12
+# Tool registry for FastMCP 2.13
 __all__ = [
     "BaseTool",
-    "FileContentSearchTool", 
+    "FileContentSearchTool",
     "DiskAnalyzerTool",
     "DuplicateFileFinderTool",
     "FileIntegrityCheckerTool",
     "SystemResourceMonitorTool",
+    "ServiceStatusTool",
     "ListServicesTool",
     "GetServiceTool",
     "StartServiceTool",
@@ -47,6 +49,7 @@ AVAILABLE_TOOLS = [
     DuplicateFileFinderTool,
     FileIntegrityCheckerTool,
     SystemResourceMonitorTool,
+    ServiceStatusTool,
     ListServicesTool,
     GetServiceTool,
     StartServiceTool,

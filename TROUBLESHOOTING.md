@@ -23,7 +23,7 @@ Ensure these files exist:
 ### Missing Requirements.txt
 This repo has no requirements.txt file. Create one:
 ```bash
-echo "fastmcp>=2.10.1" > requirements.txt
+echo "fastmcp>=2.13.0" > requirements.txt
 pip install -r requirements.txt
 ```
 

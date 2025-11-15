@@ -7,7 +7,7 @@ $ErrorActionPreference = "Stop"
 # Configuration
 $version = "2.0.0"
 $projectRoot = $PSScriptRoot
-$buildDir = "$projectRoot\target\release"
+$buildDir = "$projectRoot\dist"
 $distDir = "$projectRoot\dist"
 $packageName = "fastsearch-mcp"
 
@@ -16,22 +16,7 @@ if (-not (Test-Path $distDir)) {
     New-Item -ItemType Directory -Path $distDir | Out-Null
 }
 
-Write-Host "🚀 Building FastSearch MCP v$version" -ForegroundColor Cyan
-
-# Build the project in release mode
-try {
-    Write-Host "🔨 Building release version..." -NoNewline
-    Push-Location $projectRoot
-    cargo build --release
-    if ($LASTEXITCODE -ne 0) {
-        throw "Build failed with exit code $LASTEXITCODE"
-    }
-    Write-Host " ✅" -ForegroundColor Green
-} catch {
-    Write-Host " ❌" -ForegroundColor Red
-    Write-Error "Build failed: $_"
-    exit 1
-}
+Write-Host "🚀 Packaging FastSearch MCP v$version" -ForegroundColor Cyan
 
 # Verify build artifacts
 $requiredFiles = @(

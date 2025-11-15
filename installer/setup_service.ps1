@@ -25,7 +25,7 @@
 
 .PARAMETER ServiceDescription
     The description of the Windows service.
-    Default: "Provides fast NTFS file system indexing and search capabilities via MCP 2.11.3 protocol."
+    Default: "Provides fast NTFS file system indexing and search capabilities via MCP 2.13 protocol."
 
 .EXAMPLE
     .\setup_service.ps1
@@ -41,7 +41,7 @@ param(
     [string]$InstallDir = "$env:ProgramFiles\FastSearchMCP",
     [string]$ServiceName = "FastSearchMCP",
     [string]$ServiceDisplayName = "FastSearch MCP Bridge",
-    [string]$ServiceDescription = "Provides fast NTFS file system indexing and search capabilities via MCP 2.11.3 protocol.",
+    [string]$ServiceDescription = "Provides fast NTFS file system indexing and search capabilities via MCP 2.13 protocol.",
     [switch]$Force
 )
 

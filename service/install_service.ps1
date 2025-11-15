@@ -17,7 +17,29 @@ $ErrorActionPreference = "Stop"
 $serviceName = "FastSearchMCP"
 $serviceDisplayName = "FastSearch MCP Service"
 $serviceDescription = "Provides fast file search capabilities using MFT"
-$serviceExePath = "$PSScriptRoot\dist\FastSearchService.exe"
+
+# Try multiple possible paths for the service executable
+$possiblePaths = @(
+    "$PSScriptRoot\build\bin\Release\FastSearchServiceNew.exe",
+    "$PSScriptRoot\dist\FastSearchService.exe",
+    "$PSScriptRoot\..\service\build\bin\Release\FastSearchServiceNew.exe"
+)
+
+$serviceExePath = $null
+foreach ($path in $possiblePaths) {
+    if (Test-Path $path) {
+        $serviceExePath = $path
+        break
+    }
+}
+
+if (-not $serviceExePath) {
+    Write-Error "Service executable not found. Checked paths:"
+    foreach ($path in $possiblePaths) {
+        Write-Host "  - $path" -ForegroundColor Yellow
+    }
+    exit 1
+}
 
 # Check if running as administrator
 function Test-Administrator {

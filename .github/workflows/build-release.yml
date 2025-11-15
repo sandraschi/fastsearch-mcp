@@ -12,7 +12,7 @@ env:
   RUST_BACKTRACE: 1
 
 jobs:
-  # Build matrix for dual package strategy: MSI + DXT
+  # Build matrix for dual package strategy: MSI + MCPB
   build-packages:
     name: Build ${{ matrix.package_type }} - ${{ matrix.platform }}
     runs-on: ${{ matrix.os }}
@@ -30,32 +30,32 @@ jobs:
             binary_service: fastsearch-service.exe
             output: fastsearch-mcp-setup.msi
             
-          # DXT Package (Windows)
-          - package_type: dxt
+          # MCPB Package (Windows)
+          - package_type: mcpb
             platform: windows-x64
             os: windows-latest
             target: x86_64-pc-windows-msvc
             binary_bridge: fastsearch-mcp-bridge.exe
             binary_service: null
-            output: fastsearch-mcp.dxt
+            output: fastsearch-mcp.mcpb
             
-          # DXT Package (Linux) - Cross-platform MCP support
-          - package_type: dxt
+          # MCPB Package (Linux) - Cross-platform MCP support
+          - package_type: mcpb
             platform: linux-x64
             os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             binary_bridge: fastsearch-mcp-bridge
             binary_service: null
-            output: fastsearch-mcp-linux.dxt
+            output: fastsearch-mcp-linux.mcpb
             
-          # DXT Package (macOS) - Cross-platform MCP support
-          - package_type: dxt
+          # MCPB Package (macOS) - Cross-platform MCP support
+          - package_type: mcpb
             platform: macos-x64
             os: macos-latest
             target: x86_64-apple-darwin
             binary_bridge: fastsearch-mcp-bridge
             binary_service: null
-            output: fastsearch-mcp-macos.dxt
+            output: fastsearch-mcp-macos.mcpb
 
     steps:
     - name: Checkout code
@@ -104,11 +104,11 @@ jobs:
         # Install WiX toolset (FREE - no licensing required)
         dotnet tool install --global wix --version 5.*
         
-    - name: Setup DXT CLI (DXT only)
-      if: matrix.package_type == 'dxt'
+    - name: Setup MCPB CLI (MCPB only)
+      if: matrix.package_type == 'mcpb'
       run: |
-        # Install Anthropic DXT CLI
-        npm install -g @anthropic-ai/dxt
+        # Install Anthropic MCPB CLI
+        npm install -g @anthropic-ai/mcpb
 
     - name: Build Rust workspace
       run: |
@@ -168,14 +168,14 @@ jobs:
           Get-Item "${{ matrix.output }}" | Format-List
         }
 
-    - name: Create DXT Package
-      if: matrix.package_type == 'dxt'
+    - name: Create MCPB Package
+      if: matrix.package_type == 'mcpb'
       shell: bash
       run: |
         # Make the script executable
-        chmod +x scripts/create_dxt_package.sh
+        chmod +x scripts/create_mcpb_package.sh
         # Run the script with required parameters
-        ./scripts/create_dxt_package.sh \
+        ./scripts/create_mcpb_package.sh \
           "${{ matrix.platform }}" \
           "${{ github.ref_name }}" \
           "${{ matrix.binary_bridge }}" \
@@ -213,7 +213,7 @@ jobs:
         mkdir -p release-files
         
         # Copy all package files to release directory
-        find artifacts -name "*.msi" -o -name "*.dxt" | while read file; do
+        find artifacts -name "*.msi" -o -name "*.mcpb" | while read file; do
           cp "$file" release-files/
         done
         
@@ -243,18 +243,18 @@ jobs:
           - Service runs automatically on startup
           
           ### 2. Claude Desktop Extension (Required)  
-          Download and install: `fastsearch-mcp.dxt`
+          Download and install: `fastsearch-mcp.mcpb`
           - Install via Claude Desktop Extensions panel
           - Provides rich tool integration with parameter validation
           - Connects to Windows service via named pipe
           
-          ### Cross-Platform DXT Extensions
-          - `fastsearch-mcp-linux.dxt` - Limited functionality (no NTFS service)
-          - `fastsearch-mcp-macos.dxt` - Limited functionality (no NTFS service)
+          ### Cross-Platform MCPB Extensions
+          - `fastsearch-mcp-linux.mcpb` - Limited functionality (no NTFS service)
+          - `fastsearch-mcp-macos.mcpb` - Limited functionality (no NTFS service)
           
           ### Installation Order
           1. **First**: Install MSI (Windows service with elevated privileges)
-          2. **Second**: Install DXT (Claude Desktop extension)
+          2. **Second**: Install MCPB (Claude Desktop extension)
           3. **Verify**: Check that both service and extension are running
           
           ### Features

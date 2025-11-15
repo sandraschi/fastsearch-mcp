@@ -2,7 +2,7 @@
 
 use serde::{Serialize, Deserialize};
 
-/// Search request following FastMCP 2.11.3 standards
+/// Search request following FastMCP 2.13 standards
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct SearchRequest {
@@ -93,7 +93,7 @@ pub struct TextHighlight {
     pub snippet: String,
 }
 
-/// Search response following FastMCP 2.11.3 standards
+/// Search response following FastMCP 2.13 standards
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct SearchResponse {

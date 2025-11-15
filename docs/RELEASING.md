@@ -6,7 +6,7 @@ This document outlines the process for creating new releases of FastSearch MCP.
 
 - Git
 - Python 3.8+
-- Rust toolchain (stable, for service compilation)
+- Visual Studio 2022 Build Tools (for C++ service compilation)
 - WiX Toolset v3.11+ (Windows, for installer)
 - GitHub CLI (`gh`) - Recommended for managing releases
 - DXT CLI (`dxt`) - For DXT package creation
@@ -31,9 +31,9 @@ This document outlines the process for creating new releases of FastSearch MCP.
 
    This will:
    - Clean previous builds
-   - Run all tests (Python and Rust)
+   - Run all tests (Python)
    - Build the Python package
-   - Build the Rust service
+   - Build the C++ service
    - Create the Windows installer
    - Generate DXT package
    - Verify all artifacts are present
@@ -68,11 +68,12 @@ This document outlines the process for creating new releases of FastSearch MCP.
    pip install --force-reinstall dist/*.whl
    ```
 
-4. **Build Rust Service (Windows)**
+4. **Build C++ Service (Windows)**
 
    ```bash
    cd service
-   cargo build --release
+   cmake -S . -B build -G "Visual Studio 17 2022" -A x64
+   cmake --build build --config Release
    ```
 
 5. **Generate DXT Package**
@@ -143,15 +144,16 @@ If the automated process fails, you can create a release manually:
 1. Build the project locally:
 
    ```powershell
-   cargo build --release --all-targets
+   cmake -S service -B service/build -G "Visual Studio 17 2022" -A x64
+   cmake --build service/build --config Release
    .\build-installer.ps1
    ```
 
 2. Create a new release in GitHub
 3. Upload the following artifacts:
    - `installer/FastSearchMCP-Setup.exe`
-   - `target/release/fastsearch-mcp-bridge` (and `.exe` on Windows)
-   - `target/release/fastsearch` (and `.exe` on Windows)
+   - `service/build/bin/Release/FastSearchServiceNew.exe`
+   - `dist/fastsearch-mcp-bridge.exe` (if applicable)
 
 ## Versioning
 

@@ -1,12 +1,12 @@
 # FastSearch MCP Server
 
 ## Overview
-FastSearch MCP Server is a Python implementation of the Model-Controller-Presenter (MCP) 2.11.3 protocol, designed to provide a standardized interface for the FastSearch NTFS search service.
+FastSearch MCP Server is a Python implementation of the Model-Controller-Presenter (MCP) 2.13 protocol, designed to provide a standardized interface for the FastSearch NTFS search service.
 
 ## Key Components
 
 ### 1. MCP Server (`mcp_server.py`)
-- Implements the MCP 2.11.3 protocol
+- Implements the MCP 2.13 protocol
 - Handles JSON-RPC 2.0 requests
 - Manages tool registration and execution
 - Provides built-in methods for service management
@@ -63,7 +63,7 @@ async def fail_example():
 - `@validate_schema(schema)`: Validate input against a JSON schema
 
 ## Standards Compliance
-- MCP 2.11.3 Protocol
+- MCP 2.13 Protocol
 - JSON-RPC 2.0
 - PEP 8 Style Guide
 - Type Annotations (PEP 484)

@@ -1,34 +1,36 @@
-// Post-install script to build Rust binary if needed
+// Post-install script to build the C++ service binary if needed
 const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
 console.log('Setting up FastSearch MCP Server...');
 
-const binaryPath = path.join(__dirname, '..', 'target', 'release', 'fastsearch.exe');
+const serviceDir = path.join(__dirname, '..', 'service');
+const buildDir = path.join(serviceDir, 'build');
+const binaryPath = path.join(buildDir, 'bin', 'Release', 'FastSearchServiceNew.exe');
 
 // Check if we need to build
 if (!fs.existsSync(binaryPath)) {
-    console.log('Building FastSearch binary...');
-    
+    console.log('Building FastSearch service binary...');
+
     try {
-        // Check if we have Rust toolchain
-        execSync('cargo --version', { stdio: 'ignore' });
-        
-        // Build the release binary
-        execSync('cargo build --release', { 
-            cwd: path.join(__dirname, '..'),
-            stdio: 'inherit' 
+        execSync('cmake -S . -B build -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release', {
+            cwd: serviceDir,
+            stdio: 'inherit'
         });
-        
-        console.log('✓ FastSearch binary built successfully');
+        execSync('cmake --build build --config Release', {
+            cwd: serviceDir,
+            stdio: 'inherit'
+        });
+
+        console.log('✓ FastSearch service built successfully');
     } catch (error) {
-        console.error('❌ Failed to build FastSearch binary');
-        console.error('Please ensure Rust toolchain is installed: https://rustup.rs/');
+        console.error('❌ Failed to build FastSearch service');
+        console.error('Ensure Visual Studio Build Tools and CMake are installed and available on PATH.');
         process.exit(1);
     }
 } else {
-    console.log('✓ FastSearch binary already exists');
+    console.log('✓ FastSearch service binary already exists');
 }
 
 console.log('🚀 FastSearch MCP Server ready!');

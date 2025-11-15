@@ -1,8 +1,6 @@
 """Integration tests for FastSearch MCP Bridge."""
 
-import asyncio
 import unittest
-from typing import Dict, Any
 
 from fastsearch_mcp.mcp_server import McpServer
 
@@ -30,7 +28,7 @@ class TestMcpBridge(unittest.IsolatedAsyncioTestCase):
 
 class TestMcpBridgeIntegration(unittest.IsolatedAsyncioTestCase):
     """Integration tests for the MCP bridge with the actual service."""
-    
+
     @unittest.SkipTest
     async def test_end_to_end_search(self):
         """Test end-to-end search functionality with the real service."""
@@ -40,9 +38,10 @@ class TestMcpBridgeIntegration(unittest.IsolatedAsyncioTestCase):
 
 
 if __name__ == "__main__":
-    import pytest
     import sys
-    
+
+    import pytest
+
     # Run unit tests by default
     if len(sys.argv) > 1 and sys.argv[1] == "--integration":
         # Run integration tests

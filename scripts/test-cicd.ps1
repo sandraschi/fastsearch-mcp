@@ -6,46 +6,51 @@ Write-Host "=====================================" -ForegroundColor Cyan
 Write-Host ""
 
 # Check if we're in the right directory
-if (-not (Test-Path "Cargo.toml")) {
+if (-not (Test-Path "pyproject.toml")) {
     Write-Host "❌ Please run this script from the fastsearch-mcp root directory" -ForegroundColor Red
     exit 1
 }
 
 Write-Host "✅ Running from fastsearch-mcp root directory" -ForegroundColor Green
 
-# Check Rust installation
-Write-Host "🔍 Checking Rust installation..." -ForegroundColor Yellow
+# Check toolchain
+Write-Host "🔍 Checking CMake availability..." -ForegroundColor Yellow
 try {
-    $rustVersion = & cargo --version
-    Write-Host "✅ Rust found: $rustVersion" -ForegroundColor Green
+    $cmakeVersion = & cmake --version
+    Write-Host "✅ CMake found: $cmakeVersion" -ForegroundColor Green
 } catch {
-    Write-Host "❌ Rust/Cargo not found. Please install Rust first." -ForegroundColor Red
+    Write-Host "❌ CMake not found. Please install CMake and ensure it is on PATH." -ForegroundColor Red
     exit 1
+}
+
+Write-Host "🔍 Checking Visual Studio Build Tools..." -ForegroundColor Yellow
+if (-not (Test-Path "$Env:ProgramFiles\Microsoft Visual Studio")) {
+    Write-Host "⚠️ Visual Studio Build Tools directory not found. Ensure the Desktop C++ workload is installed." -ForegroundColor Yellow
 }
 
 # Clean previous builds
 Write-Host "🧹 Cleaning previous builds..." -ForegroundColor Yellow
-& cargo clean
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "❌ Cargo clean failed" -ForegroundColor Red
-    exit 1
-}
+Remove-Item -Recurse -Force service\build -ErrorAction SilentlyContinue
 Write-Host "✅ Clean complete" -ForegroundColor Green
 
 # Build release targets
 Write-Host "🔨 Building release targets..." -ForegroundColor Yellow
-& cargo build --release --verbose
+cmake -S service -B service/build -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release
 if ($LASTEXITCODE -ne 0) {
-    Write-Host "❌ Build failed" -ForegroundColor Red
+    Write-Host "❌ CMake configure failed" -ForegroundColor Red
     exit 1
 }
-Write-Host "✅ Build successful" -ForegroundColor Green
+cmake --build service/build --config Release
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "❌ Service build failed" -ForegroundColor Red
+    exit 1
+}
+Write-Host "✅ Service build successful" -ForegroundColor Green
 
 # Verify expected binaries
 Write-Host "🔍 Verifying binaries..." -ForegroundColor Yellow
-$releaseDir = "target\release"
-$bridgeBinary = "$releaseDir\fastsearch-mcp-bridge.exe"
-$serviceBinary = "$releaseDir\fastsearch-service.exe"
+$bridgeBinary = "dist\fastsearch-mcp-bridge.exe"
+$serviceBinary = "service\build\bin\Release\FastSearchServiceNew.exe"
 
 if (Test-Path $bridgeBinary) {
     $bridgeSize = (Get-Item $bridgeBinary).Length
@@ -115,7 +120,7 @@ This is a test build created by the local CI/CD test script.
 
 ## Files
 - fastsearch-mcp-bridge.exe - MCP bridge for Claude Desktop
-- fastsearch-service.exe - Windows service for NTFS access
+- FastSearchServiceNew.exe - Windows service for NTFS access
 - test-install.bat - Test installation script
 
 ## Testing

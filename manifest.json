@@ -1,0 +1,46 @@
+{
+  "manifest_version": "0.2",
+  "name": "fastsearch-mcp",
+  "version": "0.4.0",
+  "description": "Lightning-fast file search for Claude Desktop using direct NTFS Master File Table access",
+  "author": {
+    "name": "sandraschi",
+    "email": "team@sandraschi.dev"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/sandraschi/fastsearch-mcp",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sandraschi/fastsearch-mcp.git"
+  },
+  "keywords": ["mcp", "fastsearch", "filesystem", "search", "ntfs", "windows"],
+  "server": {
+    "type": "python",
+    "entry_point": "src/fastsearch_mcp/__main__.py",
+    "mcp_config": {
+      "command": "python",
+      "args": ["-m", "fastsearch_mcp"],
+      "env": {
+        "PYTHONPATH": "${PWD}",
+        "PYTHONUNBUFFERED": "1"
+      }
+    }
+  },
+  "prompts": [
+    {
+      "name": "system",
+      "description": "System prompt defining FastSearch MCP capabilities and behavior",
+      "text": "prompts/system.md"
+    },
+    {
+      "name": "user",
+      "description": "User guide and usage examples for FastSearch MCP",
+      "text": "prompts/user.md"
+    },
+    {
+      "name": "examples",
+      "description": "Example interactions demonstrating FastSearch MCP usage",
+      "text": "prompts/examples.json"
+    }
+  ]
+}

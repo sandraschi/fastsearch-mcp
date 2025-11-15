@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "fastsearch-mcp": {
+      "command": "python",
+      "args": [
+        "-m",
+        "fastsearch_mcp"
+      ],
+      "env": {
+        "PYTHONPATH": "${PWD}",
+        "PYTHONUNBUFFERED": "1"
+      }
+    }
+  }
+}
+

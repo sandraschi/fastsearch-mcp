@@ -1,13 +1,13 @@
 # Development Guide
 
-This guide provides detailed instructions for setting up a development environment and working with the FastSearch MCP codebase.
+This guide describes how to set up a development environment and contribute to FastSearch MCP.
 
 ## Table of Contents
 
 - [Prerequisites](#prerequisites)
-- [Getting Started](#getting-started)
+- [Environment Setup](#environment-setup)
 - [Project Structure](#project-structure)
-- [Development Workflow](#development-workflow)
+- [Workflow](#workflow)
 - [Testing](#testing)
 - [Debugging](#debugging)
 - [Code Style](#code-style)
@@ -16,203 +16,146 @@ This guide provides detailed instructions for setting up a development environme
 
 ## Prerequisites
 
-- Python 3.8+
-- Rust toolchain (for service development)
+- Python 3.10+
+- Visual Studio 2022 Build Tools (Desktop development with C++)
+- CMake 3.20+
 - Git
-- [Poetry](https://python-poetry.org/) (Python dependency management)
 - [pre-commit](https://pre-commit.com/)
 
-## Getting Started
+## Environment Setup
 
 1. **Clone the repository**
 
-   ```bash
+   ```powershell
    git clone https://github.com/yourusername/fastsearch-mcp.git
    cd fastsearch-mcp
    ```
 
-2. **Set up Python environment**
+2. **Create a virtual environment**
 
-   ```bash
-   # Install Poetry if you haven't already
-   pip install poetry
-   
-   # Install project dependencies
-   poetry install
-   
-   # Activate the virtual environment
-   poetry shell
+   ```powershell
+   python -m venv .venv
+   .venv\Scripts\Activate.ps1
+   pip install -r requirements-dev.txt
+   pip install -e .
    ```
 
 3. **Install pre-commit hooks**
 
-   ```bash
+   ```powershell
    pre-commit install
    ```
 
-4. **Set up Rust toolchain (for service development)**
+4. **Build the C++ service (Debug configuration recommended during development)**
 
-   ```bash
-   # Install Rust if you haven't already
-   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-   
-   # Add required Rust components
-   rustup component add rustfmt clippy
+   ```powershell
+   cd service
+   cmake -S . -B build -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Debug
+   cmake --build build --config Debug
+   cd ..
    ```
 
 ## Project Structure
 
 ```
 fastsearch-mcp/
-├── .github/              # GitHub workflows and templates
-├── fastsearch_mcp/       # Python package source
-│   ├── __init__.py       # Package metadata and version
-│   ├── server.py         # MCP server implementation
-│   ├── service.py        # Service client implementation
-│   └── utils/            # Utility modules
-├── service/              # Rust service code
-│   ├── src/              # Source files
-│   └── Cargo.toml        # Rust project configuration
-├── tests/                # Test suite
-├── .pre-commit-config.yaml
-├── CHANGELOG.md
-├── CONTRIBUTING.md
-├── LICENSE
-├── pyproject.toml        # Python project configuration
+├── docs/                      # Documentation
+├── scripts/                   # Helper scripts (PowerShell + bash)
+├── service/                   # C++ Windows service
+│   ├── src/                   # Service sources
+│   └── build/                 # CMake build output
+├── src/fastsearch_mcp/        # Python MCP bridge package
+│   ├── tools/                 # FastMCP tool implementations
+│   └── utils/                 # Shared helpers
+├── tests/                     # Python test suite
+├── install-service.ps1        # Service management script
+├── package.ps1                # DXT packaging helper
+├── pyproject.toml             # Python project configuration
 └── README.md
 ```
 
-## Development Workflow
+## Workflow
 
-1. **Create a new branch**
-
-   ```bash
-   git checkout -b feature/your-feature-name
+1. **Create a feature branch**
+   ```powershell
+   git checkout -b feature/your-feature
    ```
 
-2. **Make your changes**
-   - Follow the code style guidelines
-   - Write tests for new functionality
-   - Update documentation as needed
+2. **Make changes**
+   - Update Python code under `src/fastsearch_mcp`
+   - Modify the C++ service under `service/src`
+   - Keep documentation consistent with architectural constraints
 
-3. **Run tests and checks**
-
-   ```bash
-   # Run Python tests
-   pytest
-   
-   # Run Rust tests
-   cd service && cargo test && cd ..
-   
-   # Run linters
+3. **Run checks**
+   ```powershell
    pre-commit run --all-files
+   pytest
+   cmake --build service/build --config Debug
    ```
 
-4. **Commit your changes**
-
-   ```bash
+4. **Commit and push**
+   ```powershell
    git add .
-   git commit -m "feat: add new feature"
+   git commit -m "feat: describe your change"
+   git push -u origin feature/your-feature
    ```
 
-5. **Push your changes**
-
-   ```bash
-   git push -u origin feature/your-feature-name
-   ```
-
-6. **Open a Pull Request**
-   - Follow the PR template
-   - Request reviews from maintainers
-   - Address any feedback
+5. **Open a pull request**
+   - Provide context and testing notes
+   - Highlight any changes that affect service installation or architecture rules
 
 ## Testing
 
-### Running Tests
+Run the Python test suite from the repository root:
 
-```bash
-# Run all tests
+```powershell
 pytest
-
-# Run tests with coverage
 pytest --cov=fastsearch_mcp --cov-report=term-missing
-
-# Run a specific test file
-pytest tests/test_server.py
-
-# Run a specific test method
-pytest tests/test_server.py::TestServer::test_search
 ```
 
-### Writing Tests
+Service-specific smoke tests can be run using the helper scripts:
 
-- Place test files in the `tests/` directory
-- Follow the naming convention `test_*.py` for test files
-- Use descriptive test method names
-- Include docstrings explaining what each test verifies
+```powershell
+.\test-service-comprehensive.ps1 all
+.\debug-service-startup.ps1
+```
 
 ## Debugging
 
-### Python Debugging
+### Python bridge
+- Use `pdb` or VS Code’s debugger (`start_server.py` is the usual entry point).
+- Enable verbose logging via `FASTSEARCH_LOG_LEVEL=debug`.
 
-Use the built-in `pdb` debugger:
-
-```python
-import pdb; pdb.set_trace()  # Add this where you want to start debugging
-```
-
-Or use VS Code's debugger with the following launch configuration:
-
-```json
-{
-    "version": "0.2.0",
-    "configurations": [
-        {
-            "name": "Python: FastSearch MCP",
-            "type": "python",
-            "request": "launch",
-            "module": "fastsearch_mcp.server",
-            "justMyCode": true
-        }
-    ]
-}
-```
-
-### Rust Debugging
-
-Use `rust-lldb` or VS Code with the Rust Analyzer extension:
-
-```bash
-# Build with debug symbols
-cargo build
-
-# Debug with lldb
-lldb target/debug/fastsearch-service
-```
+### C++ service
+- Use `.\scripts\install-visualstudio-community.ps1` (elevated) to install Visual Studio Community with the required workload, then follow `docs/Visual_Studio_Debugger_Setup.md` for attach instructions.
+- Alternatively, load the workspace in Cursor/VS Code and pick the `Attach to FastSearch Service` configuration from `.vscode\launch.json` (requires the Microsoft `C/C++` extension and an elevated session).
+- Build the service in `Debug` configuration and launch it under the Visual Studio debugger.
+- Alternatively, run the binary from an elevated console with `--install`, `--start`, etc., or attach to the Windows service after launch.
+- Review Event Viewer entries under `Applications and Services Logs → FastSearchMCP` for startup failures.
 
 ## Code Style
 
 ### Python
+- Follow PEP 8.
+- Use type hints and descriptive docstrings.
+- Prefer `anyio`/`asyncio`-friendly patterns when integrating with FastMCP.
 
-- Follow [PEP 8](https://www.python.org/dev/peps/pep-0008/)
-- Use type hints for all function signatures
-- Keep lines under 100 characters
-- Use docstrings for all public functions and classes
-- Run `black .` to format code
-
-### Rust
-
-- Follow the [Rust API Guidelines](https://rust-lang.github.io/api-guidelines/)
-- Run `cargo fmt` to format code
-- Run `cargo clippy` for additional lints
+### C++
+- Design for determinism and minimal allocations.
+- Use RAII for HANDLE/RESOURCE management.
+- Keep logging concise and actionable (all critical paths should log to the Windows Event Log).
+- Never introduce caches or background indexing in the service.
 
 ## Documentation
 
-- Update `CHANGELOG.md` for all user-facing changes
-- Add docstrings to all public functions and classes
-- Update README.md for major changes
-- Add inline comments for complex logic
+Keep the documentation aligned with the architecture guardrails. When behaviour changes:
+- Update `README.md`, `docs/TECHNICAL_ARCHITECTURE.md`, and any relevant troubleshooting guides.
+- Ensure warnings about forbidden patterns (indexing, caching, background scans) remain prominent.
 
 ## Releasing
 
-See [RELEASING.md](RELEASING.md) for detailed release instructions.
+Follow `docs/RELEASING.md` for the full release checklist. At a minimum:
+- Run the automated test suite and service diagnostics.
+- Build the C++ service in `Release` mode.
+- Regenerate any packages (PyPI wheel, DXT, MSI if applicable).
+- Tag the release following semantic versioning.

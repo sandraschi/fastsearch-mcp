@@ -3,7 +3,7 @@
 FastSearch MCP Server - Main entry point.
 
 This module provides the main entry point for the FastSearch MCP server,
-following FastMCP 2.12 patterns and conventions.
+following FastMCP 2.13 patterns and conventions.
 """
 
 import asyncio
@@ -15,7 +15,7 @@ src_path = Path(__file__).parent.parent
 if str(src_path) not in sys.path:
     sys.path.insert(0, str(src_path))
 
-from fastsearch_mcp import FastSearchServer, __version__
+from fastsearch_mcp import FastSearchServer, __version__  # noqa: E402
 
 
 def print_banner() -> None:
@@ -27,7 +27,7 @@ def print_banner() -> None:
 ║                                                              ║
 ║  🚀 Direct NTFS MFT Access • Real-time Search              ║
 ║  ⚡ Sub-100ms Performance • <50MB Memory                    ║
-║  🎯 Instant Startup • FastMCP 2.12 Compliant              ║
+║  🎯 Instant Startup • FastMCP 2.13 Compliant              ║
 ╚══════════════════════════════════════════════════════════════╝
 """)
 
@@ -35,12 +35,12 @@ def print_banner() -> None:
 async def main() -> None:
     """Main async entry point."""
     print_banner()
-    
+
     try:
         # Create and run the server
         server = FastSearchServer()
         await server.start()
-        
+
     except KeyboardInterrupt:
         # Server was interrupted - this is normal
         pass

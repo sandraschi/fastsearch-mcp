@@ -1,34 +1,82 @@
-# DXT Extension Building - Complete Guide for MCP Servers
+# MCPB Extension Building - Complete Guide for MCP Servers
 
-**Version:** 3.0.0  
-**Date:** 2025-08-22  
+**Version:** 3.1.0  
+**Date:** 2025-01-15  
 **Applies to:** ALL MCP server repositories  
 **AI Tools:** Windsurf, Cursor, Claude Code  
 
-## 🌟 What is DXT?
+## 🚨 IMPORTANT: DXT is now MCPB
 
-DXT (Deployment eXtension Toolkit) is a powerful framework developed by Anthropic specifically for packaging and distributing MCP (Model Control Protocol) servers. It provides a standardized way to package, version, and deploy MCP server implementations with all their dependencies.
+**BREAKING CHANGE:** As of January 2025, DXT (Deployment eXtension Toolkit) has been renamed to **MCPB (MCP Bundle)**. This is more than just a name change - it reflects the evolution of the toolkit into a more comprehensive MCP packaging solution.
 
-### Key Components of DXT
+### Migration Summary
 
-1. **DXT CLI**: Command-line interface for managing the DXT packaging and deployment lifecycle
-2. **DXT Runtime**: Execution environment for MCP servers
-3. **DXT Registry**: Central repository for versioned MCP server packages
-4. **DXT SDK**: Tools and libraries for MCP server development
+| Old (DXT) | New (MCPB) | Notes |
+|-----------|------------|-------|
+| `dxt` CLI commands | `mcpb` CLI commands | All commands now use `mcpb` prefix |
+| `dxt.json` | `mcpb.json` | Configuration file renamed |
+| `dxt_manifest.json` | `mcpb_manifest.json` | Manifest file renamed |
+| `.dxt` packages | `.mcpb` packages | Package extension changed |
+| `@anthropic-ai/dxt` | `@anthropic-ai/mcpb` | NPM package renamed |
 
-## 🏗️ DXT Manifest (dxt_manifest.json)
+### Quick Migration Steps
 
-The `dxt_manifest.json` file is the heart of any MCP server package. It defines the server's metadata, configuration, dependencies, and runtime requirements.
+1. **Update CLI Installation:**
+   ```bash
+   npm uninstall -g @anthropic-ai/dxt
+   npm install -g @anthropic-ai/mcpb
+   ```
+
+2. **Rename Configuration Files:**
+   ```bash
+   # Rename dxt.json to mcpb.json
+   mv dxt.json mcpb.json
+   
+   # Rename manifest file
+   mv dxt_manifest.json mcpb_manifest.json
+   ```
+
+3. **Update Commands:**
+   ```bash
+   # Old DXT commands
+   dxt validate
+   dxt pack
+   dxt sign
+   
+   # New MCPB commands
+   mcpb validate
+   mcpb pack
+   mcpb sign
+   ```
+
+4. **Update Package Extensions:**
+   - Build outputs now use `.mcpb` extension instead of `.dxt`
+   - All references to `.dxt` files should be updated to `.mcpb`
+
+## 🌟 What is MCPB?
+
+MCPB (MCP Bundle) is a powerful framework developed by Anthropic specifically for packaging and distributing MCP (Model Control Protocol) servers. It provides a standardized way to package, version, and deploy MCP server implementations with all their dependencies.
+
+### Key Components of MCPB
+
+1. **MCPB CLI**: Command-line interface for managing the MCPB packaging and deployment lifecycle
+2. **MCPB Runtime**: Execution environment for MCP servers
+3. **MCPB Registry**: Central repository for versioned MCP server packages
+4. **MCPB SDK**: Tools and libraries for MCP server development
+
+## 🏗️ MCPB Manifest (mcpb_manifest.json)
+
+The `mcpb_manifest.json` file is the heart of any MCP server package. It defines the server's metadata, configuration, dependencies, and runtime requirements.
 
 ### Manifest Creation Methods
 
 #### 1. Manual Creation (Not Recommended)
 
 ```bash
-dxt init  # Creates a basic manifest (not recommended for production)
+mcpb init  # Creates a basic manifest (not recommended for production)
 ```
 
-This method creates a minimal `dxt_manifest.json` that requires manual updates. It's only suitable for quick testing.
+This method creates a minimal `mcpb_manifest.json` that requires manual updates. It's only suitable for quick testing.
 
 #### 2. AI-Powered Generation (Recommended)
 
@@ -36,10 +84,10 @@ The preferred method is to use AI-powered tools that analyze your repository and
 
 ```bash
 # Using Windsurf AI (recommended)
-windsurf dxt analyze --path ./src --output dxt_manifest.json
+windsurf mcpb analyze --path ./src --output mcpb_manifest.json
 
-# Or using the DXT CLI with AI enhancement
-dxt analyze --ai --output dxt_manifest.json
+# Or using the MCPB CLI with AI enhancement
+mcpb analyze --ai --output mcpb_manifest.json
 ```
 
 These tools will:
@@ -71,7 +119,7 @@ These tools will:
 }
 ```
 
-## 🤖 Prompt Templates in DXT
+## 🤖 Prompt Templates in MCPB
 
 Prompt templates are JSON files that define how AI models should interact with your extension. They're crucial for creating consistent and effective AI-driven features.
 
@@ -99,14 +147,14 @@ Prompt templates are JSON files that define how AI models should interact with y
 
 ### Automatic Template Generation
 
-DXT can generate prompt templates by analyzing your code and documentation:
+MCPB can generate prompt templates by analyzing your code and documentation:
 
 ```bash
 # Generate prompt templates from code analysis
-dxt generate-prompts --source ./src --output ./prompts
+mcpb generate-prompts --source ./src --output ./prompts
 
 # Or use AI to enhance existing prompts
-dxt enhance-prompts --input ./prompts --output ./enhanced-prompts
+mcpb enhance-prompts --input ./prompts --output ./enhanced-prompts
 ```
 
 ### Prompt Template Features
@@ -117,9 +165,9 @@ dxt enhance-prompts --input ./prompts --output ./enhanced-prompts
 4. **Localization**: Support for multiple languages
 5. **Testing**: Built-in testing framework for prompts
 
-## 🏭 DXT Standards and Governance
+## 🏭 MCPB Standards and Governance
 
-DXT is developed and maintained by Anthropic with contributions from the open-source community. The project follows semantic versioning and has a well-defined RFC process for major changes.
+MCPB is developed and maintained by Anthropic with contributions from the open-source community. The project follows semantic versioning and has a well-defined RFC process for major changes.
 
 ### Key Standards
 
@@ -139,24 +187,24 @@ DXT is developed and maintained by Anthropic with contributions from the open-so
 
 ### ❌ NEVER DO
 
-1. **NO `dxt init`** - Outdated and creates minimal configurations
-2. **NO manual configuration** - Use proper `dxt.json` with all required fields
-3. **NO custom build scripts** - Use standard DXT tooling only
+1. **NO `mcpb init`** - Outdated and creates minimal configurations
+2. **NO manual configuration** - Use proper `mcpb.json` with all required fields
+3. **NO custom build scripts** - Use standard MCPB tooling only
 4. **NO hardcoded paths** - Use relative paths in configuration
-5. **NO direct server execution** - Always use DXT CLI tools
+5. **NO direct server execution** - Always use MCPB CLI tools
 
 ### ✅ ALWAYS DO
 
-1. **Use `dxt.json`** - Central configuration file for all DXT settings
+1. **Use `mcpb.json`** - Central configuration file for all MCPB settings
 2. **Follow semantic versioning** - For both package and MCP versions
 3. **Use stdio transport** - Required for reliable communication
 4. **Specify exact versions** - For all dependencies
-5. **Validate before building** - Always run `dxt validate` first
-6. **Verify after building** - Always run `dxt verify` after packaging
-7. **Sign production packages** - Use `dxt sign` for production releases
+5. **Validate before building** - Always run `mcpb validate` first
+6. **Verify after building** - Always run `mcpb verify` after packaging
+7. **Sign production packages** - Use `mcpb sign` for production releases
 8. **Use the build script** - For consistent builds across environments
 
-## 🖥️ DXT CLI COMMAND SYNTAX
+## 🖥️ MCPB CLI COMMAND SYNTAX
 
 ### Core Commands
 
@@ -164,33 +212,33 @@ DXT is developed and maintained by Anthropic with contributions from the open-so
 
 ```bash
 # Basic package creation
-dxt pack . dist/
+mcpb pack . dist/
 
 # Sign the package (required for production)
-dxt sign --key your-key.pem dist/package.dxt
+mcpb sign --key your-key.pem dist/package.mcpb
 
 # Verify package integrity
-dxt verify --key your-key.pem dist/package.dxt
+mcpb verify --key your-key.pem dist/package.mcpb
 
-# Publish to a DXT registry (if configured)
-dxt publish --registry your-registry dist/package.dxt
+# Publish to a MCPB registry (if configured)
+mcpb publish --registry your-registry dist/package.mcpb
 ```
 
-#### 2. DXT Registries
+#### 2. MCPB Registries
 
-DXT registries are package repositories that store and distribute DXT packages. Here's what you need to know:
+MCPB registries are package repositories that store and distribute MCPB packages. Here's what you need to know:
 
 ##### Official Registries
 
-- **Anthropic's Public Registry**: The primary public registry for production DXT packages
-  - URL: `https://registry.dxt.anthropic.com` (requires authentication)
+- **Anthropic's Public Registry**: The primary public registry for production MCPB packages
+  - URL: `https://registry.mcpb.anthropic.com` (requires authentication)
   - Managed by Anthropic
   - Requires review and approval for public packages
 
 ##### Self-hosted Registries
 
-- **Enterprise/Private Registries**: Some organizations run private DXT registries
-  - Configure via environment variable: `DXT_REGISTRY_URL`
+- **Enterprise/Private Registries**: Some organizations run private MCPB registries
+  - Configure via environment variable: `MCPB_REGISTRY_URL`
   - Authentication typically required via API keys or tokens
 
 ##### Key Points
@@ -198,7 +246,7 @@ DXT registries are package repositories that store and distribute DXT packages. 
 - **Authentication**: Always required for publishing
 
   ```bash
-  export DXT_API_TOKEN='your-token-here'
+  export MCPB_API_TOKEN='your-token-here'
   ```
 
 - **Scoped Packages**: Use `@scope/package-name` for organization-specific packages
@@ -223,33 +271,28 @@ For consistent builds, use the provided PowerShell build script:
 .\scripts\build-mcp-package.ps1 -OutputDir "C:\builds"
 ```
 
-**Version:** 3.0.0  
-**Date:** 2025-08-22  
-**Applies to:** ALL MCP server repositories  
-**AI Tools:** Windsurf, Cursor, Claude Code  
-
 ## 🎯 CRITICAL RULES - READ FIRST
 
 ### ❌ NEVER DO
 
-1. **NO `dxt init`** - Outdated and creates minimal configurations
-2. **NO manual configuration** - Use proper `dxt.json` with all required fields
-3. **NO custom build scripts** - Use standard DXT tooling only
+1. **NO `mcpb init`** - Outdated and creates minimal configurations
+2. **NO manual configuration** - Use proper `mcpb.json` with all required fields
+3. **NO custom build scripts** - Use standard MCPB tooling only
 4. **NO hardcoded paths** - Use relative paths in configuration
-5. **NO direct server execution** - Always use DXT CLI tools
+5. **NO direct server execution** - Always use MCPB CLI tools
 
 ### ✅ ALWAYS DO
 
-1. **Use `dxt.json`** - Central configuration file for all DXT settings
+1. **Use `mcpb.json`** - Central configuration file for all MCPB settings
 2. **Follow semantic versioning** - For both package and MCP versions
 3. **Use stdio transport** - Required for reliable communication
 4. **Specify exact versions** - For all dependencies
-5. **Validate before building** - Always run `dxt validate` first
-6. **Verify after building** - Always run `dxt verify` after packaging
-7. **Sign production packages** - Use `dxt sign` for production releases
+5. **Validate before building** - Always run `mcpb validate` first
+6. **Verify after building** - Always run `mcpb verify` after packaging
+7. **Sign production packages** - Use `mcpb sign` for production releases
 8. **Use the build script** - For consistent builds across environments
 
-## 🖥️ DXT CLI COMMAND SYNTAX
+## 🖥️ MCPB CLI COMMAND SYNTAX
 
 ### Core Commands
 
@@ -257,33 +300,33 @@ For consistent builds, use the provided PowerShell build script:
 
 ```bash
 # Basic package creation
-dxt pack . dist/
+mcpb pack . dist/
 
 # Sign the package (required for production)
-dxt sign --key your-key.pem dist/package.dxt
+mcpb sign --key your-key.pem dist/package.mcpb
 
 # Verify package integrity
-dxt verify --key your-key.pem dist/package.dxt
+mcpb verify --key your-key.pem dist/package.mcpb
 
-# Publish to a DXT registry (if configured)
-dxt publish --registry your-registry dist/package.dxt
+# Publish to a MCPB registry (if configured)
+mcpb publish --registry your-registry dist/package.mcpb
 ```
 
-#### 2. DXT Registries
+#### 2. MCPB Registries
 
-DXT registries are package repositories that store and distribute DXT packages. Here's what you need to know:
+MCPB registries are package repositories that store and distribute MCPB packages. Here's what you need to know:
 
 ##### Official Registries
 
-- **Anthropic's Public Registry**: The primary public registry for production DXT packages
-  - URL: `https://registry.dxt.anthropic.com` (requires authentication)
+- **Anthropic's Public Registry**: The primary public registry for production MCPB packages
+  - URL: `https://registry.mcpb.anthropic.com` (requires authentication)
   - Managed by Anthropic
   - Requires review and approval for public packages
 
 ##### Self-hosted Registries
 
-- **Enterprise/Private Registries**: Some organizations run private DXT registries
-  - Configure via environment variable: `DXT_REGISTRY_URL`
+- **Enterprise/Private Registries**: Some organizations run private MCPB registries
+  - Configure via environment variable: `MCPB_REGISTRY_URL`
   - Authentication typically required via API keys or tokens
 
 ##### Key Points
@@ -291,7 +334,7 @@ DXT registries are package repositories that store and distribute DXT packages. 
 - **Authentication**: Always required for publishing
 
   ```bash
-  export DXT_API_TOKEN='your-token-here'
+  export MCPB_API_TOKEN='your-token-here'
   ```
 
 - **Scoped Packages**: Use `@scope/package-name` for organization-specific packages
@@ -320,20 +363,20 @@ For consistent builds, use the provided PowerShell build script:
 
 ```bash
 # Validate manifest file
-dxt validate
+mcpb validate
 
 # Validate built package
-dxt validate package.dxt
+mcpb validate package.mcpb
 ```
 
 #### 3. Package Signing
 
 ```bash
 # Sign a package
-dxt sign package.dxt
+mcpb sign package.mcpb
 
 # Sign with specific key
-dxt sign --key my-key.pem package.dxt
+mcpb sign --key my-key.pem package.mcpb
 ```
 
 ### Common Options
@@ -344,34 +387,34 @@ dxt sign --key my-key.pem package.dxt
 
 ### Environment Variables
 
-- `DXT_DEBUG=1`: Enable debug mode
-- `DXT_LOG_LEVEL=debug`: Set log level (debug, info, warn, error)
+- `MCPB_DEBUG=1`: Enable debug mode
+- `MCPB_LOG_LEVEL=debug`: Set log level (debug, info, warn, error)
 
 ### Important Notes
 
 1. Always run from the project root directory
-2. The `dxt init` command is deprecated - do not use it
+2. The `mcpb init` command is deprecated - do not use it
 3. For production builds, always validate before packaging
 4. Sign packages for distribution when sharing with others
 
-## 📋 DXT.JSON VS MANIFEST.JSON
+## 📋 MCPB.JSON VS MANIFEST.JSON
 
 ### Key Differences
 
 | File | Purpose | When Used | Example Use Case |
 |------|---------|-----------|------------------|
-| `dxt.json` | Development/build configuration | During development and build process | Configure build output directory, development server settings |
+| `mcpb.json` | Development/build configuration | During development and build process | Configure build output directory, development server settings |
 | `manifest.json` | Runtime configuration | When the extension is running | Define server entry points, capabilities, and extension metadata |
 
-### dxt.json (Build Configuration)
+### mcpb.json (Build Configuration)
 
-Used by the DXT CLI tools during development and build. Defines how to build and package your extension.
+Used by the MCPB CLI tools during development and build. Defines how to build and package your extension.
 
 ### manifest.json (Runtime Configuration)
 
-Packaged with your extension and used by the DXT runtime. Defines how your extension should be loaded and executed.
+Packaged with your extension and used by the MCPB runtime. Defines how your extension should be loaded and executed.
 
-## 📋 DXT.JSON CONFIGURATION
+## 📋 MCPB.JSON CONFIGURATION
 
 ### Required Fields
 
@@ -407,58 +450,83 @@ Packaged with your extension and used by the DXT runtime. Defines how your exten
 ### 1. Validate Configuration
 
 ```bash
-dxt validate
+mcpb validate
 ```
 
 ### 2. Build the Package
 
 ```bash
-dxt pack
+# Syntax: mcpb pack [directory] [output]
+mcpb pack ./mcpb-build ./dist/package-name-version.mcpb
 ```
 
-This will create the package in the `dist` directory.
+**Important:** `mcpb pack` uses positional arguments, not `--output` flag:
+- First argument: directory containing manifest.json
+- Second argument: output file path (.mcpb extension)
+
+This will create the package in the specified output location.
 
 ### 3. Package Signing (Not Currently Used)
 
 ```bash
-dxt sign package.dxt
+mcpb sign package.mcpb
 ```
 
-Package signing is used to verify the authenticity and integrity of DXT packages. However, we currently do not use package signing in our workflow. If needed in the future, signing can be enabled by:
+Package signing is used to verify the authenticity and integrity of MCPB packages. However, we currently do not use package signing in our workflow. If needed in the future, signing can be enabled by:
 
 1. Generating a signing key pair
 2. Configuring the build process to sign packages
 3. Distributing the public key to all clients
 
-For now, you can safely ignore any signing-related steps in the DXT documentation.
+For now, you can safely ignore any signing-related steps in the MCPB documentation.
 
 ## 📜 MANIFEST.JSON - CORE CONFIGURATION
 
 ### Purpose
 
-`manifest.json` is the primary configuration file that defines your DXT extension's behavior, dependencies, and capabilities. It's crucial for the DXT runtime to understand how to load and execute your extension.
+`manifest.json` is the primary configuration file that defines your MCPB extension's behavior, dependencies, and capabilities. It's crucial for the MCPB runtime to understand how to load and execute your extension.
 
 ### Required Fields
 
 ```json
 {
-  "dxt_version": "0.1",
+  "manifest_version": "0.2",
   "name": "your-extension-name",
   "version": "1.0.0",
   "description": "Brief description of your extension",
-  "author": "Your Name <email@example.com>",
+  "author": {
+    "name": "Your Name",
+    "email": "you@example.com"
+  },
   "license": "MIT",
   "server": {
     "type": "python",
-    "entry_point": "src/your_package/server.py"
+    "entry_point": "src/your_package/server.py",
+    "mcp_config": {
+      "command": "python",
+      "args": ["-m", "your_package"],
+      "env": {
+        "PYTHONPATH": "${PWD}",
+        "PYTHONUNBUFFERED": "1"
+      }
+    }
   },
-  "capabilities": {
-    "tools": true,
-    "resources": true,
-    "prompts": true
-  }
+  "prompts": [
+    {
+      "name": "system",
+      "description": "System prompt defining capabilities",
+      "text": "prompts/system.md"
+    }
+  ]
 }
 ```
+
+**Important Notes:**
+- Use `manifest_version: "0.2"` (NOT `mcpb_version`)
+- `author` must be an object with `name` and `email`, not a string
+- Tools are auto-discovered from the server - do NOT include `tools` array or `parameters` in manifest
+- Do NOT include: `capabilities`, `categories`, `mcp`, `requirements`, `permissions`, `configuration` - these are not part of the standard
+- Prompts should be an array with `name`, `description`, and `text` (file path)
 
 ### Key Sections Explained
 
@@ -476,13 +544,13 @@ For now, you can safely ignore any signing-related steps in the DXT documentatio
 - Keep `manifest.json` in the root of your project
 - Use semantic versioning for the `version` field
 - Include all required fields
-- Validate using `dxt validate` before building
+- Validate using `mcpb validate` before building
 
 ## 🏗️ PROJECT STRUCTURE
 
 ```text
 your-mcp/
-   ├── dxt.json           # DXT configuration
+   ├── mcpb.json           # MCPB configuration
    ├── pyproject.toml     # Python project metadata
    ├── src/               # Source code
    │   └── your_package/  # Your Python package
@@ -511,7 +579,7 @@ your-mcp/
 
 ```json
 {
-  "dxt_version": "0.1",
+  "manifest_version": "0.2",
   "name": "your-mcp-server",
   "version": "1.0.0",
   "description": "Brief description for extension store",
@@ -519,22 +587,35 @@ your-mcp/
     "name": "Your Name",
     "email": "you@example.com"
   },
+  "license": "MIT",
   "server": {
     "type": "python",
     "entry_point": "src/your_mcp/server.py",
     "mcp_config": {
       "command": "python",
-      "args": ["-m", "your_mcp.server"],
-      "cwd": "src",
+      "args": ["-m", "your_mcp"],
       "env": {
-        "PYTHONPATH": "src",
-        "EXTERNAL_TOOL": "${user_config.external_tool}",
+        "PYTHONPATH": "${PWD}",
         "PYTHONUNBUFFERED": "1"
       }
     }
-  }
+  },
+  "prompts": [
+    {
+      "name": "system",
+      "description": "System prompt",
+      "text": "prompts/system.md"
+    }
+  ]
 }
 ```
+
+**Critical Format Rules:**
+- ✅ Use `manifest_version: "0.2"` (required)
+- ✅ `author` must be object: `{"name": "...", "email": "..."}`
+- ✅ Tools are auto-discovered - do NOT list them in manifest
+- ✅ Prompts array format: `[{"name": "...", "description": "...", "text": "..."}]`
+- ❌ Do NOT include: `tools`, `parameters`, `capabilities`, `categories`, `mcp`, `requirements`, `permissions`, `configuration`
 
 ### 🚨 CRITICAL PYTHON PATH FIX
 
@@ -566,7 +647,7 @@ your-mcp/
 **File Structure that requires this fix:**
 
 ```
-your-extension.dxt/
+your-extension.mcpb/
 ├── manifest.json
 ├── requirements.txt
 ├── src/                           // ⭐ Python modules here
@@ -586,7 +667,7 @@ your-extension.dxt/
 DXT supports three types of prompt files that should be placed in a `prompts/` directory:
 
 ```
-your-extension.dxt/
+your-extension.mcpb/
 ├── prompts/
 │   ├── system.md     # System prompt (required)
 │   ├── user.md       # User prompt template (required)
@@ -691,7 +772,7 @@ Add a `prompts` section to your manifest.json:
 2. **CI/CD Pipeline**
    - **On tag push**:
      1. Build Python package (wheel and source)
-     2. Create DXT package (`.dxt` file)
+     2. Create MCPB package (`.mcpb` file)
      3. Publish to TestPyPI (for testing)
      4. Publish to PyPI (production)
      5. Create GitHub release with all artifacts
@@ -711,7 +792,7 @@ Add a `prompts` section to your manifest.json:
 1. **GitHub Release**
    - Source distribution (`.tar.gz`)
    - Python wheel (`.whl`)
-   - DXT package (`.dxt`)
+   - MCPB package (`.mcpb`)
    - Auto-generated release notes
 
 2. **PyPI**
@@ -729,7 +810,7 @@ Add a `prompts` section to your manifest.json:
    ```bash
    # Build packages locally first
    python -m build
-   dxt pack . dist/package.dxt
+   mcpb pack . dist/package.mcpb
    
    # Create and push tag
    git tag -a v1.0.0 -m "Release v1.0.0"
@@ -782,15 +863,15 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install build dxt
+        pip install build mcpb
     
     - name: Build Python package
       run: python -m build
     
-    - name: Build DXT package
+    - name: Build MCPB package
       run: |
         mkdir -p dist
-        dxt pack . dist/package.dxt
+        mcpb pack . dist/package.mcpb
     
     - name: Publish to PyPI
       if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')
@@ -806,7 +887,7 @@ jobs:
         files: |
           dist/*.whl
           dist/*.tar.gz
-          dist/*.dxt
+          dist/*.mcpb
         generate_release_notes: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -848,7 +929,7 @@ httpx>=0.24.0
 
 **Why fastmcp 2.12.0?**
 
-- Includes all critical DXT runtime compatibility fixes
+- Includes all critical MCPB runtime compatibility fixes
 - Resolves async/await handling in DXT environments
 - Proper error handling for extension context
 - Stable API surface for production use
@@ -955,7 +1036,7 @@ httpx>=0.24.0
 
 ```json
 {
-  "dxt_version": "0.1",
+  "mcpb_version": "0.1",
   "name": "example-mcp",
   "version": "1.0.0",
   "description": "Example MCP server with external tool integration",
@@ -1084,8 +1165,8 @@ httpx>=0.24.0
 ### Prerequisites
 
 ```bash
-# Install DXT CLI (official toolchain)
-npm install -g @anthropic-ai/dxt
+# Install MCPB CLI (official toolchain)
+npm install -g @anthropic-ai/mcpb
 
 # Install Python dependencies (EXACT VERSIONS)
 pip install "fastmcp>=2.12.0,<3.0.0"
@@ -1099,7 +1180,7 @@ your-mcp-server/
 ├── .github/
 │   └── workflows/
 │       └── build-dxt.yml          # GitHub Actions
-├── dxt/
+├── mcpb/
 │   ├── manifest.json              # AI-generated manifest
 │   └── assets/                    # Icons, screenshots
 ├── src/                           # ⭐ Python source code HERE
@@ -1117,22 +1198,22 @@ your-mcp-server/
 ### Local Development
 
 ```bash
-# 1. AI-generate manifest.json (place in dxt/manifest.json)
+# 1. AI-generate manifest.json (place in mcpb/manifest.json)
 # ENSURE: fastmcp>=2.10.1 in requirements.txt
 # ENSURE: cwd: "src" and PYTHONPATH: "src" in mcp_config
 
 # 2. Validate manifest
-cd dxt
-dxt validate
+cd mcpb
+mcpb validate
 
 # 3. Build DXT package
-dxt pack . ../dist/package.dxt
+mcpb pack . ../dist/package.mcpb
 
 # 4. Test installation
-# Drag dist/*.dxt to Claude Desktop
+# Drag dist/*.mcpb to Claude Desktop
 ```
 
-## 🚨 CLAUDE DESKTOP EXTENSION PATH BUGS
+## 🚨 CLAUDE DESKTOP MCPB EXTENSION PATH BUGS
 
 ### Critical Bug: Incorrect Extension Path Resolution
 
@@ -1147,7 +1228,7 @@ python.exe: can't open file 'C:\\Users\\user\\AppData\\Local\\AnthropicClaude\\a
 Claude Desktop has a path resolution bug where it tries to execute extensions from the wrong directory:
 
 - **Incorrect (what Claude Desktop tries):** `C:\Users\{user}\AppData\Local\AnthropicClaude\app-{version}\server\main.py`
-- **Correct (actual location):** `C:\Users\{user}\AppData\Roaming\Claude\Claude Extensions\local.dxt.{publisher}.{name}\server\main.py`
+- **Correct (actual location):** `C:\Users\{user}\AppData\Roaming\Claude\Claude Extensions\local.mcpb.{publisher}.{name}\server\main.py`
 
 ### 🔧 WORKAROUND STRATEGIES
 
@@ -1160,10 +1241,10 @@ When an extension fails with path errors, add a manual entry to `claude_desktop_
   "mcpServers": {
     "your-extension-manual": {
       "command": "python",
-      "args": ["C:/Users/{username}/AppData/Roaming/Claude/Claude Extensions/local.dxt.{publisher}.{extension-name}/server/main.py"],
-      "cwd": "C:/Users/{username}/AppData/Roaming/Claude/Claude Extensions/local.dxt.{publisher}.{extension-name}",
+      "args": ["C:/Users/{username}/AppData/Roaming/Claude/Claude Extensions/local.mcpb.{publisher}.{extension-name}/server/main.py"],
+      "cwd": "C:/Users/{username}/AppData/Roaming/Claude/Claude Extensions/local.mcpb.{publisher}.{extension-name}",
       "env": {
-        "PYTHONPATH": "C:/Users/{username}/AppData/Roaming/Claude/Claude Extensions/local.dxt.{publisher}.{extension-name}/server;C:/Users/{username}/AppData/Roaming/Claude/Claude Extensions/local.dxt.{publisher}.{extension-name}/server/lib",
+        "PYTHONPATH": "C:/Users/{username}/AppData/Roaming/Claude/Claude Extensions/local.mcpb.{publisher}.{extension-name}/server;C:/Users/{username}/AppData/Roaming/Claude/Claude Extensions/local.mcpb.{publisher}.{extension-name}/server/lib",
         "PYTHONUNBUFFERED": "1",
         "EXTENSION_DEBUG": "1"
       }
@@ -1246,10 +1327,10 @@ Include this troubleshooting section in your extension's README.md:
      "mcpServers": {
        "{your-extension-name}-manual": {
          "command": "python",
-         "args": ["C:/Users/{YOUR_USERNAME}/AppData/Roaming/Claude/Claude Extensions/local.dxt.{publisher}.{extension-name}/server/main.py"],
-         "cwd": "C:/Users/{YOUR_USERNAME}/AppData/Roaming/Claude/Claude Extensions/local.dxt.{publisher}.{extension-name}",
+         "args": ["C:/Users/{YOUR_USERNAME}/AppData/Roaming/Claude/Claude Extensions/local.mcpb.{publisher}.{extension-name}/server/main.py"],
+         "cwd": "C:/Users/{YOUR_USERNAME}/AppData/Roaming/Claude/Claude Extensions/local.mcpb.{publisher}.{extension-name}",
          "env": {
-           "PYTHONPATH": "C:/Users/{YOUR_USERNAME}/AppData/Roaming/Claude/Claude Extensions/local.dxt.{publisher}.{extension-name}/server",
+           "PYTHONPATH": "C:/Users/{YOUR_USERNAME}/AppData/Roaming/Claude/Claude Extensions/local.mcpb.{publisher}.{extension-name}/server",
            "PYTHONUNBUFFERED": "1"
          }
        }
@@ -1317,7 +1398,7 @@ if ($extensionPath) {
 }
 ```
 
-## 🚧 TROUBLESHOOTING DXT EXTENSIONS
+## 🚧 TROUBLESHOOTING MCPB EXTENSIONS
 
 ### Common Python Module Issues
 
@@ -1359,9 +1440,9 @@ If DXT fails, configure manually in `claude_desktop_config.json`:
     "your-mcp-server": {
       "command": "python",
       "args": ["-m", "your_mcp.server"],
-      "cwd": "C:/Users/{user}/AppData/Roaming/Claude/Claude Extensions/local.dxt.{publisher}.{name}/src",
+      "cwd": "C:/Users/{user}/AppData/Roaming/Claude/Claude Extensions/local.mcpb.{publisher}.{name}/src",
       "env": {
-        "PYTHONPATH": "C:/Users/{user}/AppData/Roaming/Claude/Claude Extensions/local.dxt.{publisher}.{name}/src",
+        "PYTHONPATH": "C:/Users/{user}/AppData/Roaming/Claude/Claude Extensions/local.mcpb.{publisher}.{name}/src",
         "PYTHONUNBUFFERED": "1",
         "YOUR_CONFIG": "your_value"
       }
@@ -1406,10 +1487,10 @@ pydantic>=2.0.0,<3.0.0
 
 ### Complete GitHub Actions Workflow
 
-Create `.github/workflows/build-dxt.yml`:
+Create `.github/workflows/build-mcpb.yml`:
 
 ```yaml
-name: Build and Release DXT Extension
+name: Build and Release MCPB Extension
 
 on:
   push:
@@ -1423,7 +1504,7 @@ on:
         default: '1.0.0'
 
 jobs:
-  build-dxt:
+  build-mcpb:
     runs-on: ubuntu-latest
     
     steps:
@@ -1440,8 +1521,8 @@ jobs:
       with:
         node-version: '18'
         
-    - name: Install DXT CLI
-      run: npm install -g @anthropic-ai/dxt
+    - name: Install MCPB CLI
+      run: npm install -g @anthropic-ai/mcpb
       
     - name: Install Python dependencies
       run: |
@@ -1453,42 +1534,42 @@ jobs:
       run: mkdir -p dist
         
     - name: Validate manifest.json
-      run: dxt validate dxt/manifest.json
+      run: mcpb validate mcpb/manifest.json
       
-    - name: Build DXT extension
+    - name: Build MCPB extension
       run: |
-        cd dxt
-        dxt pack . ../dist/package.dxt
+        cd mcpb
+        mcpb pack . ../dist/package.mcpb
         
-    - name: Sign DXT extension (optional)
-      if: ${{ secrets.DXT_SIGNING_KEY }}
+    - name: Sign MCPB extension (optional)
+      if: ${{ secrets.MCPB_SIGNING_KEY }}
       run: |
-        echo "${{ secrets.DXT_SIGNING_KEY }}" > signing.key
-        dxt sign --key signing.key dist/*.dxt
+        echo "${{ secrets.MCPB_SIGNING_KEY }}" > signing.key
+        mcpb sign --key signing.key dist/*.mcpb
         rm signing.key
         
-    - name: Upload DXT artifact
+    - name: Upload MCPB artifact
       uses: actions/upload-artifact@v3
       with:
-        name: dxt-extension
-        path: dist/*.dxt
+        name: mcpb-extension
+        path: dist/*.mcpb
         retention-days: 30
         
     - name: Create GitHub Release
       if: startsWith(github.ref, 'refs/tags/')
       uses: softprops/action-gh-release@v1
       with:
-        files: dist/*.dxt
+        files: dist/*.mcpb
         generate_release_notes: true
         draft: false
         prerelease: false
         body: |
-          ## DXT Extension Release
+          ## MCPB Extension Release
           
-          Download the `.dxt` file below and drag it to Claude Desktop for one-click installation.
+          Download the `.mcpb` file below and drag it to Claude Desktop for one-click installation.
           
           ### Installation
-          1. Download the `.dxt` file from the assets below
+          1. Download the `.mcpb` file from the assets below
           2. Drag the file to Claude Desktop
           3. Follow the configuration prompts
           4. Restart Claude Desktop
@@ -1509,7 +1590,7 @@ jobs:
 
 ```bash
 # Always validate before building
-dxt validate dxt/manifest.json
+mcpb validate mcpb/manifest.json
 
 # Common issues:
 # - Missing cwd and PYTHONPATH for Python servers
@@ -1532,12 +1613,12 @@ python -c "import fastmcp; print(f'FastMCP version: {fastmcp.__version__}')"
 python -c "import fastmcp; assert fastmcp.__version__ >= '2.12.0', 'Update FastMCP!'"
 ```
 
-### DXT Package Testing
+### MCPB Package Testing
 
 ```bash
 # Build test package
-cd dxt
-dxt pack . ../package.dxt
+cd mcpb
+mcpb pack . ../package.mcpb
 
 # Install test package in Claude Desktop
 # Verify configuration prompts work
@@ -1646,8 +1727,8 @@ dxt pack . ../package.dxt
 
 - [ ] Validate Python import: `cd src && python -c "import your_mcp.server"`
 - [ ] Validate FastMCP version: `python -c "import fastmcp; print(fastmcp.__version__)"`
-- [ ] Validate manifest: `dxt validate dxt/manifest.json`
-- [ ] Build package: `dxt pack . dist/`
+- [ ] Validate manifest: `mcpb validate mcpb/manifest.json`
+- [ ] Build package: `mcpb pack . dist/`
 - [ ] Test installation on clean Claude Desktop
 - [ ] Verify user configuration prompts work correctly
 
@@ -1657,7 +1738,7 @@ dxt pack . ../package.dxt
 - [ ] Include fastmcp>=2.12.0 installation step in CI
 - [ ] Create release tag: `git tag v1.0.0`
 - [ ] Verify automatic build and release
-- [ ] Test downloaded .dxt package installation
+- [ ] Test downloaded .mcpb package installation
 - [ ] Document troubleshooting for manual MCP fallback
 
 ### Post-Release
@@ -1735,7 +1816,7 @@ dxt pack . ../package.dxt
 }
 ```
 
-## 🆕 WHAT'S NEW IN VERSION 2.1
+## 🆕 WHAT'S NEW IN VERSION 3.1
 
 ### Critical Bug Documentation
 
@@ -1751,11 +1832,11 @@ dxt pack . ../package.dxt
 - Enhanced post-release monitoring for path resolution issues
 - Integrated extension bug reporting into maintenance workflows
 
-## 🆕 WHAT'S NEW IN VERSION 2.0
+## 🆕 WHAT'S NEW IN VERSION 3.0
 
 ### Critical Updates
 
-1. **FastMCP 2.12.0 Requirement**: Mandatory for DXT compatibility
+1. **FastMCP 2.12.0 Requirement**: Mandatory for MCPB compatibility
 2. **Python Path Fix**: Explicit `cwd` and `PYTHONPATH` configuration
 3. **Updated Examples**: All examples include new requirements
 4. **Enhanced Troubleshooting**: Manual MCP fallback procedures
@@ -1763,15 +1844,116 @@ dxt pack . ../package.dxt
 
 ### Breaking Changes
 
-- **FastMCP < 2.12.0 no longer supported** in DXT extensions
+- **FastMCP < 2.12.0 no longer supported** in MCPB extensions
 - **Python servers require explicit path configuration** in manifest
-- **All existing DXT packages need rebuilding** with new requirements
+- **All existing MCPB packages need rebuilding** with new requirements
 
 ### Migration Guide
 
 1. Update `requirements.txt`: `fastmcp>=2.12.0,<3.0.0`
 2. Add to manifest `mcp_config`: `"cwd": "src"` and `"PYTHONPATH": "src"`
-3. Rebuild DXT package: `dxt pack . ../dist/updated-package.dxt`
+3. Rebuild MCPB package: `mcpb pack . ../dist/updated-package.mcpb`
 4. Test installation and fallback to manual MCP if needed
 
-This guide provides everything needed to build professional DXT extensions that work reliably across all platforms and installations with the latest FastMCP improvements and Python path fixes. Follow these patterns for consistent, high-quality MCP server packaging that actually works in production.
+This guide provides everything needed to build professional MCPB extensions that work reliably across all platforms and installations with the latest FastMCP improvements and Python path fixes. Follow these patterns for consistent, high-quality MCP server packaging that actually works in production.
+
+## 🔄 MIGRATION FROM DXT TO MCPB
+
+### Overview
+
+As of January 2025, DXT (Deployment eXtension Toolkit) has been renamed to MCPB (MCP Bundle). This is a comprehensive migration that affects all aspects of the toolkit.
+
+### What Changed
+
+1. **Tool Name**: `dxt` → `mcpb`
+2. **Configuration Files**: `dxt.json` → `mcpb.json`
+3. **Manifest Files**: `dxt_manifest.json` → `mcpb_manifest.json`
+4. **Package Extensions**: `.dxt` → `.mcpb`
+5. **NPM Package**: `@anthropic-ai/dxt` → `@anthropic-ai/mcpb`
+6. **Registry URLs**: `registry.dxt.anthropic.com` → `registry.mcpb.anthropic.com`
+
+### Migration Checklist
+
+#### 1. Update Development Environment
+
+```bash
+# Uninstall old DXT CLI
+npm uninstall -g @anthropic-ai/dxt
+
+# Install new MCPB CLI
+npm install -g @anthropic-ai/mcpb
+```
+
+#### 2. Update Project Files
+
+```bash
+# Rename configuration files
+mv dxt.json mcpb.json
+mv dxt_manifest.json mcpb_manifest.json
+
+# Update any scripts or CI/CD configurations
+# Replace all references to 'dxt' with 'mcpb'
+```
+
+#### 3. Update Commands
+
+```bash
+# Old DXT commands → New MCPB commands
+dxt validate     → mcpb validate
+dxt pack        → mcpb pack
+dxt sign        → mcpb sign
+dxt verify      → mcpb verify
+mcpb publish     → mcpb publish
+```
+
+#### 4. Update Environment Variables
+
+```bash
+# Old environment variables → New environment variables
+DXT_REGISTRY_URL → MCPB_REGISTRY_URL
+DXT_API_TOKEN   → MCPB_API_TOKEN
+DXT_DEBUG       → MCPB_DEBUG
+```
+
+#### 5. Update CI/CD Pipelines
+
+- Change workflow file names from `build-dxt.yml` to `build-mcpb.yml`
+- Update all `dxt` commands to `mcpb`
+- Update package extensions from `.dxt` to `.mcpb`
+- Update artifact names and paths
+
+#### 6. Update Documentation
+
+- Update all references from DXT to MCPB
+- Update file extensions in examples
+- Update command examples
+- Update URLs and registry references
+
+### Backward Compatibility
+
+**Important**: MCPB is **not** backward compatible with DXT packages. All existing DXT packages must be rebuilt using the new MCPB toolchain.
+
+### Migration Timeline
+
+- **January 2025**: MCPB officially released
+- **February 2025**: DXT CLI deprecated (still functional)
+- **March 2025**: DXT CLI removed from NPM
+- **April 2025**: DXT registry sunset
+
+### Getting Help
+
+If you encounter issues during migration:
+
+1. Check the official MCPB documentation
+2. Review this updated guide
+3. Search for migration-related issues in the Anthropic community forums
+4. Contact Anthropic support for enterprise migration assistance
+
+### Common Migration Issues
+
+1. **Command Not Found**: Ensure MCPB CLI is properly installed
+2. **Package Import Errors**: Rebuild packages with new MCPB toolchain
+3. **Registry Access**: Update to new MCPB registry URLs
+4. **CI/CD Failures**: Update all pipeline configurations
+
+Remember: This migration improves the toolkit's functionality and provides better integration with the broader MCP ecosystem.

@@ -50,7 +50,7 @@
 
 - **For Problems That Don't Exist**: "Let's use WebAssembly!"
 - **For Simple Tasks**: "We should probably use Kubernetes"
-- **For Everything Else**: "I wrote my own database in Rust"
+- **For Everything Else**: "I wrote my own database in C++"
 
 ## The 10 Stages of Vibecoding
 
@@ -59,7 +59,7 @@
 3. "This needs a database"
 4. "Let's make it distributed"
 5. "I should probably add tests"
-6. "Might as well rewrite it in Rust"
+6. "Might as well rewrite it in C++"
 7. "This needs its own package manager"
 8. "Let's add AI"
 9. "I should write documentation" (writes this manifesto instead)

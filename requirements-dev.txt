@@ -1,7 +1,7 @@
 # Development requirements for FastSearch MCP
 
 # Core dependencies
-fastmcp>=2.11.3
+fastmcp>=2.13.0
 pydantic>=1.10.0
 pywin32>=305; sys_platform == 'win32'
 psutil>=5.9.0

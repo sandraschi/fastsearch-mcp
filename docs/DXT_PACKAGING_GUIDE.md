@@ -30,7 +30,7 @@ Due to the elevated privileges required by the service, we use a two-part packag
 ### Prerequisites
 
 - WiX Toolset v3.11 or later
-- Rust toolchain (for building the service)
+- Visual Studio 2022 Build Tools (for compiling the C++ service)
 - PowerShell 5.1 or later
 
 ### Building the Installer

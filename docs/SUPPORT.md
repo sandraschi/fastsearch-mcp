@@ -43,8 +43,8 @@ A: FastSearch MCP uses direct NTFS MFT access for faster searches and runs as a 
 A: FastSearch MCP requires:
 
 - Windows 10/11 (64-bit)
-- Python 3.8 or later
-- Rust toolchain (for service compilation)
+- Python 3.10 or later
+- Visual Studio 2022 Build Tools (for compiling the C++ service)
 
 **Q: How do I install the latest version?**  
 

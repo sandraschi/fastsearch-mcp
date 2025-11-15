@@ -296,7 +296,7 @@ jobs:
           # MSI Package
           - package_type: msi
             target: x86_64-pc-windows-msvc
-            binary_service: fastsearch-service.exe
+            binary_service: FastSearchServiceNew.exe
             binary_bridge: fastsearch-mcp-bridge.exe
             output: fastsearch-mcp-setup.msi
             
@@ -310,23 +310,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.target }}
-          
-      - name: Cache Rust dependencies
-        uses: Swatinem/rust-cache@v2
-        
-      - name: Build Rust binaries
-        run: |
-          cargo build --release --target ${{ matrix.target }}
-          
-      - name: Setup WiX Toolset (MSI only)
+      - name: Configure C++ service (MSI only)
         if: matrix.package_type == 'msi'
         run: |
-          # Install WiX toolset (FREE - no licensing required)
-          dotnet tool install --global wix
+          cmake -S service -B service/build -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build C++ service (MSI only)
+        if: matrix.package_type == 'msi'
+        run: |
+          cmake --build service/build --config Release
           
       - name: Setup DXT CLI (DXT only) 
         if: matrix.package_type == 'dxt'
@@ -338,8 +330,8 @@ jobs:
         run: |
           # Copy binaries to MSI build directory
           mkdir msi-build
-          copy target\${{ matrix.target }}\release\${{ matrix.binary_service }} msi-build\
-          copy target\${{ matrix.target }}\release\${{ matrix.binary_bridge }} msi-build\
+          copy service\build\bin\Release\${{ matrix.binary_service }} msi-build\
+          copy dist\${{ matrix.binary_bridge }} msi-build\
           copy packaging\msi\config.toml msi-build\
           
           # Build MSI with WiX (FREE toolset - professional output)
@@ -350,7 +342,7 @@ jobs:
         run: |
           # Create DXT structure
           mkdir dxt-build\server
-          copy target\${{ matrix.target }}\release\${{ matrix.binary_bridge }} dxt-build\server\
+          copy dist\${{ matrix.binary_bridge }} dxt-build\server\
           copy packaging\dxt\manifest.json dxt-build\
           copy packaging\dxt\icon.png dxt-build\
           copy README.md dxt-build\
@@ -487,7 +479,7 @@ dxt pack --output ..\..\fastsearch-mcp.dxt
 - Windows 10 1903+ (required for modern named pipe features)
 - x64 architecture only
 - Claude Desktop 0.10.0+ (DXT support)
-- .NET runtime NOT required (pure Rust binaries)
+- .NET runtime NOT required (native C++ binaries)
 
 ## 🚀 **WINDSURF IMPLEMENTATION TASKS**
 

@@ -31,19 +31,19 @@ logger = logging.getLogger('fastsearch_mcp')
 async def main():
     """Start the MCP server and keep it running."""
     logger.info(f"Starting FastSearch MCP Server v{__version__}")
-    
+
     # Create and start the server
     server = McpServer(service_pipe="\\.\\pipe\\fastsearch-test")
     server_task = asyncio.create_task(server.start())
-    
+
     # Set up signal handlers for graceful shutdown
     stop_event = asyncio.Event()
-    
+
     def signal_handler(signum, frame):
         signame = signal.Signals(signum).name
         logger.info(f"Received signal {signame}, shutting down...")
         stop_event.set()
-    
+
     # Register signal handlers
     loop = asyncio.get_event_loop()
     for sig in (signal.SIGINT, signal.SIGTERM):
@@ -52,15 +52,15 @@ async def main():
             logger.debug(f"Registered signal handler for {sig.name}")
         except (NotImplementedError, RuntimeError) as e:
             logger.warning(f"Could not register signal handler for {sig.name}: {e}")
-    
+
     try:
         # Wait for shutdown signal
         logger.info("Server is running. Press Ctrl+C to stop.")
         await stop_event.wait()
-        
+
     except asyncio.CancelledError:
         logger.info("Server task was cancelled")
-    
+
     finally:
         # Clean up
         logger.info("Shutting down server...")
@@ -69,11 +69,11 @@ async def main():
             await server_task
         except asyncio.CancelledError:
             pass
-        
+
         # Close the server
         if hasattr(server, 'close'):
             await server.close()
-        
+
         logger.info("Server shutdown complete")
 
 if __name__ == "__main__":

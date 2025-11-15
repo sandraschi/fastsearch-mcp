@@ -36,6 +36,7 @@ endif()
 # Add the service executable
 add_executable(FastSearchServiceNew
     src/fastsearch_service.cpp
+    src/mft_search.cpp
     include/fastsearch_service.h
 )
 
@@ -50,6 +51,7 @@ if(WIN32)
             advapi32.lib
             shell32.lib
             user32.lib
+            aclui.lib
     )
     
     # Set Windows SDK version if not specified

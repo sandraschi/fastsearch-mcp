@@ -1,825 +1,116 @@
 # FastSearch MCP
 
-⚡ Lightning-fast file search for Claude Desktop using direct NTFS Master File Table access
+⚡ Lightning-fast file search for Claude Desktop via direct NTFS Master File Table access — no indexing, no caching, no compromises.
 
-[![Python 3.8+](https://img.shields.io/badge/python-3.8%2B-blue)](https://www.python.org/)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![FastMCP](https://img.shields.io/badge/FastMCP-2.12%2B-brightgreen)](https://docs.anthropic.com/claude/docs/mcp)
-[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
-[![Tests](https://github.com/yourusername/fastsearch-mcp/actions/workflows/tests.yml/badge.svg)](https://github.com/yourusername/fastsearch-mcp/actions)
+[![FastMCP](https://img.shields.io/badge/FastMCP-2.13%2B-brightgreen)](https://docs.anthropic.com/claude/docs/mcp)
 
-> **Performance**: Scans 1M+ files/second on modern SSDs with minimal memory overhead
+> **Core Principle:** FastSearch MCP follows the WizFile philosophy. Every request reads straight from the NTFS MFT. We never build background indexes, caches, or persistent file databases.
 
-## 🚀 Features
+## 🚀 Why FastSearch MCP
 
-- **Blazing Fast**: Direct NTFS Master File Table access for maximum performance
-- **Low Resource Usage**: Minimal memory footprint even with millions of files
-- **Real-time Indexing**: Immediate file system changes detection
-- **Advanced Search**: Support for regex, wildcards, and complex queries
-- **Robust Error Handling**: Graceful degradation and comprehensive logging
-- **Asynchronous I/O**: Non-blocking operations for maximum throughput
-- **Windows Service Architecture**: Secure UAC-privileged service with Python MCP bridge
+- **Direct NTFS MFT reads** for sub-second search across millions of files.
+- **Zero indexing & zero persistence** keeps startup instant and memory under 50 MB.
+- **Claude-first integration** through the MCP protocol and schema-driven tools.
+- **Privilege separation**: elevated C++ service handles filesystem duties, Python bridge stays in user space.
+- **Graceful fallbacks** when service access is unavailable (with clear guidance to re-enable direct MFT access).
 
-## 🏗️ Architecture
+## 🏗 Architecture Overview
 
-FastSearch MCP uses a **dual-process architecture** for security and performance:
+```
+Claude Desktop
+      │ JSON-RPC (stdin/stdout)
+Python MCP Bridge (user privileges)
+      │ Named pipe (`\\.\pipe\FastSearchMCP`)
+C++ Windows Service (LocalSystem)
+      │
+NTFS Master File Table (live)
+```
 
-### **C++ Windows Service** (UAC Privileged)
-- **Purpose**: Direct NTFS Master File Table access
-- **Privileges**: Runs with elevated privileges for filesystem access
-- **Communication**: Named pipe server (`\\.\pipe\FastSearchMCPService`)
-- **Performance**: Optimized C++ for maximum search speed
+- **C++ Windows Service (`service/`)**
+  - Runs as `LocalSystem`.
+  - Opens NTFS volumes directly and answers search requests on demand.
+  - Emits structured logging to the Windows Event Log for diagnostics.
+  - No background threads, no file caches, no startup scans.
 
-### **Python MCP Bridge** (Standard Privileges)
-- **Purpose**: Claude Desktop integration via MCP protocol
-- **Privileges**: Runs without UAC elevation
-- **Communication**: Connects to C++ service via named pipes
-- **Integration**: Seamless Claude Desktop experience
+- **Python MCP Bridge (`src/fastsearch_mcp/`)**
+  - Implements FastMCP 2.13 tools (`file_search`, `disk_analyzer`, `service_status`, etc.).
+  - Marshals requests to the service via named pipes and reformats results for Claude.
+  - Provides Python fallbacks only when MFT access is unavailable, with warnings that performance is degraded.
 
-This architecture ensures **security** (minimal privilege escalation) while maintaining **performance** (direct NTFS access).
+## 🚨 Architecture Guardrails (Non-Negotiable)
+
+- **Never add indexing, background scanning, or persistent metadata stores.**
+- **Never introduce in-memory caches of file lists or search results.**
+- **Always query NTFS live and stop once `max_results` is reached.**
+- **Always maintain instant startup, real-time accuracy, and minimal memory usage.**
+
+See `docs/WIZFILE_COMPARISON.md` for the rationale.
 
 ## 📦 Installation
 
-### Prerequisites
+FastSearch MCP supports **three installation methods**:
 
-- Python 3.8 or higher
-- Windows 10/11 with NTFS file system
-- Visual C++ Build Tools (for C++ service compilation)
-- Administrator privileges (for service installation)
-- Git (for development)
+1. **Local Installation** - Git clone for development
+2. **NPX Installation** - For Cursor IDE, Windsurf IDE, Zed IDE, etc.
+3. **MCPB Package** - For Claude Desktop only
 
-### From Source
+**All methods require the Windows Service to be installed first** (one-time, requires UAC).
 
-```bash
-# Clone the repository
-git clone https://github.com/yourusername/fastsearch-mcp.git
-cd fastsearch-mcp
+See [Installation Methods Guide](docs/INSTALLATION_METHODS.md) for detailed instructions.
 
-# Install Python dependencies
-pip install -e ".[dev]"  # For development
-# or for production
-pip install .
+### Quick Start
 
-# Build and install the Windows service (requires Administrator privileges)
-cd service
-cmake --build build --config Release
-cd ..
-.\install-service.ps1 install
-```
+#### For Claude Desktop Users
 
-### Service Management
+1. Install service: Download `fastsearch-mcp-setup.msi` → Run as Administrator
+2. Install extension: Drag `fastsearch-mcp-0.4.0.mcpb` into Claude Desktop
 
-The Windows service can be managed using PowerShell scripts:
+#### For IDE Users (Cursor, Windsurf, Zed)
+
+1. Install service: Download `fastsearch-mcp-setup.msi` → Run as Administrator
+2. Install Python package: `pip install fastsearch-mcp`
+3. Configure IDE: `npx -y fastsearch-mcp`
+
+#### For Developers
+
+See [Local Installation](docs/INSTALLATION_METHODS.md#1-local-installation-development) for full setup.
+
+## ▶️ Running the MCP Server Locally
 
 ```powershell
-# Install the service (requires Administrator)
-.\install-service.ps1 install
-
-# Start/stop the service
-.\install-service.ps1 start
-.\install-service.ps1 stop
-
-# Check service status
-.\install-service.ps1 status
-
-# Uninstall the service
-.\install-service.ps1 uninstall
-```
-
-### Dependencies
-
-All dependencies are listed in `requirements-dev.txt`. For production, only the following are required:
-- fastmcp>=2.11.3
-- pydantic>=1.10.0
-- pywin32>=305 (Windows only)
-- psutil>=5.9.0
-- typing-extensions>=4.0.0
-
-## 🛠 Development Setup
-
-### Getting Started
-
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/yourusername/fastsearch-mcp.git
-   cd fastsearch-mcp
-   ```
-
-2. Create a virtual environment (recommended):
-   ```bash
-   python -m venv venv
-   .\venv\Scripts\activate  # On Windows
-   source venv/bin/activate  # On Unix/macOS
-   ```
-
-3. Install development dependencies:
-   ```bash
-   pip install -r requirements-dev.txt
-   pip install -e ".[dev]"
-   ```
-
-### Running the Server
-
-To start the FastSearch MCP server for development:
-
-```bash
+.venv\Scripts\Activate.ps1
 python start_server.py
 ```
 
-This will start the server with default settings. Use `--help` to see available options.
+Add `fastsearch-mcp` to Claude Desktop’s MCP configuration (see `mcp.config.json`) to auto-launch with Claude.
 
-### Running Tests
+## 🧪 Development Notes
 
-```bash
-# Run all tests
-pytest
+- `pytest` runs the Python test suite.
+- `scripts/check-repo-standards.ps1` enforces logging + doc standards.
+- The service currently focuses on direct MFT access; Python fallbacks are explicitly slower and should only be used for debugging or in environments where elevation is impossible.
+- Ongoing work: diagnosing an Event ID 7034 crash during service initialization on some machines (see `docs/SERVICE_DEVELOPMENT_STATUS.md`).
 
-# Run with coverage report
-pytest --cov=fastsearch_mcp --cov-report=html
+## 📚 Key Documentation
 
-# Run a specific test file
-pytest tests/test_mcp_server.py -v
-```
-
-### Code Style
-
-We use Black for code formatting and isort for import sorting:
-
-```bash
-black .
-isort .
-```
-
-### Linting
-
-```bash
-flake8 .
-mypy .
-```
-
-## 🏗 Project Structure
-
-```
-fastsearch-mcp/
-├── fastsearch_mcp_bridge/     # Main package
-│   ├── src/
-│   │   └── fastsearch_mcp/   # Python package
-│   │       ├── __init__.py   # Package initialization
-│   │       ├── __main__.py   # Command-line interface
-│   │       ├── mcp_server.py # MCP server implementation
-│   │       ├── ipc.py        # Inter-process communication
-│   │       ├── tools/        # MCP tools
-│   │       └── utils/        # Utility functions
-│   └── tests/                # Test suite
-│       ├── unit/             # Unit tests
-│       └── integration/      # Integration tests
-├── scripts/                  # Utility scripts
-├── docs/                     # Documentation
-├── .github/                  # GitHub workflows
-├── pyproject.toml            # Project configuration
-├── requirements-dev.txt      # Development dependencies
-└── README.md                 # This file
-```
+- `docs/TECHNICAL_ARCHITECTURE.md` – deep dive into the C++ + MCP bridge design.
+- `docs/PRODUCT_REQUIREMENTS.md` – product goals and non-negotiable principles.
+- `docs/SERVICE_DEVELOPMENT_STATUS.md` – current service stability & open issues.
+- `docs/SERVICE_IMPROVEMENTS.md` – logging & diagnostic tooling summary.
+- `docs/WIZFILE_COMPARISON.md` – why direct MFT access beats indexing.
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please follow these steps:
+We welcome contributions that preserve the direct-MFT architecture.
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
-### Development Workflow
-
-1. Create an issue describing the bug or feature
-2. Assign the issue to yourself if you're working on it
-3. Create a feature branch from `main`
-4. Write tests for your changes
-5. Ensure all tests pass and code is properly formatted
-6. Submit a pull request
+1. Open an issue describing the change.
+2. Confirm it does **not** add indexing, caching, or background scanning.
+3. Create a feature branch and add tests where applicable.
+4. Run `pytest` and the markdown linter (`scripts/lint-markdown.ps1`).
+5. Submit a PR referencing the relevant docs.
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgments
-
-- [FastMCP](https://docs.anthropic.com/claude/docs/mcp) - For the Model Control Protocol
-- [NTFS](https://en.wikipedia.org/wiki/NTFS) - For the amazing file system
-- [pywin32](https://github.com/mhammond/pywin32) - For Windows API bindings
-
-## 📊 Performance
-
-| Metric | Performance |
-|--------|-------------|
-| Initial Scan | 1,000,000+ files/second |
-| Cached Access | 10,000,000+ files/second |
-| Memory Usage | ~100MB base + ~10MB per 1M files |
-| Threads | Auto-scales with CPU cores (up to 16) |
-| Cache Size | Configurable, default 1M entries |
-pytest
-
-# Run with coverage
-pytest --cov=fastsearch_mcp --cov-report=html
-
-# Run specific test file
-pytest tests/unit/test_exceptions.py -v
-```
-
-### Code Style
-
-We use Black for code formatting and isort for import sorting:
-
-```bash
-black .
-isort .
-```
-
-## 📝 Project Structure
-
-```
-fastsearch-mcp/
-├── fastsearch_mcp/          # Main package
-│   ├── __init__.py
-│   ├── mcp_server.py        # MCP server implementation
-│   ├── tools/               # MCP tools
-│   └── utils/               # Utility functions
-├── tests/                   # Test suite
-│   ├── unit/                # Unit tests
-│   ├── integration/         # Integration tests
-│   └── conftest.py          # Test fixtures
-├── pyproject.toml           # Project configuration
-└── README.md                # This file
-```
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 👏 Acknowledgments
-
-- [FastMCP](https://docs.anthropic.com/claude/docs/mcp) - For the Model Control Protocol
-- [NTFS](https://en.wikipedia.org/wiki/NTFS) - For the amazing file system
-
-## 📊 Performance
-
-| Metric | Performance |
-|--------|-------------|
-| Initial Scan | 1,000,000+ files/second |
-| Cached Access | 10,000,000+ files/second |
-| Memory Usage | ~100MB base + ~10MB per 1M files |
-| Threads | Auto-scales with CPU cores (up to 16) |
-| Cache Size | Configurable, default 1M entries |
-
-## 🚀 Key Features
-
-- **Blazing Fast**: 1M+ files/second scanning using direct MFT access
-- **Zero Latency**: In-memory caching of frequently accessed files
-- **Multi-Threaded**: Parallel processing for maximum performance
-- **Efficient**: Memory-mapped I/O for minimal overhead
-- **Scalable**: Handles 100M+ files with ease
-- **Privilege Separation**: Secure architecture with named pipe communication
-- **Multi-Drive Support**: Seamlessly search across all NTFS volumes
-
-## 🏗 Architecture
-
-**High-Performance C++ Service with Python Bridge**: Optimized for speed and efficiency.
-
-### Components
-
-1. **Python MCP Bridge** (`fastsearch_mcp/`)
-   - Lightweight Python interface to the native service
-   - Handles JSON-RPC 2.0 protocol
-   - Manages communication with Claude Desktop
-   - **This is what Claude Desktop calls**
-
-2. **C++ Windows Service** (`service/`) - **Core Engine**
-   - High-performance C++17 service for NTFS MFT access
-   - Memory-mapped I/O for maximum throughput
-   - Multi-threaded processing (16+ threads)
-   - Advanced caching with LRU eviction
-   - Processes 1M+ files/second
-   - Runs as a system service with elevated privileges
-
-3. **Communication**
-   - High-speed named pipe interface
-   - Binary protocol for minimal overhead
-   - Zero-copy data transfer where possible
-
-## 📊 Development Status
-
-### ✅ **Completed Milestones**
-- **Service Infrastructure**: Complete Windows service installation, uninstallation, start, stop, and status checking
-- **PowerShell Scripts**: Comprehensive service management with error handling and diagnostics
-- **C++ Service Build**: CMake configuration and compilation working correctly
-- **Service Architecture**: Dual-process architecture with named pipes established
-- **Named Pipe Foundation**: Basic framework for C++ service communication
-- **PowerShell Script Analyzer Warning**: Fixed PSPossibleIncorrectComparisonWithNull warning
-- **Service "Marked for Deletion" Issue**: Implemented fix-service.ps1 for stuck services
-- **PowerShell Function Name Conflict**: Resolved Start-Service/Stop-Service conflicts
-- **C++ Pipe Server Initialization Bug**: Fixed PipeServerThread startup sequence
-- **MCP 2.12 Compliance**: ✅ **COMPLETED** - Full FastMCP 2.12 standard compliance
-- **All 15 Tools Working**: ✅ **COMPLETED** - All tools properly registered and functional
-
-### 🎯 **Current Status: PRODUCTION READY**
-**FastSearch MCP is now fully functional with all 15 tools working in Claude Desktop!**
-
-#### **Available Tools (15 Total):**
-1. **file_search** - Direct NTFS MFT file search (primary tool)
-2. **file_content_search** - Text pattern search in files
-3. **disk_analyzer** - Disk usage analysis and large file detection
-4. **duplicate_finder** - Find duplicate files by content hash
-5. **integrity_checker** - File integrity verification with checksums
-6. **resource_monitor** - System resource monitoring (CPU, memory, disk)
-7. **service_status** - FastSearch C++ service status
-8. **list_services** - List all Windows services
-9. **get_service** - Get detailed service information
-10. **start_service** - Start Windows services
-11. **stop_service** - Stop Windows services
-12. **restart_service** - Restart Windows services
-13. **set_service_startup_type** - Configure service startup behavior
-14. **get_service_logs** - Retrieve service event logs
-15. **help** - Comprehensive tool documentation
-
-### ⚠️ **Remaining Tasks**
-- **Service Runtime Crash**: C++ service crashes during Windows initialization (Event ID 7034)
-- **NTFS MFT Access**: Direct NTFS Master File Table access implementation pending
-- **Python MCP Bridge Integration**: Connection to C++ service via named pipes pending
-
-### 📋 **Next Steps**
-1. **Debug Service Startup Crash**: Investigate C++ service initialization issues
-2. **Implement NTFS MFT Reading**: Complete direct MFT access in C++ service
-3. **Connect Python MCP Bridge**: Develop named pipe client integration
-4. **Performance Optimization**: Profile and optimize MFT processing
-
-**Note**: The MCP server works perfectly with Python fallback implementations. The C++ service provides enhanced performance but is not required for basic functionality.
-
-*See [Service Development Status](docs/SERVICE_DEVELOPMENT_STATUS.md) for detailed progress report.*
-
-## 🚀 Quick Start
-
-### Prerequisites
-
-- Windows 10/11 with NTFS volumes
-- Python 3.8+ (for bridge)
-- Visual Studio 2022 (for service compilation)
-- Windows 10/11 SDK
-- CMake 3.20+
-- Claude Desktop with MCP support
-
-### Installation
-
-#### 1. Install from PyPI (Recommended)
-
-```bash
-pip install fastsearch-mcp
-```
-
-#### 2. Install from Source
-
-1. Clone the repository:
-
-   ```bash
-   git clone https://github.com/yourusername/fastsearch-mcp.git
-   cd fastsearch-mcp
-   ```
-
-2. Install in development mode:
-
-   ```bash
-   pip install -e .[dev]
-   ```
-
-#### 3. Install the Windows Service
-
-1. Build the service (requires Visual Studio 2022):
-
-   ```powershell
-   cd service
-   mkdir build
-   cd build
-   cmake .. -G "Visual Studio 17 2022" -A x64
-   cmake --build . --config Release
-   ```
-
-2. Install the service (admin privileges required):
-
-   ```powershell
-   # In an elevated PowerShell
-   .\Release\FastSearchService.exe install
-   Start-Service FastSearchService
-   ```
-
-## 🛠 Usage
-
-### Starting the MCP Server
-
-```bash
-fastsearch-mcp
-```
-
-### Using with Claude Desktop
-
-1. Install the DXT package:
-
-   ```bash
-   dxt install fastsearch-mcp
-   ```
-
-2. Restart Claude Desktop
-
-3. Use the `@fastsearch` command in Claude Desktop to search files
-
-### Example Search
-
-```python
-@fastsearch pattern: "*.py"
-```
-
-## 📚 Documentation
-
-For detailed documentation, including API reference and development guides, see:
-
-- [API Reference](docs/api.md)
-- [Development Guide](docs/development.md)
-- [Troubleshooting](docs/troubleshooting.md)
-
-## 🤝 Contributing
-
-Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md) for details on our code of conduct and the process for submitting pull requests.
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgments
-
-- [WizFile](https://www.antibody-software.com/) for demonstrating the power of direct MFT access
-- The Claude team for the MCP protocol
-- The Rust community for excellent systems programming tools
-
-1. Clone the repository:
-
-   ```bash
-   git clone https://github.com/yourusername/fastsearch-mcp.git
-   cd fastsearch-mcp
-   ```
-
-2. Install Python dependencies:
-
-   ```bash
-   pip install -e .
-   ```
-
-3. Build and install the Windows service:
-
-   ```bash
-   cd service
-   cargo build --release
-   # Follow service installation instructions in service/README.md
-   ```
-
-4. Install the DXT package in Claude Desktop:
-
-   ```bash
-   dxt pack
-   # Install the generated .dxt file in Claude Desktop
-   ```
-
-## 🛠 Usage
-
-### Basic Search
-
-Search for files using natural language:
-
-```python
-# Claude will automatically use FastSearch for file operations
-Find all Python files modified in the last week that are larger than 1MB
-```
-
-### Advanced Search
-
-Use specific search parameters:
-
-```python
-# Find large log files with specific patterns
-Search for error logs from the last 24 hours:
-- Path contains "logs"
-- File extension is "log"
-- Modified in the last 24 hours
-- Size > 10MB
-- Content contains "ERROR"
-```
-
-## 📚 Documentation
-
-### MCP Methods
-
-Documentation for all MCP methods is automatically generated from code:
-
-```bash
-python scripts/generate_docs.py
-# View docs at docs/api.md
-```
-
-### DXT Integration
-
-The DXT package includes LLM-friendly documentation that helps Claude understand how to use the MCP:
-
-- **System Prompts**: Pre-defined prompts for Claude
-- **Examples**: Common usage patterns
-- **Parameter Validation**: Ensures correct usage
-- **Error Handling**: Clear error messages
-
-## 🔧 Development
-
-### Directory Structure
-
-```
-fastsearch-mcp/
-├── fastsearch_mcp/           # Python MCP implementation
-│   ├── __init__.py
-│   ├── mcp_server.py        # MCP server implementation
-│   ├── decorators.py        # LLM documentation decorators
-│   ├── ipc.py              # Windows named pipe client
-│   └── __main__.py         # CLI entry point
-├── service/                 # Rust Windows service
-│   ├── src/
-│   │   ├── main.rs        # Service entry point
-│   │   ├── ntfs_reader.rs # Direct MFT access
-│   │   └── lib.rs
-│   └── Cargo.toml
-├── tests/                   # Test suite
-├── scripts/
-│   └── generate_docs.py    # Documentation generator
-├── dxt.yaml                # DXT package configuration
-└── README.md               # This file
-├── service/                   # FastSearch Service (elevated)
-│   ├── src/
-│   │   ├── main.rs           # Service entry point
-│   │   ├── search_engine.rs  # Search logic (was mcp_server.rs)
-│   │   ├── ntfs_reader.rs    # NTFS MFT reader
-│   │   ├── web_api.rs        # Web API for frontend
-│   │   └── lib.rs
-│   └── Cargo.toml
-├── shared/                    # Common types
-│   ├── src/
-│   │   ├── types.rs          # SearchRequest, SearchResponse, etc.
-│   │   └── lib.rs
-│   └── Cargo.toml
-├── installer/                 # One-time UAC installation
-├── frontend/                  # Web UI
-└── Cargo.toml                # Workspace root
-```
-
-## Installation & Usage
-
-### Prerequisites
-
-- Windows 10/11 with NTFS file system
-- Rust toolchain (for building from source)
-- Administrator privileges (required for initial setup only)
-
-### Manual Installation (Recommended for Development)
-
-1. **Build the project** (from an elevated command prompt):
-
-   ```powershell
-   # Clone the repository
-   git clone https://github.com/yourusername/fastsearch-mcp.git
-   cd fastsearch-mcp
-   
-   # Build in release mode
-   cargo build --release
-   ```
-
-2. **Install the Windows Service** (one-time setup with admin rights):
-
-   ```powershell
-   # Run as Administrator
-   $servicePath = "D:\Dev\repos\fastsearch-mcp\target\release\fastsearch.exe"
-   sc.exe create FastSearch binPath= "$servicePath --run-as-service" start= auto
-   sc.exe description FastSearch "FastSearch MCP Service for lightning-fast file search using NTFS MFT"
-   sc.exe start FastSearch
-   ```
-
-   > **Note**: Update `$servicePath` to match your actual path to the built `fastsearch.exe`
-
-3. **Verify the service is running**:
-
-   ```powershell
-   sc.exe query FastSearch
-   ```
-
-### One-Click Installer (Coming Soon)
-
-```powershell
-# Download installer from GitHub releases
-# Run installer as Administrator (one-time UAC prompt)
-setup.exe
-```
-
-**What the installer will do:**
-
-- Install FastSearch service with elevated privileges
-- Register service for automatic startup
-- Set up named pipe communication
-- Configure the MCP bridge for Claude Desktop
-
-### Claude Desktop Configuration
-
-Add to your Claude Desktop configuration (typically in `settings.json` or via UI):
-
-```json
-{
-  "mcpServers": {
-    "fastsearch": {
-      "command": "D:\\Dev\\repos\\fastsearch-mcp\\target\\release\\fastsearch-mcp-bridge.exe",
-      "args": ["--service-pipe", "\\\\\\.\\pipe\\fastsearch-service"],
-      "timeout": 30,
-      "autoStart": true,
-      "enabled": true,
-      "description": "FastSearch MCP Bridge for lightning-fast file search using NTFS MFT"
-    }
-  }
-}
-```
-
-## 🔒 Security
-
-### Normal Operation (Privilege Separation)
-
-- **Windows Service (Elevated)**
-  - Runs automatically at system startup
-  - Has direct NTFS MFT access
-  - Listens on named pipe: `\\.\pipe\fastsearch-service`
-  - No UI, runs in background
-
-- **Bridge (User Mode)**
-  - Started by Claude Desktop
-  - Runs with normal user privileges
-  - Forwards requests to elevated service
-  - No UAC prompts during normal use
-
-- **Performance**
-  - Sub-100ms search response times
-  - Minimal memory footprint
-  - Efficient NTFS MFT scanning
-
-## Development
-
-## 🛠 Building from Source
-
-### Prerequisites
-
-- Rust 1.70+ (https://rustup.rs/)
-- Windows 10/11 (x64)
-- Python 3.8+ (for MCP bridge)
-
-### Build Service (Rust)
-
-```powershell
-# Build the service
-cd service
-cargo build --release
-
-# Install as Windows service (admin required)
-sc.exe create FastSearch binPath= "%CD%\target\release\fastsearch-service.exe" start= auto
-sc.exe start FastSearch
-```
-
-### Build MCP Bridge (Python)
-
-```powershell
-# Create virtual environment
-python -m venv .venv
-.venv\Scripts\activate
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Build DXT package
-dxt build
-```
-
-### Verify Installation
-
-```powershell
-# Test direct search (service must be running)
-.\target\release\fastsearch-service search "*.dxt" --drive all
-
-# Test MCP bridge
-python -m fastsearch_mcp --help
-```
-
-### Build Individual Components
-
-```bash
-# Build bridge only
-cd bridge && cargo build --release
-
-# Build service only  
-cd service && cargo build --release
-
-# Build shared types
-cd shared && cargo build --release
-```
-
-### Test Architecture
-
-```bash
-# Test bridge standalone
-./bridge/target/release/fastsearch-mcp-bridge.exe
-
-# Test service (requires admin)
-./service/target/release/fastsearch-service.exe
-```
-
-## Why This Architecture?
-
-### Problem
-
-- **NTFS MFT access requires elevated privileges**
-- **Claude Desktop cannot run elevated MCP servers**
-- **Users don't want UAC prompts during normal operation**
-
-### Solution  
-
-- **Service**: Runs elevated, handles NTFS access, installed once
-- **Bridge**: Runs as user, handles MCP protocol, no elevation needed
-- **Communication**: Named pipes for secure IPC
-
-### Benefits
-
-- ✅ **No UAC during normal use** - Only during installation
-- ✅ **Secure privilege separation** - Service isolated from MCP protocol
-- ✅ **Fast performance** - Direct NTFS MFT access
-- ✅ **Seamless Claude integration** - Standard MCP server interface
-- ✅ **Robust error handling** - Graceful degradation if service unavailable
-
-## Features
-
-- **Lightning-fast search** - Direct NTFS Master File Table reading
-- **Multiple search types** - Exact, glob, regex, fuzzy matching
-- **Real-time results** - Sub-100ms response times
-- **Privilege separation** - Secure bridge/service architecture
-- **Graceful fallback** - Helpful messages if service unavailable
-- **REST API** - Web interface for integration with other applications
-
-## Acknowledgments
-
-- **WizFile**: For pioneering fast MFT-based search techniques
-- **NTFS-3G**: For NTFS documentation and reference implementation
-- **FastMCP**: For the MCP protocol specification
-
-## License
-
-MIT - See [LICENSE](LICENSE) for more information.
-
-## Contributing
-
-Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md) for details.
-
-## Documentation
-
-- [Project Plan](projects/FastSearch%20MCP%20Server%20-%20Project%20Plan.md)
-- [MCP Ecosystem](MCP_ECOSYSTEM.md) - About MCP protocol and ecosystem
-- [Web API](WEB_API.md) - REST API documentation for web and application integration
-
-## Release Process
-
-FastSearch MCP uses GitHub Actions for automated builds and releases. The release process is fully automated:
-
-1. Create a version tag (e.g., `v1.0.0`)
-2. Push the tag to trigger the release workflow
-3. GitHub Actions builds for all platforms
-4. Artifacts are uploaded to GitHub Releases
-
-For detailed release instructions, see [RELEASING.md](RELEASING.md).
-
-### Testing a Release Locally
-
-Before creating a release, test the build process locally:
-
-```powershell
-# Run the test script
-.\test-release.ps1
-```
-
-This will verify that all components build correctly and the installer is created successfully.
-
-- **Web interface** - Optional frontend for direct access
-
-## License
-
-MIT - Sandra & Claudius
+MIT – see [LICENSE](LICENSE).

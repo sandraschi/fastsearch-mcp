@@ -50,7 +50,7 @@ permalink: projects-fast-search-mcp-server-project-plan
 #### 1. NTFS MFT Reader
 
 ```
-Language: Rust (for speed + safety)
+Language: C++ (for speed + direct Windows API access)
 Dependencies:
 - winapi-rs for Windows API access
 - ntfs crate for MFT parsing
@@ -140,7 +140,7 @@ find_large_files(min_size: "100MB", filters: {
 
 #### Week 1: NTFS Foundation
 
-- [ ] Set up Rust project with ntfs/winapi dependencies
+- [ ] Finalise C++ project scaffolding with NTFS bindings
 - [ ] Implement basic MFT record reading
 - [ ] Parse file names and basic attributes
 - [ ] Handle different record types (files, directories, etc.)
@@ -366,7 +366,7 @@ Scenario: Find duplicate files by content
 ### Prerequisites
 
 - Windows 10/11 (NTFS filesystem)
-- Rust development environment
+- C++ development environment (Visual Studio Build Tools + CMake)
 - Admin privileges for MFT access
 - 2-4GB RAM for large file indexes
 
@@ -377,8 +377,8 @@ Scenario: Find duplicate files by content
 git clone https://github.com/sandra-claudius/fastsearch-mcp
 cd fastsearch-mcp
 
-# Install Rust dependencies
-cargo build
+# Install Visual Studio Build Tools (Desktop C++ workload)
+# Ensure CMake and Ninja are available in PATH
 
 # Run tests
 cargo test

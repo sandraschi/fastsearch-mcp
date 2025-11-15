@@ -1,604 +1,192 @@
 # FastSearch MCP - Technical Architecture
 
-**Project**: FastSearch MCP Server  
-**Version**: 1.0  
-**Date**: July 17, 2025  
-**Architecture**: Direct NTFS Master File Table Access  
+**Project:** FastSearch MCP Server  
+**Date:** November 2025  
+**Architecture:** Direct NTFS Master File Table access with C++ service + Python MCP bridge
 
-## 🎯 **Architectural Philosophy: The WizFile Approach**
+---
 
-FastSearch MCP is built on a **fundamentally different architecture** from traditional file search tools. Instead of indexing files and caching results, it queries the **NTFS Master File Table (MFT) directly** for each search request.
+## 1. Architectural Philosophy
 
-### **Traditional Search Architecture (What We DON'T Do)**
+FastSearch MCP deliberately mirrors the WizFile approach: every search reads the NTFS Master File Table (MFT) directly. We do **not** build indexes, walk directory trees in advance, or cache file metadata.
 
-```
-┌─────────────┐    ┌──────────────┐    ┌─────────────┐    ┌──────────────┐
-│   Startup   │───▶│ Index Entire │───▶│ Cache Files │───▶│ Search Cache │
-│             │    │ Drive (10min)│    │  (GB RAM)   │    │  (Fast)      │
-└─────────────┘    └──────────────┘    └─────────────┘    └──────────────┘
-```
+| Principle | Expectation |
+|-----------|-------------|
+| **Zero Indexing** | No startup scans, no background workers, no cached file lists. |
+| **Live Data** | Each query opens the MFT and streams results until `max_results` is reached. |
+| **Instant Startup** | Process startup must remain sub-second. |
+| **Minimal Memory** | Peak usage < 50 MB; no persistent allocations proportional to file counts. |
+| **Deterministic Stop** | Stop scanning immediately once the caller’s `max_results` limit is satisfied. |
 
-**Problems:**
+Any optimisation that contradicts these constraints (e.g. LRU caches, pre-built databases, recursive directory walks) is considered an architectural regression and must be rejected.
 
-- ❌ Long startup delays (10+ minutes)
-- ❌ Massive memory usage (GB of cached data)
-- ❌ Stale results (deleted files still shown)
-- ❌ Missed new files (cache not updated)
+---
 
-### **FastSearch Architecture (Direct MFT Access)**
+## 2. High-Level Components
 
 ```
-┌─────────────┐    ┌──────────────┐    ┌─────────────┐
-│ Search      │───▶│ Query NTFS   │───▶│ Return      │
-│ Request     │    │ MFT Live     │    │ Results     │
-└─────────────┘    └──────────────┘    └─────────────┘
+Claude Desktop ──JSON-RPC── Python MCP Bridge ──Named Pipe── C++ Service ── NTFS MFT
 ```
 
-**Advantages:**
+### 2.1 Python MCP Bridge (`src/fastsearch_mcp/`)
+- Runs with standard user privileges.
+- Implements the FastMCP 2.13 schema for all tools (file search, disk analysis, service management, etc.).
+- Routes file-search requests to the service via the named pipe `\\.\pipe\FastSearchMCP`.
+- Provides **explicitly degraded** Python fallbacks when the service is offline (recursive glob + filters). Fallbacks must surface warnings so users restore direct MFT access.
 
-- ✅ Instant startup (no indexing needed)
-- ✅ Minimal memory usage (<50MB)
-- ✅ Always current results (live filesystem state)
-- ✅ Sub-100ms search times (direct hardware access)
+### 2.2 C++ Windows Service (`service/`)
+- Runs as `LocalSystem` after a one-time elevated install.
+- Owns all direct NTFS interactions. Opens volume handles (`\\.\C:` etc.), reads the MFT via Windows filesystem APIs, and streams matching entries back to the bridge.
+- Exposes a duplex named pipe accepting JSON requests and streaming JSON responses.
+- Emits structured diagnostics to the Windows Event Log (source: `FastSearchMCP`). Logging is mandatory for each init step to aid Event ID 7034 crash triage.
 
-## 🔧 **Core Technical Components**
+### 2.3 Communication Contract
+- **Protocol:** newline-delimited JSON with UTF-8 payloads.
+- **Request envelope:** `{ "id": <uuid>, "tool": "file_search", "params": {...} }`
+- **Response envelope:** `{ "id": <uuid>, "status": "ok" | "error", "data": {...} }`
+- The bridge enforces `max_results` and aborts the pipe read once enough entries have been returned.
 
-### **1. NTFS Master File Table (MFT) Reader**
+---
 
-**File**: `src/ntfs_reader.rs`  
-**Purpose**: Direct access to NTFS filesystem metadata  
+## 3. Direct NTFS MFT Access
 
-#### **Key Concepts**
+### 3.1 Volume Access
 
-**NTFS Master File Table**: A special file on every NTFS volume that contains metadata about every file and directory. It's essentially a database of the entire filesystem.
-
-**MFT Structure**:
-
-```
-MFT Record 0: $MFT (the MFT itself)
-MFT Record 1: $MFTMirr (MFT backup)
-MFT Record 2: $LogFile (transaction log)
-MFT Record 3: $Volume (volume info)
-MFT Record 4: $AttrDef (attribute definitions)
-MFT Record 5: $Root (root directory)
-...
-MFT Record N: Your files and directories
-```
-
-**Each MFT Record Contains**:
-
-- File name and attributes
-- File size and timestamps
-- Data location on disk
-- Security descriptors
-- Directory structure information
-
-#### **Direct MFT Access Advantages**
-
-1. **Complete Filesystem View**
-   - Single source of truth for all files
-   - No dependency on directory traversal
-   - Includes hidden and system files
-
-2. **Constant-Time Access**
-   - MFT is a flat structure (not hierarchical)
-   - No need to traverse directory trees
-   - Direct record access by index
-
-3. **Hardware Optimized**
-   - NTFS designed for MFT efficiency
-   - Sequential reads of MFT records
-   - Leverages filesystem caching
-
-4. **Always Current**
-   - MFT updated by filesystem driver
-   - No synchronization delays
-   - Real-time state reflection
-
-#### **Implementation Details**
-
-**Volume Access**:
-
-```rust
-// Open NTFS volume directly
-let volume_handle = CreateFileW(
-    volume_path,
+```cpp
+// Simplified: see service/src/fastsearch_service.cpp
+HANDLE volume = CreateFileW(
+    L"\\\\.\\C:",
     GENERIC_READ,
     FILE_SHARE_READ | FILE_SHARE_WRITE,
-    null_mut(),
+    nullptr,
     OPEN_EXISTING,
-    0,
-    null_mut(),
-);
+    FILE_FLAG_BACKUP_SEMANTICS,
+    nullptr);
 ```
 
-**MFT Reading**:
+- The service elevates required privileges (`SeBackupPrivilege`) during startup; failures are logged and surfaced to the bridge.
+- Volumes are opened on demand per request; we do **not** keep long-lived handles when idle.
 
-```rust
-// Read MFT using ntfs crate
-let ntfs = Ntfs::new(&mut volume)?;
-let mft = ntfs.mft();
+### 3.2 Enumerating the MFT
 
-// Iterate through MFT records
-for record_number in 0..mft.record_count() {
-    let record = mft.record(record_number)?;
-    // Process file metadata
-}
-```
+**IMPLEMENTED:** Direct MFT reading via LCN (Logical Cluster Number) - November 2025
 
-**Pattern Matching**:
+```cpp
+// Get MFT start location from volume data
+NTFS_VOLUME_DATA_BUFFER volumeData;
+GetNtfsVolumeData(hVolume, volumeData);
+ULONGLONG mftStartLcn = volumeData.MftStartLcn.QuadPart;
+DWORD recordSize = volumeData.BytesPerFileRecordSegment;
+DWORD bytesPerCluster = volumeData.BytesPerCluster;
 
-```rust
-// Convert glob patterns to regex
-let pattern = glob_to_regex(&search_pattern)?;
-let regex = Regex::new(&pattern)?;
-
-// Match against filenames during MFT scan
-if regex.is_match(&filename) {
-    results.push(file_info);
-    if results.len() >= max_results {
-        break; // Early termination
-    }
-}
-```
-
-### **2. Dual Interface Architecture**
-
-**Strategic Design Decision**: FastSearch MCP implements **two complementary interfaces** for maximum adoption and utility.
-
-#### **Interface 1: MCP Server** (`src/mcp_server.rs`)
-
-**Purpose**: Model Context Protocol integration for Claude Desktop  
-
-#### **MCP Protocol Overview**
-
-The Model Context Protocol (MCP) allows Claude Desktop to communicate with external tools through JSON-RPC over stdin/stdout.
-
-**Message Flow**:
-
-```
-Claude Desktop ←→ stdin/stdout ←→ FastSearch MCP Server ←→ NTFS MFT
-```
-
-#### **Tool Implementations**
-
-**1. fast_search Tool**
-
-```json
-{
-  "name": "fast_search",
-  "description": "Lightning-fast file search using direct NTFS access",
-  "inputSchema": {
-    "type": "object",
-    "properties": {
-      "pattern": {
-        "type": "string",
-        "description": "File pattern (*.js, config.*, README)"
-      },
-      "path": {
-        "type": "string", 
-        "description": "Optional path filter"
-      },
-      "drive": {
-        "type": "string",
-        "description": "Drive letter (C, D, etc.)"
-      },
-      "max_results": {
-        "type": "integer",
-        "description": "Maximum results to return"
-      }
-    }
-  }
-}
-```
-
-**2. find_large_files Tool**
-
-```json
-{
-  "name": "find_large_files",
-  "description": "Find largest files on system",
-  "inputSchema": {
-    "type": "object",
-    "properties": {
-      "min_size_mb": {
-        "type": "integer",
-        "description": "Minimum file size in MB"
-      },
-      "drive": {
-        "type": "string",
-        "description": "Drive to scan"
-      }
-    }
-  }
-}
-```
-
-**3. benchmark_search Tool**
-
-```json
-{
-  "name": "benchmark_search",
-  "description": "Performance testing and validation",
-  "inputSchema": {
-    "type": "object",
-    "properties": {
-      "drive": {
-        "type": "string",
-        "description": "Drive to benchmark"
-      }
-    }
-  }
-}
-```
-
-#### **Interface 2: HTTP REST API** (`src/web_api.rs`)
-
-**Purpose**: Universal web/application integration
-
-**REST Endpoints**:
-
-- `POST /search` - File search (same as MCP fast_search)
-- `POST /large-files` - Large file discovery
-- `POST /benchmark` - Performance testing
-- `GET /health` - Server status
-
-**Why Dual Interface is Strategic**:
-
-✅ **Market Reach Expansion**
-
-- **MCP**: Claude Desktop ecosystem (growing but niche)
-- **REST**: Universal HTTP clients (massive market)
-
-✅ **Use Case Optimization**
-
-- **MCP**: AI workflows, conversational search, schema discovery
-- **REST**: Dashboards, mobile apps, microservices, CI/CD
-
-✅ **Risk Mitigation**
-
-- **Protocol independence**: If MCP changes, REST unaffected
-- **Future-proofing**: REST universally supported
-
-✅ **Implementation Efficiency**
-
-- **90% code sharing**: Same core NTFS logic
-- **10% interface wrappers**: Thin adaptation layers
-- **Minimal overhead**: ~200 lines for complete REST API
-
-**Real-World Scenarios Enabled**:
-
-```
-Web Dashboard: REST API for large file visualization
-Mobile App: REST API for file discovery on-the-go
-CI/CD Pipeline: REST API for build file analysis
-Claude Desktop: MCP for conversational file search
-```
-
-### **3. Performance Optimization Strategies**
-
-#### **Early Termination**
-
-```rust
-let mut results = Vec::new();
-for record in mft_records {
-    if let Some(file_info) = process_record(record)? {
-        if pattern_matches(&file_info.name, &pattern) {
-            results.push(file_info);
-            if results.len() >= max_results {
-                break; // Stop when we have enough
-            }
+// Read MFT records directly from volume using LCN offsets
+ULONGLONG recordNumber = 5;  // Start from first user file
+while (results.size() < maxResults) {
+    // Calculate absolute byte offset from MFT start LCN
+    ULONGLONG recordOffsetInBytes = recordNumber * recordSize;
+    ULONGLONG clusterOffset = recordOffsetInBytes / bytesPerCluster;
+    ULONGLONG targetLcn = mftStartLcn + clusterOffset;
+    
+    // Seek to record location and read directly
+    LARGE_INTEGER seekPos;
+    seekPos.QuadPart = targetLcn * bytesPerCluster + (recordOffsetInBytes % bytesPerCluster);
+    SetFilePointerEx(hVolume, seekPos, nullptr, FILE_BEGIN);
+    ReadFile(hVolume, recordBuffer.data(), recordSize, &bytesRead, nullptr);
+    
+    // Parse FILE_NAME attribute and match pattern
+    if (ParseFileNameAttribute(recordBuffer, fileName, ...)) {
+        if (MatchPattern(fileName, pattern)) {
+            send_result(fileName);
         }
     }
+    recordNumber++;
 }
 ```
 
-#### **Path Pruning**
-
-```rust
-// Skip directories that can't contain matches
-if let Some(path_filter) = &path_filter {
-    if !file_path.contains(path_filter) {
-        continue; // Skip this branch entirely
-    }
-}
-```
-
-#### **Pattern Optimization**
-
-```rust
-// Pre-compile regex patterns
-let compiled_pattern = Regex::new(&glob_to_regex(pattern))?;
-
-// Use efficient string matching
-if pattern.contains('*') || pattern.contains('?') {
-    // Use regex for complex patterns
-    compiled_pattern.is_match(filename)
-} else {
-    // Use simple string comparison for exact matches
-    filename == pattern
-}
-```
-
-#### **Memory Management**
-
-```rust
-// Use string interning for repeated paths
-let mut string_interner = StringInterner::new();
-
-// Avoid unnecessary allocations
-let filename_ref = string_interner.get_or_intern(filename);
-
-// Use stack allocation for small results
-const MAX_STACK_RESULTS: usize = 100;
-let mut stack_results: ArrayVec<FileInfo, MAX_STACK_RESULTS> = ArrayVec::new();
-```
-
-### **4. Error Handling and Fallbacks**
-
-#### **Privilege Management**
-
-```rust
-// Check for admin privileges
-if !has_admin_privileges() {
-    warn!("Admin privileges required for optimal NTFS access");
-    return fallback_to_filesystem_walk();
-}
-```
-
-#### **Cross-Platform Fallback**
-
-```rust
-#[cfg(windows)]
-fn search_files(pattern: &str) -> Result<Vec<FileInfo>> {
-    // Use NTFS MFT on Windows
-    ntfs_search(pattern)
-}
-
-#[cfg(not(windows))]
-fn search_files(pattern: &str) -> Result<Vec<FileInfo>> {
-    // Use filesystem walk on other platforms
-    filesystem_walk_search(pattern)
-}
-```
-
-#### **Graceful Degradation**
-
-```rust
-// Try NTFS first, fallback to standard methods
-match ntfs_direct_search(pattern) {
-    Ok(results) => Ok(results),
-    Err(NtfsError::AccessDenied) => {
-        warn!("NTFS access denied, falling back to standard search");
-        standard_filesystem_search(pattern)
-    },
-    Err(e) => Err(e),
-}
-```
-
-## 🚀 **Performance Characteristics**
-
-### **Benchmark Results**
-
-| Operation | Target | Typical | Worst Case |
-|-----------|--------|---------|------------|
-| **Search *.exe** | <100ms | 45ms | 150ms |
-| **Search config.*** | <100ms | 23ms | 80ms |
-| **Find large files** | <500ms | 200ms | 1000ms |
-| **Memory usage** | <50MB | 12MB | 30MB |
-
-### **Scaling Characteristics**
-
-**File Count vs Performance**:
-
-```
-100K files:   ~20ms
-500K files:   ~40ms  
-1M files:     ~60ms
-2M files:     ~100ms
-5M files:     ~200ms
-```
-
-**Drive Size vs Performance**:
-
-```
-250GB SSD:    ~30ms
-500GB SSD:    ~45ms
-1TB SSD:      ~60ms
-2TB HDD:      ~120ms
-4TB HDD:      ~200ms
-```
-
-### **Memory Usage Profile**
-
-**Static Memory**:
-
-- Base application: ~5MB
-- NTFS crate overhead: ~2MB
-- Pattern compilation: ~1MB
-
-**Dynamic Memory** (per search):
-
-- MFT record processing: ~2-5MB
-- Result collection: ~1-10MB (depends on max_results)
-- String allocations: ~1-3MB
-
-**Peak Memory**: Typically 15-20MB during active searches
-
-## 🔍 **Comparison with Traditional Indexing**
-
-### **Memory Usage Comparison**
-
-| Tool | Startup Memory | Peak Memory | File Cache |
-|------|----------------|-------------|------------|
-| **FastSearch MCP** | 8MB | 20MB | None |
-| **Everything** | 50MB | 500MB+ | Full index |
-| **Windows Search** | 100MB | 1GB+ | Full index |
-| **Agent Ransack** | 30MB | 200MB+ | Partial cache |
-
-### **Startup Time Comparison**
-
-| Tool | Cold Start | Index Time | Ready Time |
-|------|------------|------------|------------|
-| **FastSearch MCP** | <1s | None | <1s |
-| **Everything** | 30s | 10-30min | 10-30min |
-| **Windows Search** | 60s | Hours | Hours |
-| **Agent Ransack** | 10s | None | 10s |
-
-### **Search Accuracy Comparison**
-
-| Tool | False Positives | False Negatives | Freshness |
-|------|----------------|----------------|-----------|
-| **FastSearch MCP** | 0% | 0% | Real-time |
-| **Everything** | 0% | 5-10% | Minutes old |
-| **Windows Search** | 1-2% | 10-20% | Hours old |
-| **Agent Ransack** | 0% | 0% | Real-time |
-
-## 🛡️ **Security and Permissions**
-
-### **Windows Privilege Requirements**
-
-**NTFS MFT Access**: Requires `SeBackupPrivilege` or Administrator rights
-
-**Privilege Check**:
-
-```rust
-fn check_ntfs_access() -> bool {
-    // Try to open volume handle
-    let handle = unsafe {
-        CreateFileW(
-            wide_string(r"\\.\C:").as_ptr(),
-            GENERIC_READ,
-            FILE_SHARE_READ | FILE_SHARE_WRITE,
-            null_mut(),
-            OPEN_EXISTING,
-            0,
-            null_mut(),
-        )
-    };
-    
-    handle != INVALID_HANDLE_VALUE
-}
-```
-
-### **Security Boundaries**
-
-**What FastSearch CAN Access**:
-
-- File and directory names
-- File sizes and timestamps
-- File attributes and permissions
-- Directory structure
-
-**What FastSearch CANNOT Access**:
-
-- File contents
-- Encrypted file contents
-- Files on unmounted volumes
-- Network drives (depends on configuration)
-
-### **Privacy Considerations**
-
-**Data Handling**:
-
-- No file contents are read
-- No data is cached or stored
-- No network communication
-- No telemetry or logging of search terms
-
-**Minimal Exposure**:
-
-- Only filename metadata accessed
-- Results sent only to requesting Claude session
-- No persistent storage of search history
-
-## 🔧 **Development and Debugging**
-
-### **Debug Mode Features**
-
-**Enable Debug Logging**:
-
-```bash
-RUST_LOG=debug fastsearch.exe --mcp-server
-```
-
-**Performance Profiling**:
-
-```bash
-RUST_LOG=trace fastsearch.exe --benchmark
-```
-
-### **Common Debug Scenarios**
-
-**1. MFT Access Issues**
-
-```
-Error: Access denied to NTFS MFT
-Solution: Run as Administrator or check SeBackupPrivilege
-```
-
-**2. Pattern Compilation Errors**
-
-```
-Error: Invalid regex pattern from glob
-Solution: Validate glob pattern syntax
-```
-
-**3. Memory Issues**
-
-```
-Error: Out of memory during large searches
-Solution: Reduce max_results or add pagination
-```
-
-### **Testing Strategies**
-
-**Unit Tests**:
-
-- Pattern matching accuracy
-- MFT record parsing
-- Error handling paths
-
-**Integration Tests**:
-
-- Full MCP protocol flow
-- Large filesystem performance
-- Cross-platform fallbacks
-
-**Performance Tests**:
-
-- Search latency benchmarks
-- Memory usage profiling
-- Concurrent request handling
+**Key Implementation Details:**
+- **Direct LCN-based reading**: Uses `FSCTL_GET_NTFS_VOLUME_DATA` to get MFT start LCN, then reads records directly from volume handle
+- **No file system API calls**: Bypasses `FindFirstFile`, `FindNextFile`, and all directory traversal
+- **Pattern matching**: Simple glob-to-regex conversion with case-insensitive matching
+- **Early termination**: Stops immediately when `max_results` is reached
+- **Streaming**: Records are parsed and emitted one-by-one, never stored in bulk
+- **Real-time accuracy**: Every search reads live MFT data - no stale caches
+
+**Performance Validation:**
+- Tested: 100 results from 5,008 MFT records scanned in <1 second
+- Memory: <50MB peak usage (no caching)
+- Startup: <1 second (no indexing)
+
+### 3.3 Error Handling
+
+- All service operations return `Status` structs with Windows error codes.
+- Failures are logged via `SvcLogMessage(level, message, error_code)` and relayed to the bridge so Claude can message the user.
+- Bridge methods wrap errors with `anyhow::Context` (Python side uses `fastmcp` error helpers) to provide actionable responses.
 
 ---
 
-## 🎯 **Architectural Principles (Non-Negotiable)**
+## 4. Request Lifecycle
 
-### **1. Direct Access Only**
+1. Claude invokes `file_search` with JSON arguments.
+2. The MCP bridge validates and normalises parameters (pattern, drive, max_results).
+3. The bridge writes a JSON request to the named pipe and awaits streamed results.
+4. The service opens the requested NTFS volume, scans the MFT, and emits matching entries one-by-one.
+5. Once `max_results` is reached—or the MFT is exhausted—the service sends a completion frame.
+6. The bridge forwards results to Claude and records telemetry counters (in-memory only).
 
-- NEVER cache filesystem data
-- NEVER build background indexes
-- ALWAYS query live filesystem state
-
-### **2. Early Termination**
-
-- ALWAYS stop at max_results
-- NEVER scan entire filesystem unnecessarily
-- OPTIMIZE for common search patterns
-
-### **3. Minimal Resource Usage**
-
-- KEEP memory usage under 50MB
-- AVOID unnecessary allocations
-- LEVERAGE system filesystem caches
-
-### **4. Real-Time Accuracy**
-
-- NEVER return stale data
-- ALWAYS reflect current filesystem state
-- HANDLE concurrent filesystem changes gracefully
+If the service is unavailable, step 3 fails; the bridge logs a warning and executes the Python fallback with a prominent degradation notice.
 
 ---
 
-**FastSearch MCP: Professional file search through direct NTFS Master File Table access** 🚀
+## 5. Performance Targets & Validation
+
+| Metric | Target | Notes |
+|--------|--------|-------|
+| Service start | < 1 s | No background work permitted. |
+| Search latency | < 100 ms for typical patterns on SSDs | Achieved via direct MFT streaming and early termination. |
+| Memory usage | < 50 MB | Verified with Windows Performance Monitor; no caches allowed. |
+| Result freshness | Real-time | Direct MFT read guarantees live state. |
+
+Performance testing scripts live under `tests/` and `scripts/`. Run `python test_fastsearch.py` with elevated privileges to exercise the fast path.
+
+---
+
+## 6. Diagnostics & Logging
+
+- **Event Log Source:** `FastSearchMCP`
+- **Key startup checkpoints:**
+  1. Service control registration
+  2. Privilege enablement
+  3. Named pipe creation
+  4. Worker thread launch
+  5. Volume probe
+
+`debug-service-startup.ps1` collects these logs and verifies registry entries, service configuration, and pipe connectivity. `read-service-logs.ps1` filters entries by severity for quick triage.
+
+---
+
+## 7. Fallback Behaviour
+
+- Python fallback (`service_client._fallback_search`) uses `Path.rglob` + `fnmatch`.
+- Fallbacks must never be silently upgraded to long-running crawlers; they exist solely to keep the tool responsive when elevation is unavailable.
+- The bridge labels fallback results with `method: "fallback_python"` so Claude can signal reduced fidelity.
+
+---
+
+## 8. Security & Permissions
+
+- Service binaries run as `LocalSystem`; installation requires Administrator once.
+- Named pipe ACLs restrict access to the current interactive user session to prevent cross-user leakage.
+- No file contents are read—only metadata from the MFT.
+- No telemetry, network egress, or persistent storage is produced.
+
+---
+
+## 9. Current Status & Open Work
+
+- Service installs reliably via `install-service.ps1`.
+- Some environments still hit Event ID 7034 during startup; see `docs/SERVICE_DEVELOPMENT_STATUS.md` for the debugging checklist.
+- Named pipe contract is stable; any schema changes must be mirrored between `fastsearch_service` and `service_client.py`.
+
+---
+
+Maintaining this architecture is non-negotiable. Changes that drift toward traditional indexing must be blocked during review and escalated immediately.

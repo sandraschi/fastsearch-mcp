@@ -94,6 +94,7 @@ VOID SvcMain(DWORD, LPTSTR*);
 VOID ReportSvcStatus(DWORD, DWORD, DWORD);
 VOID SvcInit(DWORD, LPTSTR*);
 VOID SvcReportEvent(LPTSTR);
+VOID SvcLogMessage(LPCTSTR szMessage, WORD wType);
 DWORD WINAPI ServiceWorkerThread(LPVOID lpParam);
 
 // Cache management functions

@@ -1,7 +1,7 @@
 """
 Logging configuration for FastSearch MCP.
 
-This module provides logging utilities following FastMCP 2.12 patterns.
+This module provides logging utilities following FastMCP 2.13 patterns.
 """
 
 import logging
@@ -15,22 +15,17 @@ def get_logger(name: str) -> logging.Logger:
 
 
 def setup_logging(
-    log_level: str = "INFO",
-    console: bool = True,
-    format_string: Optional[str] = None
+    log_level: str = "INFO", console: bool = True, format_string: Optional[str] = None
 ) -> None:
     """Set up logging configuration."""
     if format_string is None:
-        format_string = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    
+        format_string = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
     level = getattr(logging, log_level.upper(), logging.INFO)
-    
+
     # Configure root logger
     logging.basicConfig(
-        level=level,
-        format=format_string,
-        stream=sys.stderr if console else None,
-        force=True
+        level=level, format=format_string, stream=sys.stderr if console else None, force=True
     )
 
 

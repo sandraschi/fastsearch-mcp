@@ -5,7 +5,7 @@ This document explains how to package and distribute the FastSearch MCP.
 ## Prerequisites
 
 - Windows 10/11
-- Rust toolchain (latest stable)
+- Visual Studio 2022 Build Tools (for C++ service)
 - `dxt` CLI tool installed
 - PowerShell 5.1 or later
 
@@ -21,10 +21,13 @@ The DXT package will include:
 
 ## Building the Package
 
-1. Ensure all dependencies are installed:
+1. Ensure the C++ service is built:
 
    ```powershell
-   cargo build --release
+   cd service
+   cmake -S . -B build -G "Visual Studio 17 2022" -A x64
+   cmake --build build --config Release
+   cd ..
    ```
 
 2. Run the packaging script:
@@ -66,7 +69,7 @@ To distribute the package:
 Update the version in:
 
 1. `dxt_manifest.json`
-2. `Cargo.toml`
+2. `service/CMakeLists.txt`
 3. `package.ps1`
 
 ## Troubleshooting

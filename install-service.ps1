@@ -263,18 +263,59 @@ function Resolve-ServiceIssues {
     if ($service) {
         Write-ColorOutput "Service exists with status: $($service.Status)" $InfoColor
         
+        # Get detailed service info
+        try {
+            $serviceInfo = Get-CimInstance -ClassName Win32_Service -Filter "Name='$ServiceName'"
+            Write-ColorOutput "`nService Details:" $InfoColor
+            Write-ColorOutput "  Path: $($serviceInfo.PathName)" $InfoColor
+            Write-ColorOutput "  Account: $($serviceInfo.StartName)" $InfoColor
+            Write-ColorOutput "  State: $($serviceInfo.State)" $InfoColor
+            Write-ColorOutput "  Process ID: $($serviceInfo.ProcessId)" $InfoColor
+        }
+        catch {
+            Write-ColorOutput "⚠️  Could not retrieve detailed service info" $WarningColor
+        }
+        
         if ($service.Status -eq "Stopped") {
-            Write-ColorOutput "Attempting to start service..." $InfoColor
+            Write-ColorOutput "`nAttempting to start service..." $InfoColor
             try {
                 Start-Service -Name $ServiceName
                 Start-Sleep -Seconds 3
                 $newStatus = Get-Service -Name $ServiceName
                 Write-ColorOutput "Service status after start: $($newStatus.Status)" $InfoColor
+                
+                if ($newStatus.Status -ne "Running") {
+                    Write-ColorOutput "`n⚠️  Service failed to start. Checking event logs..." $WarningColor
+                    try {
+                        $events = Get-WinEvent -LogName Application -MaxEvents 10 -ErrorAction SilentlyContinue | 
+                            Where-Object { 
+                                $_.ProviderName -eq $ServiceName -or 
+                                $_.Message -like "*$ServiceName*" 
+                            } | 
+                            Sort-Object TimeCreated -Descending | 
+                            Select-Object -First 3
+                        
+                        if ($events) {
+                            Write-ColorOutput "Recent events:" $InfoColor
+                            foreach ($event in $events) {
+                                $levelColor = if ($event.LevelDisplayName -eq "Error") { $ErrorColor } else { $WarningColor }
+                                Write-ColorOutput "  [$($event.TimeCreated)] [$($event.LevelDisplayName)]" $levelColor
+                                Write-ColorOutput "    $($event.Message.Substring(0, [Math]::Min(100, $event.Message.Length)))..." $InfoColor
+                            }
+                        }
+                    }
+                    catch {
+                        Write-ColorOutput "  Could not read event logs: $($_.Exception.Message)" $WarningColor
+                    }
+                }
             }
             catch {
                 Write-ColorOutput "Failed to start service: $($_.Exception.Message)" $ErrorColor
             }
         }
+    }
+    else {
+        Write-ColorOutput "Service is not installed" $WarningColor
     }
     
     # Check for orphaned service entries
@@ -283,6 +324,10 @@ function Resolve-ServiceIssues {
         $regPath = "HKLM:\SYSTEM\CurrentControlSet\Services\$ServiceName"
         if (Test-Path $regPath) {
             Write-ColorOutput "✅ Service registry entry exists" $SuccessColor
+            $regValues = Get-ItemProperty -Path $regPath -ErrorAction SilentlyContinue
+            if ($regValues) {
+                Write-ColorOutput "  ImagePath: $($regValues.ImagePath)" $InfoColor
+            }
         }
         else {
             Write-ColorOutput "❌ Service registry entry not found" $ErrorColor
@@ -292,12 +337,31 @@ function Resolve-ServiceIssues {
         Write-ColorOutput "❌ Cannot access service registry: $($_.Exception.Message)" $ErrorColor
     }
     
+    # Check executable
+    Write-ColorOutput "`nChecking service executable..." $InfoColor
+    if ($ServicePath) {
+        if (Test-Path $ServicePath) {
+            Write-ColorOutput "✅ Executable found: $ServicePath" $SuccessColor
+            $fileInfo = Get-Item $ServicePath
+            Write-ColorOutput "  Size: $([math]::Round($fileInfo.Length / 1MB, 2)) MB" $InfoColor
+            Write-ColorOutput "  Modified: $($fileInfo.LastWriteTime)" $InfoColor
+        }
+        else {
+            Write-ColorOutput "❌ Executable not found: $ServicePath" $ErrorColor
+        }
+    }
+    else {
+        Write-ColorOutput "⚠️  Service executable path not resolved" $WarningColor
+    }
+    
     # Suggest solutions
     Write-ColorOutput "`nRecommended solutions:" $InfoColor
-    Write-ColorOutput "1. Wait 30 seconds and try again (Windows cleanup delay)" $InfoColor
-    Write-ColorOutput "2. Restart Windows to clear service state" $InfoColor
-    Write-ColorOutput "3. Use sc.exe to manually delete: sc delete $ServiceName" $InfoColor
-    Write-ColorOutput "4. Check Windows Event Log for detailed error messages" $InfoColor
+    Write-ColorOutput "1. Check event logs: .\read-service-logs.ps1" $InfoColor
+    Write-ColorOutput "2. Run comprehensive test: .\test-service-comprehensive.ps1" $InfoColor
+    Write-ColorOutput "3. Debug startup: .\debug-service-startup.ps1" $InfoColor
+    Write-ColorOutput "4. Wait 30 seconds and try again (Windows cleanup delay)" $InfoColor
+    Write-ColorOutput "5. Restart Windows to clear service state" $InfoColor
+    Write-ColorOutput "6. Use sc.exe to manually delete: sc delete $ServiceName" $InfoColor
 }
 
 function Show-Help {
