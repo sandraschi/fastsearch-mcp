@@ -22,8 +22,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - ZIP integrity verification after creation
   - Error logs saved to temp directory on failures
 - **PowerShell standards in .cursorrules** - Mandatory error handling patterns for all new scripts
+- **Fast service availability checks** - Optimized from 5 seconds to <1ms per check
+  - Fast pipe connection check (fails immediately if service is down)
+  - 2-second caching to avoid repeated checks on rapid searches
+  - Fallback to process check only if pipe check is ambiguous
+- **Improved error messages** - Clear, user-friendly error messages with step-by-step recovery instructions
+  - Service-required flags in search responses
+  - Tool suggestions for troubleshooting (`service_status`, `start_service`, etc.)
 
-## [0.5.0] - 2025-11-27
+### Changed
+- **Service checks performance** - Reduced from 5 seconds to <1ms overhead per search
+- **Error handling** - More explicit and actionable error messages
+- **Search response format** - Added `service_required` flag and `suggestion` field
+- **GitHub Actions workflows** - Restricted CI to only run on code changes (prevents spam)
+
+### Removed
+- **Fallback code** - Removed all treewalking fallbacks that violated architecture
+  - Removed `_fallback_search()` dead code from `service_client.py`
+  - Removed `basic_file_search()` treewalker from `mcp_server.py`
+  - Removed `fastsearch.search_basic` tool registration
+- **Python fallback references** - Updated all documentation to reflect direct MFT access only
+- **Outdated test files** - Removed broken tests referencing deprecated `ipc` module
+
+### Fixed
+- **Search functionality** - All search tools now fully operational
+  - File searches working across different patterns, drives, and directories
+  - Service integration complete - FastSearch Windows service running and responding
+  - Direct NTFS MFT access verified and working
+
+## [0.4.0] - 2025-11-15
 
 ### Added
 - **Fast service availability checks** - Optimized from 5 seconds to <1ms per check
@@ -87,7 +114,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[Unreleased]: https://github.com/yourusername/fastsearch-mcp/compare/v0.5.0...HEAD
-[0.5.0]: https://github.com/yourusername/fastsearch-mcp/compare/v0.4.0...v0.5.0
-[0.4.0]: https://github.com/yourusername/fastsearch-mcp/compare/v0.3.0...v0.4.0
+[Unreleased]: https://github.com/sandraschi/fastsearch-mcp/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/sandraschi/fastsearch-mcp/compare/v0.3.0...v0.4.0
 
