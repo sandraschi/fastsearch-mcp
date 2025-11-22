@@ -6,11 +6,6 @@ on:
       - 'v*'  # Trigger on version tags (e.g., v1.0.0)
   workflow_dispatch:  # Allow manual triggering for testing
 
-env:
-  CARGO_TERM_COLOR: always
-  CARGO_INCREMENTAL: 0  # Disable incremental compilation for CI
-  RUST_BACKTRACE: 1
-
 jobs:
   # Build matrix for dual package strategy: MSI + MCPB
   build-packages:
@@ -21,40 +16,28 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # MSI Package (Windows service + bridge)
+          # MSI Package (Windows service - C++ CMake build)
           - package_type: msi
             platform: windows-x64
             os: windows-latest
-            target: x86_64-pc-windows-msvc
-            binary_bridge: fastsearch-mcp-bridge.exe
-            binary_service: fastsearch-service.exe
             output: fastsearch-mcp-setup.msi
             
           # MCPB Package (Windows)
           - package_type: mcpb
             platform: windows-x64
             os: windows-latest
-            target: x86_64-pc-windows-msvc
-            binary_bridge: fastsearch-mcp-bridge.exe
-            binary_service: null
             output: fastsearch-mcp.mcpb
             
-          # MCPB Package (Linux) - Cross-platform MCP support
+          # MCPB Package (Linux) - Cross-platform MCP support (Python bridge only, no service)
           - package_type: mcpb
             platform: linux-x64
             os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-            binary_bridge: fastsearch-mcp-bridge
-            binary_service: null
             output: fastsearch-mcp-linux.mcpb
             
-          # MCPB Package (macOS) - Cross-platform MCP support
+          # MCPB Package (macOS) - Cross-platform MCP support (Python bridge only, no service)
           - package_type: mcpb
             platform: macos-x64
             os: macos-latest
-            target: x86_64-apple-darwin
-            binary_bridge: fastsearch-mcp-bridge
-            binary_service: null
             output: fastsearch-mcp-macos.mcpb
 
     steps:
@@ -64,123 +47,162 @@ jobs:
         fetch-depth: 0  # Needed for git describe version detection
 
     - name: Get version from tag
-      shell: bash
+      shell: pwsh
       run: |
-        if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
-          VERSION=${GITHUB_REF#refs/tags/}
-        else
-          VERSION=$(git describe --tags --always --dirty)
-        fi
-        echo "VERSION=${VERSION}" >> $GITHUB_ENV
-        echo "Building version: ${VERSION}"
+        if ($env:GITHUB_REF -like "refs/tags/*") {
+          $version = $env:GITHUB_REF -replace "refs/tags/", ""
+        } else {
+          $version = git describe --tags --always --dirty
+        }
+        Write-Host "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+        Write-Host "Building version: $version"
 
-    - name: Setup Rust toolchain
-      uses: dtolnay/rust-toolchain@stable
-      with:
-        targets: ${{ matrix.target }}
-        components: clippy, rustfmt
-
-    - name: Configure Rust cache
-      uses: Swatinem/rust-cache@v2
-      with:
-        key: ${{ matrix.target }}-${{ matrix.package_type }}
-        cache-on-failure: true
-
-    - name: Install Linux dependencies
-      if: matrix.os == 'ubuntu-latest'
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y pkg-config libssl-dev
-
-    - name: Install macOS dependencies
-      if: matrix.os == 'macos-latest'
-      run: |
-        brew install pkg-config openssl
-        echo "PKG_CONFIG_PATH=/opt/homebrew/lib/pkgconfig" >> $GITHUB_ENV
-
-    - name: Setup WiX Toolset (MSI only)
+    - name: Setup Visual Studio (MSI only)
       if: matrix.package_type == 'msi'
+      uses: microsoft/setup-msbuild@v1
+
+    - name: Setup CMake (MSI only)
+      if: matrix.package_type == 'msi'
+      uses: microsoft/setup-cmake@v1
+      with:
+        cmake-version: '3.20'
+
+    - name: Setup Node.js (MCPB only)
+      if: matrix.package_type == 'mcpb'
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+
+    - name: Setup Python (MCPB only)
+      if: matrix.package_type == 'mcpb'
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Setup WiX Toolset (MSI only - required for CPack)
+      if: matrix.package_type == 'msi'
+      shell: pwsh
       run: |
-        # Install WiX toolset (FREE - no licensing required)
+        # Install WiX toolset v5 (CPack uses WiX for MSI generation)
         dotnet tool install --global wix --version 5.*
+        $wixPath = "$env:USERPROFILE\.dotnet\tools"
+        Write-Host "WIX=$wixPath" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+        Write-Host "$wixPath" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
         
     - name: Setup MCPB CLI (MCPB only)
       if: matrix.package_type == 'mcpb'
       run: |
-        # Install Anthropic MCPB CLI
         npm install -g @anthropic-ai/mcpb
 
-    - name: Build Rust workspace
-      run: |
-        cargo build --release --target ${{ matrix.target }} --verbose
-
-    - name: Verify binaries
-      shell: bash
-      run: |
-        RELEASE_DIR="target/${{ matrix.target }}/release"
-        
-        # Check bridge binary
-        if [[ -f "${RELEASE_DIR}/${{ matrix.binary_bridge }}" ]]; then
-          echo "✅ Bridge binary found: ${{ matrix.binary_bridge }}"
-          ls -la "${RELEASE_DIR}/${{ matrix.binary_bridge }}"
-        else
-          echo "❌ Bridge binary not found: ${{ matrix.binary_bridge }}"
-          exit 1
-        fi
-        
-        # Check service binary (MSI package only)
-        if [[ "${{ matrix.package_type }}" == "msi" && "${{ matrix.binary_service }}" != "null" ]]; then
-          if [[ -f "${RELEASE_DIR}/${{ matrix.binary_service }}" ]]; then
-            echo "✅ Service binary found: ${{ matrix.binary_service }}"
-            ls -la "${RELEASE_DIR}/${{ matrix.binary_service }}"
-          else
-            echo "❌ Service binary not found: ${{ matrix.binary_service }}"
-            exit 1
-          fi
-        fi
-
-    - name: Create MSI Package
+    - name: Build C++ Service (MSI only)
       if: matrix.package_type == 'msi'
       shell: pwsh
       run: |
-        # Create MSI build directory
-        New-Item -ItemType Directory -Force -Path "msi-build"
+        Write-Host "Building C++ service with CMake..." -ForegroundColor Cyan
+        cd service
+        cmake -S . -B build -G "Visual Studio 17 2022" -A x64
+        cmake --build build --config Release
         
-        # Copy binaries to MSI build directory
-        Copy-Item "target\${{ matrix.target }}\release\${{ matrix.binary_bridge }}" "msi-build\"
-        Copy-Item "target\${{ matrix.target }}\release\${{ matrix.binary_service }}" "msi-build\"
+        # Verify binary exists
+        $serviceBinary = "build\bin\Release\FastSearchServiceNew.exe"
+        if (-not (Test-Path $serviceBinary)) {
+          Write-Host "❌ Service binary not found: $serviceBinary" -ForegroundColor Red
+          exit 1
+        }
+        Write-Host "✅ Service binary found: $serviceBinary" -ForegroundColor Green
+        Get-Item $serviceBinary | Format-List
+
+    - name: Create MSI Package with CPack
+      if: matrix.package_type == 'msi'
+      shell: pwsh
+      run: |
+        Write-Host "Creating MSI package with CPack..." -ForegroundColor Cyan
         
-        # Create MSI package using the script
-        .\scripts\create_msi_package.ps1 `
-          -Version "${{ github.ref_name }}" `
-          -Platform "${{ matrix.platform }}" `
-          -OutputDir "msi-package" `
-          -ProjectDir "." `
-          -WixBinDir "wix"
+        # Get version from tag
+        $version = $env:GITHUB_REF -replace "refs/tags/v", ""
+        Write-Host "Building version: $version" -ForegroundColor Yellow
         
-        # Move MSI to artifacts directory
-        New-Item -ItemType Directory -Force -Path "artifacts" | Out-Null
-        Move-Item -Path "msi-package\FastSearchMCP-${{ github.ref_name }}-${{ matrix.platform }}.msi" -Destination "${{ matrix.output }}"
+        # Reconfigure CMake with version and build package
+        cd service
+        cmake -S . -B build -G "Visual Studio 17 2022" -A x64 `
+          -DCPACK_PACKAGE_VERSION="$version" `
+          -DCMAKE_PROJECT_VERSION="$version"
         
-        # Verify MSI was created
-        if (Test-Path "${{ matrix.output }}") {
-          Write-Host "✅ MSI package created: ${{ github.ref_name }}"
-          Get-Item "${{ matrix.output }}" | Format-List
+        # Build and package with CPack
+        cmake --build build --config Release --target package
+        
+        # Find the created MSI (CPack puts it in build/_CPack_Packages or build/)
+        $msiFile = Get-ChildItem -Path "build" -Filter "*.msi" -Recurse | Select-Object -First 1
+        if ($msiFile) {
+          $outputPath = Join-Path (Get-Location) "..\${{ matrix.output }}"
+          Copy-Item -Path $msiFile.FullName -Destination $outputPath -Force
+          Write-Host "✅ MSI package created: $outputPath" -ForegroundColor Green
+          Get-Item $outputPath | Format-List
+        } else {
+          Write-Host "❌ MSI package not found in build directory" -ForegroundColor Red
+          Write-Host "Searching in build directory:" -ForegroundColor Yellow
+          Get-ChildItem -Path "build" -Recurse | Select-Object FullName
+          exit 1
         }
 
-    - name: Create MCPB Package
-      if: matrix.package_type == 'mcpb'
+    - name: Create MCPB Package (Windows)
+      if: matrix.package_type == 'mcpb' && matrix.os == 'windows-latest'
+      shell: pwsh
+      run: |
+        Write-Host "Creating MCPB package..." -ForegroundColor Cyan
+        .\scripts\build-mcpb-package.ps1
+        
+        # Find the created MCPB and rename to expected output name
+        $mcpbFile = Get-ChildItem -Path "dist" -Filter "*.mcpb" | Select-Object -First 1
+        if ($mcpbFile) {
+          $outputPath = Join-Path (Get-Location) "${{ matrix.output }}"
+          Move-Item -Path $mcpbFile.FullName -Destination $outputPath -Force
+          Write-Host "✅ MCPB package created: $outputPath" -ForegroundColor Green
+        } else {
+          Write-Host "❌ MCPB package not found in dist directory" -ForegroundColor Red
+          exit 1
+        }
+
+    - name: Create MCPB Package (Linux/macOS)
+      if: matrix.package_type == 'mcpb' && matrix.os != 'windows-latest'
       shell: bash
       run: |
-        # Make the script executable
-        chmod +x scripts/create_mcpb_package.sh
-        # Run the script with required parameters
-        ./scripts/create_mcpb_package.sh \
-          "${{ matrix.platform }}" \
-          "${{ github.ref_name }}" \
-          "${{ matrix.binary_bridge }}" \
-          "${{ matrix.target }}" \
-          "${{ matrix.output }}"
+        echo "Creating MCPB package for ${{ matrix.platform }}..." 
+        
+        # Install MCPB CLI if not already installed
+        npm install -g @anthropic-ai/mcpb
+        
+        # Create build directory
+        mkdir -p mcpb-build/src
+        mkdir -p mcpb-build/prompts
+        
+        # Copy source code
+        cp -r src/fastsearch_mcp mcpb-build/src/
+        cp manifest.json mcpb-build/
+        cp -r prompts/* mcpb-build/prompts/
+        
+        # Create requirements.txt
+        cat > mcpb-build/requirements.txt << EOF
+        fastmcp>=2.13.0
+        pydantic>=2.0.0
+        psutil>=5.9.0
+        EOF
+        
+        # Validate manifest
+        cd mcpb-build
+        mcpb validate manifest.json
+        
+        # Build package
+        mcpb pack . "../${{ matrix.output }}"
+        
+        cd ..
+        if [ -f "${{ matrix.output }}" ]; then
+          echo "✅ MCPB package created: ${{ matrix.output }}"
+          ls -lh "${{ matrix.output }}"
+        else
+          echo "❌ MCPB package not found"
+          exit 1
+        fi
 
     - name: Upload package artifact
       uses: actions/upload-artifact@v4
