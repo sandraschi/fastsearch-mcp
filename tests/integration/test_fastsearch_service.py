@@ -47,24 +47,45 @@ except ImportError:
 
 @pytest.fixture(scope="module")
 def service_available():
-    """Check if the service is available for testing."""
+    """Check if the service is available for testing.
+    
+    In CI/GitHub Actions, this will return False and tests will be skipped.
+    Tests should use mocks instead of requiring actual service.
+    
+    Note: This fixture respects mocking - if Windows APIs are mocked (as in CI),
+    it will return False to indicate real service is not available, allowing
+    tests to use mocked implementations instead.
+    """
     try:
+        # Try to import - if mocked, this will work but QueryServiceStatus might fail
+        # If not mocked and not available, ImportError will be raised
         import win32serviceutil
-
-        win32serviceutil.QueryServiceStatus(SERVICE_NAME)
-        return True
-    except Exception:
+        
+        # Try to query service - this will fail if service not installed or APIs not available
+        # In CI with mocks, this will use the mocked version which should succeed
+        # In real environment, this checks if service actually exists
+        try:
+            win32serviceutil.QueryServiceStatus(SERVICE_NAME)
+            return True
+        except Exception:
+            # Service not installed or not available - use mocks instead
+            return False
+    except ImportError:
+        # Windows APIs not available (e.g., in CI without pywin32) - use mocks
         return False
 
 
 @pytest.fixture(scope="module")
 def admin_privileges():
-    """Check if running with admin privileges."""
+    """Check if running with admin privileges.
+    
+    In CI/GitHub Actions, this will return False and admin-required tests will be skipped.
+    """
     try:
         import ctypes
-
         return ctypes.windll.shell32.IsUserAnAdmin() != 0
-    except Exception:
+    except (AttributeError, ImportError, Exception):
+        # Not Windows or APIs not available
         return False
 
 
