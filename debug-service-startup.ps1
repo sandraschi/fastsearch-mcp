@@ -185,7 +185,7 @@ if (-not $service) {
 
 if ($service -and $service.Status -ne "Running") {
     $recommendations += "Start the service: .\install-service.ps1 start"
-    $recommendations += "Check event logs: .\read-service-logs.ps1"
+    $recommendations += "Check event logs: .\scripts\read-service-logs.ps1"
 }
 
 if ($recommendations.Count -eq 0) {

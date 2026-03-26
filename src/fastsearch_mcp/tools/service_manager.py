@@ -6,7 +6,7 @@ import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Literal, Optional, Union
 
 import psutil
 import win32service
@@ -15,9 +15,31 @@ import winerror
 from pywintypes import error as win32_error
 
 from fastsearch_mcp.logging_config import get_logger
-from fastsearch_mcp.tools.base import BaseTool, ToolCategory, ToolParameter, tool
+from fastsearch_mcp.mcp_instance import mcp
 
 logger = get_logger(__name__)
+
+# JSON-schema-friendly filter literals (match Windows SCM / ServiceStatus after .lower())
+ServiceListStatus = Literal[
+    "all",
+    "stopped",
+    "start_pending",
+    "stop_pending",
+    "running",
+    "continue_pending",
+    "pause_pending",
+    "paused",
+    "unknown",
+]
+ServiceListStartup = Literal[
+    "all",
+    "boot",
+    "system",
+    "automatic",
+    "manual",
+    "disabled",
+]
+ServiceStartupInput = Literal["automatic", "manual", "disabled", "boot", "system", "auto"]
 
 # Constants for service access rights
 SERVICE_QUERY_CONFIG = 0x0001
@@ -325,7 +347,10 @@ class ServiceManager:
                 elif service.status == ServiceStatus.STOPPED:
                     return {
                         "success": False,
-                        "error": f"Service '{service_name}' failed to start (status: {service.status.value})",
+                        "error": (
+                            f"Service '{service_name}' failed to start "
+                            f"(status: {service.status.value})"
+                        ),
                         "service": service_name,
                         "status": service.status.value,
                         "exit_code": service.exit_code,
@@ -506,9 +531,12 @@ class ServiceManager:
             Dict with status information
         """
         try:
-            # Convert string to enum if needed
+            # Convert string to enum if needed (accepts auto -> AUTOMATIC, etc.)
             if isinstance(startup_type, str):
-                startup_type = ServiceStartupType[startup_type.upper()]
+                key = startup_type.strip().upper().replace("-", "_")
+                if key == "AUTO":
+                    key = "AUTOMATIC"
+                startup_type = ServiceStartupType[key]
 
             # Map our enum to Windows constants
             win32_startup_type = {
@@ -544,7 +572,10 @@ class ServiceManager:
 
                     return {
                         "success": True,
-                        "message": f"Set startup type for service '{service_name}' to {startup_type.value}",
+                        "message": (
+                            f"Set startup type for service '{service_name}' "
+                            f"to {startup_type.value}"
+                        ),
                         "service": service_name,
                         "startup_type": startup_type.value,
                         "action": "set_startup_type",
@@ -587,9 +618,16 @@ class ServiceManager:
                 winerror.ERROR_ACCESS_DENIED: "Access is denied",
                 winerror.ERROR_INVALID_HANDLE: "The handle is invalid",
                 winerror.ERROR_PATH_NOT_FOUND: "The system cannot find the path specified",
-                winerror.ERROR_SERVICE_DISABLED: "The service cannot be started because it is disabled",
-                winerror.ERROR_SERVICE_LOGON_FAILED: "The service did not start due to a logon failure",
-                winerror.ERROR_SERVICE_REQUEST_TIMEOUT: "The service did not respond to the start request in a timely fashion",
+                winerror.ERROR_SERVICE_DISABLED: (
+                    "The service cannot be started because it is disabled"
+                ),
+                winerror.ERROR_SERVICE_LOGON_FAILED: (
+                    "The service did not start due to a logon failure"
+                ),
+                winerror.ERROR_SERVICE_REQUEST_TIMEOUT: (
+                    "The service did not respond to the start request "
+                    "in a timely fashion"
+                ),
             }
 
             return error_messages.get(error.winerror, str(error))
@@ -597,570 +635,575 @@ class ServiceManager:
             return str(error)
 
 
-@tool(
-    name="list_services",
-    description="List all Windows services with their status and details",
-    category=ToolCategory.SYSTEM,
-    parameters=[
-        ToolParameter(
-            name="status",
-            type=str,
-            description="Filter services by status (all, running, stopped, start_pending, stop_pending, paused, pause_pending, continue_pending)",
-            default="all",
-            required=False,
-        ),
-        ToolParameter(
-            name="startup_type",
-            type=str,
-            description="Filter services by startup type (all, automatic, manual, disabled, boot, system)",
-            default="all",
-            required=False,
-        ),
-        ToolParameter(
-            name="search",
-            type=str,
-            description="Search filter for service names or display names (case-insensitive)",
-            default="",
-            required=False,
-        ),
-        ToolParameter(
-            name="include_details",
-            type=bool,
-            description="Include detailed information about each service",
-            default=True,
-            required=False,
-        ),
-    ],
-    return_type=Dict,
-    return_description="Dictionary containing the list of services and their details",
-)
-class ListServicesTool(BaseTool):
-    """Tool for listing Windows services."""
+@mcp.tool
+async def list_services(
+    status: ServiceListStatus = "all",
+    startup_type: ServiceListStartup = "all",
+    search: str = "",
+    include_details: bool = True,
+) -> Dict:
+    """LIST_SERVICES — Enumerate Windows services with optional filters.
 
-    async def execute(self, **kwargs) -> Dict:
-        """List Windows services with optional filtering."""
-        status_filter = kwargs.get("status", "all").lower()
-        startup_type_filter = kwargs.get("startup_type", "all").lower()
-        search_term = (kwargs.get("search", "") or "").lower()
-        include_details = kwargs.get("include_details", True)
+    Use this read-only tool to discover service names, states, and startup types before
+    calling get_service, start_service, stop_service, or restart_service. Prefer
+    list_services + get_service over mutating tools when you only need diagnostics.
+
+    Args:
+        status: Filter by SCM state. Use ``all`` for every service, or one of the
+            lowercase state names matching Windows (e.g. ``running``, ``stopped``).
+        startup_type: Filter by startup mode: ``all``, ``automatic``, ``manual``,
+            ``disabled``, ``boot``, or ``system``.
+        search: Case-insensitive substring match on service name or display name.
+        include_details: When True, returns full service records; when False, a compact
+            summary per service.
+
+    Returns:
+        On success: ``success`` (bool), ``count`` (int), ``services`` (list of dicts),
+        ``filters`` (echo of applied filters). On failure: ``success`` False, ``error``,
+        ``count`` 0, ``services`` [].
+
+    Recovery: If ``count`` is 0, widen filters (status/startup_type ``all``) or adjust
+    ``search``.
+    """
+    status_filter = status.lower()
+    startup_type_filter = startup_type.lower()
+    search_term = (search or "").lower()
+
+    try:
+        # Get all services
+        services = await asyncio.to_thread(ServiceManager.get_services)
+
+        filtered_services = []
+
+        # Apply filters
+        for service in services:
+            # Status filter (compare lowercase to lowercase; status_filter is already .lower())
+            if status_filter != "all" and service.status.value.lower() != status_filter:
+                continue
+
+            # Startup type filter
+            if (
+                startup_type_filter != "all"
+                and service.startup_type.value.lower() != startup_type_filter
+            ):
+                continue
+
+            # Search filter
+            if search_term and not (
+                search_term in service.name.lower()
+                or search_term in (service.display_name or "").lower()
+            ):
+                continue
+
+            # Convert to dict with or without details
+            if include_details:
+                filtered_services.append(service.to_dict())
+            else:
+                filtered_services.append(
+                    {
+                        "name": service.name,
+                        "display_name": service.display_name,
+                        "status": service.status.value,
+                        "startup_type": service.startup_type.value,
+                        "pid": service.pid,
+                    }
+                )
+
+        return {
+            "success": True,
+            "count": len(filtered_services),
+            "services": filtered_services,
+            "filters": {
+                "status": status_filter,
+                "startup_type": startup_type_filter,
+                "search": search_term,
+            },
+        }
+
+    except Exception as e:
+        return {
+            "success": False,
+            "error": f"Error listing services: {str(e)}",
+            "count": 0,
+            "services": [],
+        }
+
+
+@mcp.tool
+async def get_service(service_name: str) -> Dict:
+    """GET_SERVICE — Read-only snapshot of one Windows service (SCM).
+
+    Use before start/stop/restart to confirm the exact service ``name``, current
+    ``status``, and impact (dependencies, binary_path). Does not change system state.
+
+    Args:
+        service_name: Short SCM service name (e.g. ``Spooler``), not the display name.
+
+    Returns:
+        Success: ``success`` True, ``service`` dict (name, display_name, status,
+        startup_type, binary_path, pid, dependencies, …). Failure: ``success`` False,
+        ``error`` string.
+
+    Recovery: Unknown name → list_services(search=...) then retry; access denied → run
+    elevated or query a different service.
+    """
+    if not service_name:
+        return {"success": False, "error": "Service name is required"}
+
+    try:
+        service = await asyncio.to_thread(ServiceManager.get_service, service_name)
+
+        if not service:
+            return {"success": False, "error": f"Service '{service_name}' not found"}
+
+        return {"success": True, "service": service.to_dict()}
+
+    except Exception as e:
+        return {
+            "success": False,
+            "error": f"Error getting service '{service_name}': {str(e)}",
+            "service_name": service_name,
+        }
+
+
+@mcp.tool
+async def start_service(
+    service_name: str,
+    args: Optional[List[str]] = None,
+    timeout: int = 30,
+    dry_run: bool = False,
+) -> Dict:
+    """START_SERVICE — Start a Windows service and wait until RUNNING or timeout.
+
+    Mutates system state: can launch processes depended on by other components. Use
+    get_service or list_services first; avoid stopping/starting critical OS services
+    (e.g. network stack) unless the user explicitly requested it.
+
+    Args:
+        service_name: SCM service name (short name), not display name.
+        args: Optional extra arguments passed to the service start (rare; often empty).
+        timeout: Seconds to poll for RUNNING after issuing start (default 30). Typical
+            range 5–120; low values may false-fail on slow services.
+        dry_run: If True, does not start the service; returns current state and whether
+            a start would be attempted (idempotent if already running).
+
+    Returns:
+        Success: ``success`` True, ``message``, ``service``, ``status``, optional ``pid``,
+        ``elapsed_time``, ``action`` ``start``. Failure: ``success`` False, ``error``,
+        optional ``win32_error_code``, ``status``, ``exit_code``.
+
+    Recovery: Timeout → increase ``timeout``; ACCESS_DENIED → elevated session;
+    service disabled → set_service_startup_type then retry; verify ``error`` text.
+    """
+    if not service_name:
+        return {"success": False, "error": "Service name is required"}
+
+    if args is None:
+        args = []
+
+    if dry_run:
+        try:
+            svc = await asyncio.to_thread(ServiceManager.get_service, service_name)
+            if not svc:
+                return {
+                    "success": False,
+                    "error": f"Service '{service_name}' not found",
+                    "service": service_name,
+                    "action": "start",
+                    "dry_run": True,
+                }
+            return {
+                "success": True,
+                "dry_run": True,
+                "message": (
+                    f"Would start '{service_name}' (current status: {svc.status.value}); "
+                    "no start issued."
+                ),
+                "service": service_name,
+                "status": svc.status.value,
+                "action": "start",
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": f"Dry-run failed for '{service_name}': {e!s}",
+                "service_name": service_name,
+                "dry_run": True,
+            }
+
+    try:
+        return await asyncio.to_thread(ServiceManager.start_service, service_name, args, timeout)
+    except Exception as e:
+        return {
+            "success": False,
+            "error": f"Error starting service '{service_name}': {str(e)}",
+            "service_name": service_name,
+        }
+
+
+@mcp.tool
+async def stop_service(service_name: str, timeout: int = 30, dry_run: bool = False) -> Dict:
+    """STOP_SERVICE — Stop a Windows service and wait until STOPPED or timeout.
+
+    Destructive: can interrupt dependent apps (DB, web, print queues). Use get_service
+    first; do not stop services you cannot name or that the user did not ask to stop.
+
+    Args:
+        service_name: SCM short name of the service.
+        timeout: Seconds to wait for STOPPED (default 30). Typical range 5–300; some
+            services take long to drain connections.
+        dry_run: If True, does not stop; reports current state and whether a stop would
+            be issued (no-op if already stopped).
+
+    Returns:
+        Success: ``success`` True, ``message``, ``service``, ``status``, ``elapsed_time``,
+        ``action`` ``stop``. Failure: ``success`` False, ``error``, optional ``win32_error_code``.
+
+    Recovery: Timeout → increase ``timeout`` or stop dependents first; ACCESS_DENIED
+    → elevation; ``error`` text lists Win32 cause.
+    """
+    if not service_name:
+        return {"success": False, "error": "Service name is required"}
+
+    if dry_run:
+        try:
+            svc = await asyncio.to_thread(ServiceManager.get_service, service_name)
+            if not svc:
+                return {
+                    "success": False,
+                    "error": f"Service '{service_name}' not found",
+                    "service": service_name,
+                    "action": "stop",
+                    "dry_run": True,
+                }
+            return {
+                "success": True,
+                "dry_run": True,
+                "message": (
+                    f"Would stop '{service_name}' (current status: {svc.status.value}); "
+                    "no stop issued."
+                ),
+                "service": service_name,
+                "status": svc.status.value,
+                "action": "stop",
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": f"Dry-run failed for '{service_name}': {e!s}",
+                "service_name": service_name,
+                "dry_run": True,
+            }
+
+    try:
+        return await asyncio.to_thread(ServiceManager.stop_service, service_name, timeout)
+    except Exception as e:
+        return {
+            "success": False,
+            "error": f"Error stopping service '{service_name}': {str(e)}",
+            "service_name": service_name,
+        }
+
+
+@mcp.tool
+async def restart_service(service_name: str, timeout: int = 60, dry_run: bool = False) -> Dict:
+    """RESTART_SERVICE — Stop then start a Windows service (two-phase, bounded time).
+
+    Highest-impact mutation: combines stop + start risks. Use for user-requested
+    recovery of a known service; prefer stop_service + start_service separately if you
+    need to inspect state between phases.
+
+    Args:
+        service_name: SCM short name.
+        timeout: Total budget in seconds split across stop and start (default 60).
+        dry_run: If True, does not restart; returns current state and planned phases.
+
+    Returns:
+        Success: ``success`` True, ``message``, ``service``, ``status``, ``pid``,
+        ``elapsed_time``, ``action`` ``restart``. Failure: ``success`` False, ``error``
+        describing which phase failed.
+
+    Recovery: Read ``error`` for stop vs start failure; increase ``timeout`` for slow
+    services; verify dependencies via get_service.
+    """
+    if not service_name:
+        return {"success": False, "error": "Service name is required"}
+
+    if dry_run:
+        try:
+            svc = await asyncio.to_thread(ServiceManager.get_service, service_name)
+            if not svc:
+                return {
+                    "success": False,
+                    "error": f"Service '{service_name}' not found",
+                    "service": service_name,
+                    "action": "restart",
+                    "dry_run": True,
+                }
+            return {
+                "success": True,
+                "dry_run": True,
+                "message": (
+                    f"Would restart '{service_name}' (current status: {svc.status.value}): "
+                    "stop phase then start phase; no changes made."
+                ),
+                "service": service_name,
+                "status": svc.status.value,
+                "action": "restart",
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": f"Dry-run failed for '{service_name}': {e!s}",
+                "service_name": service_name,
+                "dry_run": True,
+            }
+
+    try:
+        return await asyncio.to_thread(ServiceManager.restart_service, service_name, timeout)
+    except Exception as e:
+        return {
+            "success": False,
+            "error": f"Error restarting service '{service_name}': {str(e)}",
+            "service_name": service_name,
+        }
+
+
+@mcp.tool
+async def set_service_startup_type(
+    service_name: str, startup_type: ServiceStartupInput
+) -> Dict:
+    """SET_SERVICE_STARTUP_TYPE — Change SCM start mode (boot/system/auto/manual/disabled).
+
+    Persists across reboots. Disabling or switching to manual can prevent a service
+    from coming back after restart—confirm with the user before disabling dependencies.
+
+    Args:
+        service_name: SCM short name.
+        startup_type: One of ``automatic`` (or alias ``auto``), ``manual``, ``disabled``,
+            ``boot``, ``system``. JSON schema lists allowed literals.
+
+    Returns:
+        Success: ``success`` True, ``message``, ``service``, ``startup_type``, ``action``
+        ``set_startup_type``. Failure: ``success`` False, ``error``, optional ``win32_error_code``.
+
+    Recovery: ACCESS_DENIED → elevation; invalid state → get_service then retry.
+    """
+    if not service_name:
+        return {"success": False, "error": "Service name is required"}
+
+    if not startup_type:
+        return {"success": False, "error": "Startup type is required"}
+
+    try:
+        return await asyncio.to_thread(
+            ServiceManager.set_startup_type, service_name, startup_type
+        )
+    except Exception as e:
+        return {
+            "success": False,
+            "error": f"Error setting startup type for service '{service_name}': {str(e)}",
+            "service_name": service_name,
+            "startup_type": startup_type,
+        }
+
+
+@mcp.tool
+async def get_service_logs(
+    service_name: str,
+    log_type: str = "system",
+    source: str = "",
+    last: str = "1h",
+    limit: int = 50,
+    event_level: str = "all",
+) -> Dict:
+    """Get event logs for a Windows service.
+
+    Retrieves Windows Event Log entries for a specific service with optional
+    filtering by time range, event level, and log type.
+
+    Args:
+        service_name: Name of the service to get logs for
+        log_type: Type of logs to retrieve (system, application, security, setup,
+            forwardedevents, or application and services logs path)
+        source: Event source to filter by (defaults to service name if not specified)
+        last: Get logs from the last X minutes/hours/days (e.g., '10m', '2h', '1d')
+        limit: Maximum number of log entries to return
+        event_level: Filter by event level (all, critical, error, warning,
+            information, verbose)
+
+    Returns:
+        Dictionary containing the service logs
+    """
+    import re
+    from datetime import timedelta
+
+    import win32con
+    import win32evtlog
+
+    if not source:
+        source = service_name
+    event_level = event_level.lower()
+
+    if not service_name:
+        return {"success": False, "error": "Service name is required"}
+
+    try:
+        # Calculate time filter
+        now = datetime.now()
+        time_ago = now
+
+        # Parse time string (e.g., '10m', '2h', '1d')
+        time_match = re.match(r"^(\d+)([mhd])$", last.lower())
+        if time_match:
+            num = int(time_match.group(1))
+            unit = time_match.group(2)
+
+            if unit == "m":
+                time_ago = now - timedelta(minutes=num)
+            elif unit == "h":
+                time_ago = now - timedelta(hours=num)
+            elif unit == "d":
+                time_ago = now - timedelta(days=num)
+
+        # Open the event log
+        try:
+            hand = win32evtlog.OpenEventLog(None, log_type)
+        except Exception:
+            # Try with Application log if the specified log type fails
+            try:
+                hand = win32evtlog.OpenEventLog(None, "Application")
+            except Exception as e:
+                return {
+                    "success": False,
+                    "error": f"Could not open event log: {str(e)}",
+                    "service_name": service_name,
+                    "log_type": log_type,
+                }
+
+        # Set up flags for reading the log
+        flags = win32evtlog.EVENTLOG_BACKWARDS_READ | win32evtlog.EVENTLOG_SEQUENTIAL_READ
+
+        # Prepare results
+        logs = []
+        total_events = 0
 
         try:
-            # Get all services
-            services = await asyncio.get_event_loop().run_in_executor(
-                None, ServiceManager.get_services
-            )
+            while len(logs) < limit:
+                # Read events in chunks
+                events = win32evtlog.ReadEventLog(hand, flags, 0)
+                if not events:
+                    break
 
-            filtered_services = []
+                for event in events:
+                    # Filter by time
+                    try:
+                        if hasattr(event.TimeGenerated, "timestamp"):
+                            if event.TimeGenerated.timestamp() < time_ago.timestamp():
+                                continue
+                        else:
+                            # Fallback for older pywin32 versions
+                            event_time = event.TimeGenerated
+                            if event_time < time_ago:
+                                continue
+                    except Exception:
+                        # If time comparison fails, include the event
+                        pass
 
-            # Apply filters
-            for service in services:
-                # Status filter
-                if status_filter != "all" and service.status.value.lower() != status_filter.upper():
-                    continue
+                    # Filter by source if specified
+                    event_source = getattr(event, "SourceName", "")
+                    # Also check if service name appears in message
+                    if source:
+                        source_lower = source.lower()
+                        if event_source.lower() != source_lower:
+                            # Check if service name is in the message
+                            message_lower = getattr(event, "Message", "").lower()
+                            if source_lower not in message_lower:
+                                continue
 
-                # Startup type filter
-                if (
-                    startup_type_filter != "all"
-                    and service.startup_type.value.lower() != startup_type_filter.upper()
-                ):
-                    continue
+                    # Filter by level if specified
+                    if event_level != "all":
+                        if (
+                            event_level == "critical"
+                            and event.EventType != win32con.EVENTLOG_ERROR_TYPE
+                        ):
+                            continue
+                        if (
+                            event_level == "error"
+                            and event.EventType != win32con.EVENTLOG_ERROR_TYPE
+                        ):
+                            continue
+                        if (
+                            event_level == "warning"
+                            and event.EventType != win32con.EVENTLOG_WARNING_TYPE
+                        ):
+                            continue
+                        if (
+                            event_level == "information"
+                            and event.EventType != win32con.EVENTLOG_INFORMATION_TYPE
+                        ):
+                            continue
+                        if event_level == "verbose" and event.EventType not in [
+                            win32con.EVENTLOG_AUDIT_SUCCESS,
+                            win32con.EVENTLOG_AUDIT_FAILURE,
+                        ]:
+                            continue
 
-                # Search filter
-                if search_term and not (
-                    search_term in service.name.lower()
-                    or search_term in (service.display_name or "").lower()
-                ):
-                    continue
+                    # Format the log entry
+                    log_entry = {
+                        "timestamp": event.TimeGenerated.isoformat(),
+                        "source": event_source,
+                        "event_id": event.EventID & 0xFFFF,  # Lower 16 bits
+                        "event_type": _get_event_type(event.EventType),
+                        "computer": event.ComputerName,
+                        "message": _get_event_message(event),
+                        "data": event.StringInserts,
+                    }
 
-                # Convert to dict with or without details
-                if include_details:
-                    filtered_services.append(service.to_dict())
-                else:
-                    filtered_services.append(
-                        {
-                            "name": service.name,
-                            "display_name": service.display_name,
-                            "status": service.status.value,
-                            "startup_type": service.startup_type.value,
-                            "pid": service.pid,
-                        }
-                    )
+                    logs.append(log_entry)
+                    total_events += 1
+
+                    if len(logs) >= limit:
+                        break
 
             return {
                 "success": True,
-                "count": len(filtered_services),
-                "services": filtered_services,
-                "filters": {
-                    "status": status_filter,
-                    "startup_type": startup_type_filter,
-                    "search": search_term,
-                },
-            }
-
-        except Exception as e:
-            return {
-                "success": False,
-                "error": f"Error listing services: {str(e)}",
-                "count": 0,
-                "services": [],
-            }
-
-
-@tool(
-    name="get_service",
-    description="Get detailed information about a specific Windows service",
-    category=ToolCategory.SYSTEM,
-    parameters=[
-        ToolParameter(
-            name="service_name",
-            type=str,
-            description="Name of the service to get information about",
-            required=True,
-        )
-    ],
-    return_type=Dict,
-    return_description="Dictionary containing detailed information about the service",
-)
-class GetServiceTool(BaseTool):
-    """Tool for getting detailed information about a Windows service."""
-
-    async def execute(self, **kwargs) -> Dict:
-        """Get information about a specific Windows service."""
-        service_name = kwargs.get("service_name")
-        if not service_name:
-            return {"success": False, "error": "Service name is required"}
-
-        try:
-            service = await asyncio.get_event_loop().run_in_executor(
-                None, ServiceManager.get_service, service_name
-            )
-
-            if not service:
-                return {"success": False, "error": f"Service '{service_name}' not found"}
-
-            return {"success": True, "service": service.to_dict()}
-
-        except Exception as e:
-            return {
-                "success": False,
-                "error": f"Error getting service '{service_name}': {str(e)}",
+                "count": len(logs),
+                "total_events": total_events,
                 "service_name": service_name,
+                "log_type": log_type,
+                "logs": logs,
             }
 
+        finally:
+            win32evtlog.CloseEventLog(hand)
 
-@tool(
-    name="start_service",
-    description="Start a Windows service",
-    category=ToolCategory.SYSTEM,
-    parameters=[
-        ToolParameter(
-            name="service_name", type=str, description="Name of the service to start", required=True
-        ),
-        ToolParameter(
-            name="args",
-            type=list,
-            description="Optional arguments to pass to the service",
-            default=[],
-            required=False,
-        ),
-        ToolParameter(
-            name="timeout",
-            type=int,
-            description="Maximum time to wait for the service to start (in seconds)",
-            default=30,
-            required=False,
-        ),
-    ],
-    return_type=Dict,
-    return_description="Dictionary containing the result of the start operation",
-)
-class StartServiceTool(BaseTool):
-    """Tool for starting a Windows service."""
-
-    async def execute(self, **kwargs) -> Dict:
-        """Start a Windows service."""
-        service_name = kwargs.get("service_name")
-        args = kwargs.get("args", [])
-        timeout = kwargs.get("timeout", 30)
-
-        if not service_name:
-            return {"success": False, "error": "Service name is required"}
-
-        try:
-            return await asyncio.get_event_loop().run_in_executor(
-                None, ServiceManager.start_service, service_name, args, timeout
-            )
-        except Exception as e:
-            return {
-                "success": False,
-                "error": f"Error starting service '{service_name}': {str(e)}",
-                "service_name": service_name,
-            }
-
-
-@tool(
-    name="stop_service",
-    description="Stop a Windows service",
-    category=ToolCategory.SYSTEM,
-    parameters=[
-        ToolParameter(
-            name="service_name", type=str, description="Name of the service to stop", required=True
-        ),
-        ToolParameter(
-            name="timeout",
-            type=int,
-            description="Maximum time to wait for the service to stop (in seconds)",
-            default=30,
-            required=False,
-        ),
-    ],
-    return_type=Dict,
-    return_description="Dictionary containing the result of the stop operation",
-)
-class StopServiceTool(BaseTool):
-    """Tool for stopping a Windows service."""
-
-    async def execute(self, **kwargs) -> Dict:
-        """Stop a Windows service."""
-        service_name = kwargs.get("service_name")
-        timeout = kwargs.get("timeout", 30)
-
-        if not service_name:
-            return {"success": False, "error": "Service name is required"}
-
-        try:
-            return await asyncio.get_event_loop().run_in_executor(
-                None, ServiceManager.stop_service, service_name, timeout
-            )
-        except Exception as e:
-            return {
-                "success": False,
-                "error": f"Error stopping service '{service_name}': {str(e)}",
-                "service_name": service_name,
-            }
-
-
-@tool(
-    name="restart_service",
-    description="Restart a Windows service",
-    category=ToolCategory.SYSTEM,
-    parameters=[
-        ToolParameter(
-            name="service_name",
-            type=str,
-            description="Name of the service to restart",
-            required=True,
-        ),
-        ToolParameter(
-            name="timeout",
-            type=int,
-            description="Maximum time to wait for the service to restart (in seconds)",
-            default=60,
-            required=False,
-        ),
-    ],
-    return_type=Dict,
-    return_description="Dictionary containing the result of the restart operation",
-)
-class RestartServiceTool(BaseTool):
-    """Tool for restarting a Windows service."""
-
-    async def execute(self, **kwargs) -> Dict:
-        """Restart a Windows service."""
-        service_name = kwargs.get("service_name")
-        timeout = kwargs.get("timeout", 60)
-
-        if not service_name:
-            return {"success": False, "error": "Service name is required"}
-
-        try:
-            return await asyncio.get_event_loop().run_in_executor(
-                None, ServiceManager.restart_service, service_name, timeout
-            )
-        except Exception as e:
-            return {
-                "success": False,
-                "error": f"Error restarting service '{service_name}': {str(e)}",
-                "service_name": service_name,
-            }
-
-
-@tool(
-    name="set_service_startup_type",
-    description="Set the startup type for a Windows service",
-    category=ToolCategory.SYSTEM,
-    parameters=[
-        ToolParameter(
-            name="service_name", type=str, description="Name of the service", required=True
-        ),
-        ToolParameter(
-            name="startup_type",
-            type=str,
-            description="Desired startup type (automatic, manual, disabled, boot, system)",
-            required=True,
-            choices=[t.value.lower() for t in ServiceStartupType],
-        ),
-    ],
-    return_type=Dict,
-    return_description="Dictionary containing the result of the operation",
-)
-class SetServiceStartupTypeTool(BaseTool):
-    """Tool for setting the startup type of a Windows service."""
-
-    async def execute(self, **kwargs) -> Dict:
-        """Set the startup type for a Windows service."""
-        service_name = kwargs.get("service_name")
-        startup_type = kwargs.get("startup_type")
-
-        if not service_name:
-            return {"success": False, "error": "Service name is required"}
-
-        if not startup_type:
-            return {"success": False, "error": "Startup type is required"}
-
-        try:
-            return await asyncio.get_event_loop().run_in_executor(
-                None, ServiceManager.set_startup_type, service_name, startup_type
-            )
-        except Exception as e:
-            return {
-                "success": False,
-                "error": f"Error setting startup type for service '{service_name}': {str(e)}",
-                "service_name": service_name,
-                "startup_type": startup_type,
-            }
-
-
-@tool(
-    name="get_service_logs",
-    description="Get event logs for a Windows service",
-    category=ToolCategory.SYSTEM,
-    parameters=[
-        ToolParameter(
-            name="service_name",
-            type=str,
-            description="Name of the service to get logs for",
-            required=True,
-        ),
-        ToolParameter(
-            name="log_type",
-            type=str,
-            description="Type of logs to retrieve (system, application, security, setup, forwardedevents, or application and services logs path)",
-            default="system",
-            required=False,
-        ),
-        ToolParameter(
-            name="source",
-            type=str,
-            description="Event source to filter by (defaults to service name if not specified)",
-            default="",
-            required=False,
-        ),
-        ToolParameter(
-            name="last",
-            type=str,
-            description="Get logs from the last X minutes/hours/days (e.g., '10m', '2h', '1d')",
-            default="1h",
-            required=False,
-        ),
-        ToolParameter(
-            name="limit",
-            type=int,
-            description="Maximum number of log entries to return",
-            default=50,
-            required=False,
-        ),
-        ToolParameter(
-            name="event_level",
-            type=str,
-            description="Filter by event level (all, critical, error, warning, information, verbose)",
-            default="all",
-            required=False,
-            choices=["all", "critical", "error", "warning", "information", "verbose"],
-        ),
-    ],
-    return_type=Dict,
-    return_description="Dictionary containing the service logs",
-)
-class GetServiceLogsTool(BaseTool):
-    """Tool for retrieving Windows event logs for a service."""
-
-    async def execute(self, **kwargs) -> Dict:
-        """Get event logs for a Windows service."""
-        import re
-        from datetime import timedelta
-
-        import win32con
-        import win32evtlog
-
-        service_name = kwargs.get("service_name")
-        log_type = kwargs.get("log_type", "system")
-        source = kwargs.get("source", service_name)
-        last = kwargs.get("last", "1h")
-        limit = kwargs.get("limit", 50)
-        event_level = kwargs.get("event_level", "all").lower()
-
-        if not service_name:
-            return {"success": False, "error": "Service name is required"}
-
-        # Map event level to Windows event levels
-
-        try:
-            # Calculate time filter
-            now = datetime.now()
-            time_ago = now
-
-            # Parse time string (e.g., '10m', '2h', '1d')
-            time_match = re.match(r"^(\d+)([mhd])$", last.lower())
-            if time_match:
-                num = int(time_match.group(1))
-                unit = time_match.group(2)
-
-                if unit == "m":
-                    time_ago = now - timedelta(minutes=num)
-                elif unit == "h":
-                    time_ago = now - timedelta(hours=num)
-                elif unit == "d":
-                    time_ago = now - timedelta(days=num)
-
-            # Time filter is handled by comparing timestamps below
-
-            # Open the event log
-            try:
-                hand = win32evtlog.OpenEventLog(None, log_type)
-            except Exception:
-                # Try with Application log if the specified log type fails
-                try:
-                    hand = win32evtlog.OpenEventLog(None, "Application")
-                except Exception as e:
-                    return {
-                        "success": False,
-                        "error": f"Could not open event log: {str(e)}",
-                        "service_name": service_name,
-                        "log_type": log_type,
-                    }
-
-            # Set up flags for reading the log
-            flags = win32evtlog.EVENTLOG_BACKWARDS_READ | win32evtlog.EVENTLOG_SEQUENTIAL_READ
-
-            # Prepare results
-            logs = []
-            total_events = 0
-
-            try:
-                while len(logs) < limit:
-                    # Read events in chunks
-                    events = win32evtlog.ReadEventLog(hand, flags, 0)
-                    if not events:
-                        break
-
-                    for event in events:
-                        # Filter by time
-                        try:
-                            if hasattr(event.TimeGenerated, "timestamp"):
-                                if event.TimeGenerated.timestamp() < time_ago.timestamp():
-                                    continue
-                            else:
-                                # Fallback for older pywin32 versions
-                                event_time = event.TimeGenerated
-                                if event_time < time_ago:
-                                    continue
-                        except Exception:
-                            # If time comparison fails, include the event
-                            pass
-
-                        # Filter by source if specified
-                        event_source = getattr(event, "SourceName", "")
-                        # Also check if service name appears in message
-                        if source:
-                            source_lower = source.lower()
-                            if event_source.lower() != source_lower:
-                                # Check if service name is in the message
-                                message_lower = getattr(event, "Message", "").lower()
-                                if source_lower not in message_lower:
-                                    continue
-
-                        # Filter by level if specified
-                        if event_level != "all":
-                            if (
-                                event_level == "critical"
-                                and event.EventType != win32con.EVENTLOG_ERROR_TYPE
-                            ):
-                                continue
-                            if (
-                                event_level == "error"
-                                and event.EventType != win32con.EVENTLOG_ERROR_TYPE
-                            ):
-                                continue
-                            if (
-                                event_level == "warning"
-                                and event.EventType != win32con.EVENTLOG_WARNING_TYPE
-                            ):
-                                continue
-                            if (
-                                event_level == "information"
-                                and event.EventType != win32con.EVENTLOG_INFORMATION_TYPE
-                            ):
-                                continue
-                            if event_level == "verbose" and event.EventType not in [
-                                win32con.EVENTLOG_AUDIT_SUCCESS,
-                                win32con.EVENTLOG_AUDIT_FAILURE,
-                            ]:
-                                continue
-
-                        # Format the log entry
-                        log_entry = {
-                            "timestamp": event.TimeGenerated.isoformat(),
-                            "source": event_source,
-                            "event_id": event.EventID & 0xFFFF,  # Lower 16 bits
-                            "event_type": self._get_event_type(event.EventType),
-                            "computer": event.ComputerName,
-                            "message": self._get_event_message(event),
-                            "data": event.StringInserts,
-                        }
-
-                        logs.append(log_entry)
-                        total_events += 1
-
-                        if len(logs) >= limit:
-                            break
-
-                return {
-                    "success": True,
-                    "count": len(logs),
-                    "total_events": total_events,
-                    "service_name": service_name,
-                    "log_type": log_type,
-                    "logs": logs,
-                }
-
-            finally:
-                win32evtlog.CloseEventLog(hand)
-
-        except Exception as e:
-            return {
-                "success": False,
-                "error": f"Error retrieving logs for service '{service_name}': {str(e)}",
-                "service_name": service_name,
-            }
-
-    def _get_event_type(self, event_type: int) -> str:
-        """Convert Windows event type to string."""
-        event_types = {
-            0x0001: "Error",
-            0x0010: "Audit Failure",
-            0x0008: "Audit Success",
-            0x0004: "Information",
-            0x0002: "Warning",
+    except Exception as e:
+        return {
+            "success": False,
+            "error": f"Error retrieving logs for service '{service_name}': {str(e)}",
+            "service_name": service_name,
         }
-        return event_types.get(event_type, f"Unknown ({event_type})")
 
-    def _get_event_message(self, event) -> str:
-        """Get the message from a Windows event."""
-        try:
-            # Try to get the formatted message
-            if hasattr(event, "StringInserts") and event.StringInserts:
-                return " ".join(str(x) for x in event.StringInserts if x)
-            return "No message available"
-        except Exception:
-            return "Error retrieving message"
+
+def _get_event_type(event_type: int) -> str:
+    """Convert Windows event type to string."""
+    event_types = {
+        0x0001: "Error",
+        0x0010: "Audit Failure",
+        0x0008: "Audit Success",
+        0x0004: "Information",
+        0x0002: "Warning",
+    }
+    return event_types.get(event_type, f"Unknown ({event_type})")
+
+
+def _get_event_message(event) -> str:
+    """Get the message from a Windows event."""
+    try:
+        # Try to get the formatted message
+        if hasattr(event, "StringInserts") and event.StringInserts:
+            return " ".join(str(x) for x in event.StringInserts if x)
+        return "No message available"
+    except Exception:
+        return "Error retrieving message"

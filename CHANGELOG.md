@@ -8,6 +8,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Live integration tests** - Real pipe connection and real search tests
+  - `fastsearch_mcp.live_tests.run_live_tests()`: service_process, pipe_connect, get_service_info, search_via_pipe
+  - `tests/test_live_pipe.py`: pytest integration tests (marked `@pytest.mark.service`, Windows-only)
+  - POST `/api/tests/run` with optional body `{ pattern, directory, max_results }` for webapp
+- **Tests page in webapp** - Live testing from the dashboard at `/tests`
+  - Configurable pattern, directory, max_results; run button; pass/fail list with duration and details
+  - Sidebar link "Tests" (FlaskConical icon)
+- **Path normalization for search** - User paths like `C:` are normalized to `C:\\` before sending to the C++ service to avoid empty results from format mismatch
+
+### Fixed
+- **Server import crash** — Removed an invalid line in `service_client.py` (`get_pipe_name() = ...`) that caused `SyntaxError` on import and blocked uvicorn / `python -m fastsearch_mcp`. The pipe path is defined only in `pipe_client.py` (`DEFAULT_PIPE_NAME`, `get_pipe_name()`); `service_client` imports that.
+- **Pipe connection failures no longer reported as success** - When the named pipe fails to connect or Windows API is unavailable, the pipe client now returns an `error` key so the service client raises and the UI shows a clear error instead of "success, 0 results"
+
+### Changed
+- **Search error handling** - Pipe disconnect and non-Windows cases now propagate as errors (RuntimeError) with explicit messages
 - **SOTA PowerShell error handling** - Comprehensive error handling standards for all scripts
   - Individual error handling per operation (graceful degradation)
   - Retry logic with exponential backoff for transient failures
@@ -29,8 +44,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Improved error messages** - Clear, user-friendly error messages with step-by-step recovery instructions
   - Service-required flags in search responses
   - Tool suggestions for troubleshooting (`service_status`, `start_service`, etc.)
-
-### Changed
 - **Service checks performance** - Reduced from 5 seconds to <1ms overhead per search
 - **Error handling** - More explicit and actionable error messages
 - **Search response format** - Added `service_required` flag and `suggestion` field
@@ -43,12 +56,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Removed `fastsearch.search_basic` tool registration
 - **Python fallback references** - Updated all documentation to reflect direct MFT access only
 - **Outdated test files** - Removed broken tests referencing deprecated `ipc` module
-
-### Fixed
-- **Search functionality** - All search tools now fully operational
-  - File searches working across different patterns, drives, and directories
-  - Service integration complete - FastSearch Windows service running and responding
-  - Direct NTFS MFT access verified and working
 
 ## [0.4.0] - 2025-11-15
 

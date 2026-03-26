@@ -136,7 +136,7 @@ Monitor system resources
 
 **Check:**
 1. C++ service is running: `Get-Service -Name FastSearchMCP`
-2. Service logs: `python read_service_logs.py`
+2. Service logs: `python tests/read_service_logs.py`
 3. Claude Desktop logs for errors
 
 ### File Search Slow

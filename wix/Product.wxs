@@ -127,11 +127,11 @@
         <File Id="FixServicePs1" 
               Source="$(var.SolutionDir)fix-service.ps1" />
         <File Id="TestServicePs1" 
-              Source="$(var.SolutionDir)test-service.ps1" />
+              Source="$(var.SolutionDir)tests\scripts\test-service.ps1" />
         <File Id="TestServiceStartupPs1" 
-              Source="$(var.SolutionDir)test-service-startup.ps1" />
+              Source="$(var.SolutionDir)tests\scripts\test-service-startup.ps1" />
         <File Id="TestWindowsServicePs1" 
-              Source="$(var.SolutionDir)test-windows-service.ps1" />
+              Source="$(var.SolutionDir)tests\scripts\test-windows-service.ps1" />
       </Component>
       
       <!-- Service Installation -->

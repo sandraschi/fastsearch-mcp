@@ -128,7 +128,7 @@ Key checkpoints that log `Information` or `Error` events:
 4. Volume handle acquisition
 5. Search completion or failure
 
-Logs are read via `read-service-logs.ps1` or the Windows Event Viewer (`Applications and Services Logs/FastSearchMCP`).
+Logs are read via `scripts/read-service-logs.ps1` or the Windows Event Viewer (`Applications and Services Logs/FastSearchMCP`).
 
 ---
 

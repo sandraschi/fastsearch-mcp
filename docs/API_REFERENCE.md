@@ -676,6 +676,119 @@ curl -X POST http://localhost:3000/search \
 3. **Set reasonable limits** - `max_results: 100-1000`
 4. **Exclude system files** - for storage analysis
 
+### **Tool 4: search_result_export**
+
+**Description**: Export search results to various formats (CSV, JSON, Markdown, TSV, PDF, Word, HTML, EPUB, etc.)
+
+#### **Input Schema**
+
+```json
+{
+  "name": "search_result_export",
+  "description": "Export search results to various formats for external analysis",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "results": {
+        "type": "array",
+        "description": "List of search result dictionaries from fastsearch_search or fastsearch_search_advanced",
+        "items": {
+          "type": "object"
+        }
+      },
+      "export_format": {
+        "type": "string",
+        "description": "Export format. Standard: csv, json, markdown, tsv. Pandoc: pdf, docx, html, epub, odt, rtf, latex",
+        "default": "csv",
+        "enum": ["csv", "json", "markdown", "tsv", "pdf", "docx", "html", "epub", "odt", "rtf", "latex"]
+      },
+      "output_path": {
+        "type": "string",
+        "description": "Path where exported file should be saved. Required for Pandoc formats.",
+        "examples": ["C:\\temp\\results.csv", "D:\\exports\\report.pdf"]
+      },
+      "include_columns": {
+        "type": "array",
+        "items": {"type": "string"},
+        "description": "List of column names to include. If None, includes all available columns."
+      },
+      "exclude_columns": {
+        "type": "array",
+        "items": {"type": "string"},
+        "description": "List of column names to exclude from export"
+      },
+      "include_metadata": {
+        "type": "boolean",
+        "description": "Include search metadata (query, timestamp, result count)",
+        "default": true
+      },
+      "search_query": {
+        "type": "string",
+        "description": "Original search query for metadata header"
+      }
+    },
+    "required": ["results"]
+  }
+}
+```
+
+#### **Example Requests**
+
+**Export to CSV**:
+```json
+{
+  "name": "search_result_export",
+  "arguments": {
+    "results": [...],
+    "export_format": "csv",
+    "output_path": "C:\\temp\\results.csv",
+    "search_query": "*.log"
+  }
+}
+```
+
+**Export to PDF (requires Pandoc)**:
+```json
+{
+  "name": "search_result_export",
+  "arguments": {
+    "results": [...],
+    "export_format": "pdf",
+    "output_path": "C:\\temp\\report.pdf"
+  }
+}
+```
+
+**Export to JSON (return content)**:
+```json
+{
+  "name": "search_result_export",
+  "arguments": {
+    "results": [...],
+    "export_format": "json",
+    "include_columns": ["path", "size"]
+  }
+}
+```
+
+#### **Response Format**
+
+```json
+{
+  "success": true,
+  "format": "csv",
+  "output_path": "C:\\temp\\results.csv",
+  "row_count": 150,
+  "columns": ["path", "size", "modified", "size_formatted", "modified_formatted"],
+  "pandoc_used": false
+}
+```
+
+**Note**: Pandoc formats (PDF, DOCX, HTML, EPUB, etc.) require:
+- Pandoc installed on the system (https://pandoc.org/installing.html)
+- `output_path` parameter (cannot return content string)
+- For PDF: LaTeX distribution may be required
+
 ### **Troubleshooting Checklist**
 
 - ✅ Run as Administrator for NTFS access
@@ -683,5 +796,7 @@ curl -X POST http://localhost:3000/search \
 - ✅ Verify pattern syntax (glob format)
 - ✅ Monitor memory usage with large result sets
 - ✅ Check logs with `RUST_LOG=debug`
+- ✅ For Pandoc formats: Ensure Pandoc is installed and accessible
+- ✅ For PDF export: Ensure LaTeX distribution is installed (for pdflatex)
 
 **FastSearch MCP: Professional file search at your fingertips** 🚀

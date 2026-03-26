@@ -5,15 +5,84 @@ This module provides individual wrapper functions for each tool to ensure
 FastMCP compatibility by avoiding **kwargs signatures.
 """
 
+from fastsearch_mcp.tools.base import _sanitize_for_json
+
 
 def create_help_wrapper(tool_instance):
     """Create a wrapper for the help tool."""
 
     async def help_wrapper(tool_name: str = None):
         """Get help for available tools"""
-        return await tool_instance.execute(tool_name=tool_name)
+        result = await tool_instance.execute(tool_name=tool_name)
+        return _sanitize_for_json(result)
 
     return help_wrapper
+
+
+def create_file_name_search_wrapper(tool_instance):
+    """Create a wrapper for the simple file name search tool."""
+
+    async def file_name_search_wrapper(
+        pattern: str, path: str = "C:\\", search_all: bool = False, max_results: int = 100
+    ):
+        """Search for files by name pattern using direct NTFS MFT access.
+        Can search all NTFS drives."""
+        result = await tool_instance.execute(
+            pattern=pattern, path=path, search_all=search_all, max_results=max_results
+        )
+        return _sanitize_for_json(result)
+
+    return file_name_search_wrapper
+
+
+def create_advanced_search_wrapper(tool_instance):
+    """Create a wrapper for the advanced search tool."""
+
+    async def advanced_search_wrapper(
+        pattern: str,
+        path: str = "C:\\",
+        search_all: bool = False,
+        max_results: int = 100,
+        min_size: int = None,
+        max_size: int = None,
+        created_after: str = None,
+        created_before: str = None,
+        modified_after: str = None,
+        modified_before: str = None,
+        accessed_after: str = None,
+        accessed_before: str = None,
+        include_directories: bool = False,
+        include_readonly: bool = True,
+        include_hidden: bool = False,
+        include_system: bool = False,
+        include_compressed: bool = True,
+        include_encrypted: bool = True,
+    ):
+        """Advanced file search using all available NTFS MFT attributes
+        with comprehensive filtering."""
+        result = await tool_instance.execute(
+            pattern=pattern,
+            path=path,
+            search_all=search_all,
+            max_results=max_results,
+            min_size=min_size,
+            max_size=max_size,
+            created_after=created_after,
+            created_before=created_before,
+            modified_after=modified_after,
+            modified_before=modified_before,
+            accessed_after=accessed_after,
+            accessed_before=accessed_before,
+            include_directories=include_directories,
+            include_readonly=include_readonly,
+            include_hidden=include_hidden,
+            include_system=include_system,
+            include_compressed=include_compressed,
+            include_encrypted=include_encrypted,
+        )
+        return _sanitize_for_json(result)
+
+    return advanced_search_wrapper
 
 
 def create_file_search_wrapper(tool_instance):
@@ -44,7 +113,7 @@ def create_file_search_wrapper(tool_instance):
         owner: str = None,
     ):
         """Search for text patterns in files with advanced filtering"""
-        return await tool_instance.execute(
+        result = await tool_instance.execute(
             search_pattern=search_pattern,
             search_dir=search_dir,
             file_pattern=file_pattern,
@@ -68,6 +137,7 @@ def create_file_search_wrapper(tool_instance):
             file_attributes=file_attributes,
             owner=owner,
         )
+        return _sanitize_for_json(result)
 
     return file_search_wrapper
 
@@ -84,7 +154,7 @@ def create_disk_analyzer_wrapper(tool_instance):
         min_file_size_mb: int = 10,
     ):
         """Analyze disk usage and find large files and directories"""
-        return await tool_instance.execute(
+        result = await tool_instance.execute(
             path=path,
             max_depth=max_depth,
             include_partitions=include_partitions,
@@ -92,8 +162,22 @@ def create_disk_analyzer_wrapper(tool_instance):
             large_file_limit=large_file_limit,
             min_file_size_mb=min_file_size_mb,
         )
+        return _sanitize_for_json(result)
 
     return disk_analyzer_wrapper
+
+
+def create_drive_inventory_wrapper(tool_instance):
+    """Create a wrapper for the drive inventory tool."""
+
+    async def drive_inventory_wrapper(filesystem_type: str = "", include_unmounted: bool = False):
+        """List all connected drives and partitions with their basic information"""
+        result = await tool_instance.execute(
+            filesystem_type=filesystem_type, include_unmounted=include_unmounted
+        )
+        return _sanitize_for_json(result)
+
+    return drive_inventory_wrapper
 
 
 def create_duplicate_finder_wrapper(tool_instance):
@@ -111,7 +195,7 @@ def create_duplicate_finder_wrapper(tool_instance):
         max_results: int = 100,
     ):
         """Find duplicate files based on content hashing"""
-        return await tool_instance.execute(
+        result = await tool_instance.execute(
             search_dir=search_dir,
             min_size=min_size,
             max_size=max_size,
@@ -122,6 +206,7 @@ def create_duplicate_finder_wrapper(tool_instance):
             min_duplicate_group=min_duplicate_group,
             max_results=max_results,
         )
+        return _sanitize_for_json(result)
 
     return duplicate_finder_wrapper
 
@@ -140,7 +225,7 @@ def create_integrity_checker_wrapper(tool_instance):
         max_file_size: int = 100,
     ):
         """Check the integrity of files by verifying their checksums"""
-        return await tool_instance.execute(
+        result = await tool_instance.execute(
             paths=paths,
             database=database,
             algorithm=algorithm,
@@ -150,6 +235,7 @@ def create_integrity_checker_wrapper(tool_instance):
             exclude_dirs=exclude_dirs,
             max_file_size=max_file_size,
         )
+        return _sanitize_for_json(result)
 
     return integrity_checker_wrapper
 
@@ -170,7 +256,7 @@ def create_resource_monitor_wrapper(tool_instance):
         callback_url: str = None,
     ):
         """Monitor system resources including CPU, memory, disk, and network usage"""
-        return await tool_instance.execute(
+        result = await tool_instance.execute(
             interval=interval,
             duration=duration,
             include_processes=include_processes,
@@ -182,6 +268,7 @@ def create_resource_monitor_wrapper(tool_instance):
             include_system=include_system,
             callback_url=callback_url,
         )
+        return _sanitize_for_json(result)
 
     return resource_monitor_wrapper
 
@@ -198,9 +285,10 @@ def create_process_info_wrapper(tool_instance):
         sort_desc: bool = True,
     ):
         """Get detailed information about running processes"""
-        return await tool_instance.execute(
+        result = await tool_instance.execute(
             pids=pids, name=name, user=user, limit=limit, sort_by=sort_by, sort_desc=sort_desc
         )
+        return _sanitize_for_json(result)
 
     return process_info_wrapper
 
@@ -215,9 +303,10 @@ def create_list_services_wrapper(tool_instance):
         include_details: bool = True,
     ):
         """List all Windows services with their status and details"""
-        return await tool_instance.execute(
+        result = await tool_instance.execute(
             status=status, startup_type=startup_type, search=search, include_details=include_details
         )
+        return _sanitize_for_json(result)
 
     return list_services_wrapper
 
@@ -227,7 +316,8 @@ def create_get_service_wrapper(tool_instance):
 
     async def get_service_wrapper(service_name: str):
         """Get detailed information about a specific Windows service"""
-        return await tool_instance.execute(service_name=service_name)
+        result = await tool_instance.execute(service_name=service_name)
+        return _sanitize_for_json(result)
 
     return get_service_wrapper
 
@@ -237,7 +327,8 @@ def create_start_service_wrapper(tool_instance):
 
     async def start_service_wrapper(service_name: str, args: list = None, timeout: int = 30):
         """Start a Windows service"""
-        return await tool_instance.execute(service_name=service_name, args=args, timeout=timeout)
+        result = await tool_instance.execute(service_name=service_name, args=args, timeout=timeout)
+        return _sanitize_for_json(result)
 
     return start_service_wrapper
 
@@ -247,7 +338,8 @@ def create_stop_service_wrapper(tool_instance):
 
     async def stop_service_wrapper(service_name: str, timeout: int = 30):
         """Stop a Windows service"""
-        return await tool_instance.execute(service_name=service_name, timeout=timeout)
+        result = await tool_instance.execute(service_name=service_name, timeout=timeout)
+        return _sanitize_for_json(result)
 
     return stop_service_wrapper
 
@@ -257,7 +349,8 @@ def create_restart_service_wrapper(tool_instance):
 
     async def restart_service_wrapper(service_name: str, timeout: int = 60):
         """Restart a Windows service"""
-        return await tool_instance.execute(service_name=service_name, timeout=timeout)
+        result = await tool_instance.execute(service_name=service_name, timeout=timeout)
+        return _sanitize_for_json(result)
 
     return restart_service_wrapper
 
@@ -267,7 +360,8 @@ def create_set_startup_type_wrapper(tool_instance):
 
     async def set_startup_type_wrapper(service_name: str, startup_type: str):
         """Set the startup type for a Windows service"""
-        return await tool_instance.execute(service_name=service_name, startup_type=startup_type)
+        result = await tool_instance.execute(service_name=service_name, startup_type=startup_type)
+        return _sanitize_for_json(result)
 
     return set_startup_type_wrapper
 
@@ -284,7 +378,7 @@ def create_get_logs_wrapper(tool_instance):
         event_level: str = "all",
     ):
         """Get event logs for a Windows service"""
-        return await tool_instance.execute(
+        result = await tool_instance.execute(
             service_name=service_name,
             log_type=log_type,
             source=source,
@@ -292,6 +386,7 @@ def create_get_logs_wrapper(tool_instance):
             limit=limit,
             event_level=event_level,
         )
+        return _sanitize_for_json(result)
 
     return get_logs_wrapper
 
@@ -299,8 +394,11 @@ def create_get_logs_wrapper(tool_instance):
 # Mapping of tool names to their wrapper creators
 TOOL_WRAPPERS = {
     "help": create_help_wrapper,
+    "fastsearch.search": create_file_name_search_wrapper,  # Simple file name search
+    "fastsearch.search_advanced": create_advanced_search_wrapper,  # Advanced MFT search
     "file_content_search": create_file_search_wrapper,
     "analyze_disk_usage": create_disk_analyzer_wrapper,
+    "drive_inventory": create_drive_inventory_wrapper,
     "find_duplicate_files": create_duplicate_finder_wrapper,
     "check_file_integrity": create_integrity_checker_wrapper,
     "monitor_system_resources": create_resource_monitor_wrapper,

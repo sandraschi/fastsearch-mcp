@@ -9,7 +9,9 @@ Add this to your Claude Desktop MCP configuration file:
 - **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
 - **Linux**: `~/.config/Claude/claude_desktop_config.json`
 
-### Configuration Snippet
+### Configuration Snippet (Local Development)
+
+**For local development** (when using the repo source directly):
 
 ```json
 {
@@ -20,14 +22,17 @@ Add this to your Claude Desktop MCP configuration file:
         "-m",
         "fastsearch_mcp"
       ],
+      "cwd": "D:\\Dev\\repos\\fastsearch-mcp",
       "env": {
-        "PYTHONPATH": "${PWD}",
+        "PYTHONPATH": "D:\\Dev\\repos\\fastsearch-mcp\\src",
         "PYTHONUNBUFFERED": "1"
       }
     }
   }
 }
 ```
+
+**Note**: Replace `D:\\Dev\\repos\\fastsearch-mcp` with your actual repository path.
 
 ### Full Example (with other MCP servers)
 
@@ -41,7 +46,6 @@ Add this to your Claude Desktop MCP configuration file:
         "fastsearch_mcp"
       ],
       "env": {
-        "PYTHONPATH": "${PWD}",
         "PYTHONUNBUFFERED": "1"
       }
     },
@@ -66,7 +70,7 @@ Add this to your Claude Desktop MCP configuration file:
 
 1. Build the MCPB package:
    ```powershell
-   .\scripts\build-mcpb-package.ps1 -NoSign
+   .\mcpb\scripts\build-mcpb-package.ps1 -NoSign
    ```
 
 2. Install in Claude Desktop:
@@ -113,8 +117,14 @@ After configuration, you should see:
 ## Environment Variables
 
 The configuration includes:
-- `PYTHONPATH`: Ensures Python can find the fastsearch_mcp module
+- `cwd`: Working directory (your local repo path)
+- `PYTHONPATH`: Points to the `src/` directory in your local repo
 - `PYTHONUNBUFFERED`: Ensures real-time log output
+
+**Note**: 
+- **For local development**: Use the config above with your actual repo path
+- **For MCPB packages**: Claude Desktop handles configuration automatically (no manual config needed)
+- **For pip-installed packages**: Use `pip install -e .` and you can omit PYTHONPATH
 
 ## Related Documentation
 

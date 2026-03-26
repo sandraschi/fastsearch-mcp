@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Dict, List, Union
 
 from fastsearch_mcp.logging_config import get_logger
-from fastsearch_mcp.tools.base import BaseTool, ToolCategory, ToolParameter, tool
+from fastsearch_mcp.mcp_instance import mcp
 
 logger = get_logger(__name__)
 
@@ -45,56 +45,87 @@ class DiskUsage:
         return f"{size:.{decimal_places}f} {units[-1]}"
 
 
-def get_disk_usage(path: Union[str, Path], max_depth: int = 3) -> DiskUsage:
-    """Get disk usage information for a directory."""
+def get_disk_usage(
+    path: Union[str, Path], max_depth: int = 3, max_entries: int = 10000
+) -> DiskUsage:
+    """Get disk usage information for a directory with limits to prevent hangs."""
     path = Path(path).resolve()
     usage = DiskUsage(path=str(path), size=0)
+    entries_processed = 0
 
-    try:
-        for entry in os.scandir(path):
-            try:
-                if entry.is_symlink():
+    def scan_dir(current_path: Path, depth: int, max_d: int) -> DiskUsage:
+        nonlocal entries_processed
+        current_usage = DiskUsage(path=str(current_path), size=0)
+
+        if entries_processed >= max_entries or depth > max_d:
+            return current_usage
+
+        try:
+            for entry in os.scandir(current_path):
+                if entries_processed >= max_entries:
+                    break
+
+                try:
+                    if entry.is_symlink():
+                        continue
+
+                    if entry.is_file():
+                        current_usage.file_count += 1
+                        current_usage.size += entry.stat().st_size
+                        entries_processed += 1
+
+                    elif entry.is_dir():
+                        if depth < max_d:
+                            child_usage = scan_dir(entry.path, depth + 1, max_d)
+                            current_usage.dir_count += 1 + child_usage.dir_count
+                            current_usage.file_count += child_usage.file_count
+                            current_usage.size += child_usage.size
+                            if (
+                                len(current_usage.children) < 20
+                            ):  # Limit children to prevent huge responses
+                                current_usage.children.append(child_usage)
+                        else:
+                            current_usage.dir_count += 1
+                            # Estimate size using shutil.disk_usage for performance
+                            try:
+                                du = shutil.disk_usage(entry.path)
+                                current_usage.size += du.used
+                            except (OSError, PermissionError):
+                                pass
+                        entries_processed += 1
+
+                except (PermissionError, OSError) as e:
+                    logger.debug("Error accessing %s: %s", entry.path, e)
                     continue
 
-                if entry.is_file():
-                    usage.file_count += 1
-                    usage.size += entry.stat().st_size
+        except (PermissionError, OSError) as e:
+            logger.warning("Error scanning directory %s: %s", current_path, e)
 
-                elif entry.is_dir():
-                    if max_depth > 0:
-                        child_usage = get_disk_usage(entry.path, max_depth - 1)
-                        usage.dir_count += 1 + child_usage.dir_count
-                        usage.file_count += child_usage.file_count
-                        usage.size += child_usage.size
-                        usage.children.append(child_usage)
-                    else:
-                        # Just count the directory without recursing
-                        usage.dir_count += 1
-                        # Estimate size using shutil.disk_usage for performance
-                        try:
-                            du = shutil.disk_usage(entry.path)
-                            usage.size += du.used
-                        except (OSError, PermissionError):
-                            pass
+        return current_usage
 
-            except (PermissionError, OSError) as e:
-                logger.debug("Error accessing %s: %s", entry.path, e)
-                continue
-
-    except (PermissionError, OSError) as e:
-        logger.warning("Error scanning directory %s: %s", path, e)
-
+    usage = scan_dir(path, 0, max_depth)
+    usage.path = str(path)
     return usage
 
 
-def get_largest_files(path: Union[str, Path], limit: int = 50) -> List[Dict]:
-    """Get the largest files in a directory."""
+def get_largest_files(
+    path: Union[str, Path], limit: int = 50, max_files_to_scan: int = 10000
+) -> List[Dict]:
+    """Get the largest files in a directory with early termination."""
     path = Path(path).resolve()
     largest = []
+    files_scanned = 0
 
-    def scan_dir(directory: Path):
+    def scan_dir(directory: Path, depth: int = 0, max_depth: int = 5):
+        nonlocal files_scanned
+        if depth > max_depth or files_scanned >= max_files_to_scan:
+            return
+
         try:
             for entry in directory.iterdir():
+                if files_scanned >= max_files_to_scan:
+                    break
+
                 try:
                     if entry.is_symlink():
                         continue
@@ -102,13 +133,14 @@ def get_largest_files(path: Union[str, Path], limit: int = 50) -> List[Dict]:
                     if entry.is_file():
                         stat = entry.stat()
                         largest.append((entry, stat.st_size))
+                        files_scanned += 1
                         # Keep only the largest files
                         largest.sort(key=lambda x: x[1], reverse=True)
                         if len(largest) > limit * 2:  # Keep some extra to avoid frequent resizing
                             largest.pop()
 
-                    elif entry.is_dir():
-                        scan_dir(entry)
+                    elif entry.is_dir() and depth < max_depth:
+                        scan_dir(entry, depth + 1, max_depth)
 
                 except (PermissionError, OSError):
                     continue
@@ -161,102 +193,82 @@ def get_disk_partitions() -> List[Dict]:
     return partitions
 
 
-@tool(
-    name="analyze_disk_usage",
-    description="Analyze disk usage and find large files and directories",
-    category=ToolCategory.SYSTEM,
-    parameters=[
-        ToolParameter(
-            name="path",
-            type=str,
-            description="Path to analyze (default: root of all mounted filesystems)",
-            required=False,
-            default="/",
-        ),
-        ToolParameter(
-            name="max_depth",
-            type=int,
-            description="Maximum depth to analyze (0 for unlimited)",
-            default=3,
-            min=0,
-            max=10,
-        ),
-        ToolParameter(
-            name="include_partitions",
-            type=bool,
-            description="Include disk partition information",
-            default=True,
-        ),
-        ToolParameter(
-            name="find_large_files",
-            type=bool,
-            description="Find largest files in the directory",
-            default=True,
-        ),
-        ToolParameter(
-            name="large_file_limit",
-            type=int,
-            description="Number of largest files to find",
-            default=50,
-            min=1,
-            max=1000,
-        ),
-        ToolParameter(
-            name="min_file_size_mb",
-            type=int,
-            description="Minimum file size to consider (in MB)",
-            default=10,
-        ),
-    ],
-    return_type=Dict,
-    return_description="Disk usage analysis results",
-)
-class DiskAnalyzerTool(BaseTool):
-    """Tool for analyzing disk usage and finding large files."""
+@mcp.tool
+async def analyze_disk_usage(
+    path: str = "C:\\",
+    max_depth: int = 3,
+    include_partitions: bool = True,
+    find_large_files: bool = True,
+    large_file_limit: int = 50,
+    min_file_size_mb: int = 10,
+) -> Dict:
+    """Analyze disk usage and find large files and directories.
 
-    async def execute(self, **kwargs) -> Dict:
-        """Execute the disk analysis."""
-        return await asyncio.get_event_loop().run_in_executor(None, self._analyze_sync, **kwargs)
+    Provides comprehensive disk usage analysis including partition information,
+    directory sizes, and identification of large files.
 
-    def _analyze_sync(
-        self,
-        path: str = "/",
-        max_depth: int = 3,
-        include_partitions: bool = True,
-        find_large_files: bool = True,
-        large_file_limit: int = 50,
-        min_file_size_mb: int = 10,
-        **kwargs,
-    ) -> Dict:
-        """Synchronous implementation of disk analysis."""
-        result = {"path": path, "status": "completed"}
+    Args:
+        path: Path to analyze (default: C:\\) or root of all mounted filesystems
+        max_depth: Maximum depth to analyze (0 for unlimited)
+        include_partitions: Include disk partition information
+        find_large_files: Find largest files in the directory
+        large_file_limit: Number of largest files to find
+        min_file_size_mb: Minimum file size to consider (in MB)
 
-        # Get partition information
-        if include_partitions:
-            try:
-                result["partitions"] = get_disk_partitions()
-            except Exception as e:
-                logger.error("Error getting partition info: %s", e)
-                result["partitions"] = []
+    Returns:
+        Disk usage analysis results
+    """
+    return await asyncio.to_thread(
+        _analyze_disk_usage_sync,
+        path,
+        max_depth,
+        include_partitions,
+        find_large_files,
+        large_file_limit,
+        min_file_size_mb,
+    )
 
-        # Analyze disk usage
+
+def _analyze_disk_usage_sync(
+    path: str = "C:\\",
+    max_depth: int = 3,
+    include_partitions: bool = True,
+    find_large_files: bool = True,
+    large_file_limit: int = 50,
+    min_file_size_mb: int = 10,
+) -> Dict:
+    """Synchronous implementation of disk analysis."""
+    result = {"path": path, "status": "completed"}
+
+    # Get partition information
+    if include_partitions:
         try:
-            usage = get_disk_usage(path, max_depth)
-            result["disk_usage"] = usage.to_dict()
+            result["partitions"] = get_disk_partitions()
         except Exception as e:
-            logger.error("Error analyzing disk usage: %s", e)
-            result["error"] = f"Failed to analyze disk usage: {e}"
+            logger.error("Error getting partition info: %s", e)
+            result["partitions"] = []
 
-        # Find large files
-        if find_large_files:
-            try:
-                min_size = min_file_size_mb * 1024 * 1024
-                large_files = get_largest_files(path, large_file_limit)
-                result["large_files"] = [f for f in large_files if f["size"] >= min_size][
-                    :large_file_limit
-                ]
-            except Exception as e:
-                logger.error("Error finding large files: %s", e)
-                result["error"] = f"Failed to find large files: {e}"
+    # Analyze disk usage
+    try:
+        # Limit entries to prevent hangs on large directories
+        max_entries = 5000 if max_depth > 2 else 10000
+        usage = get_disk_usage(path, max_depth, max_entries=max_entries)
+        result["disk_usage"] = usage.to_dict()
+    except Exception as e:
+        logger.error("Error analyzing disk usage: %s", e)
+        result["error"] = f"Failed to analyze disk usage: {e}"
 
-        return result
+    # Find large files
+    if find_large_files:
+        try:
+            min_size = min_file_size_mb * 1024 * 1024
+            # Limit scanning to prevent hangs
+            large_files = get_largest_files(path, large_file_limit, max_files_to_scan=5000)
+            result["large_files"] = [f for f in large_files if f["size"] >= min_size][
+                :large_file_limit
+            ]
+        except Exception as e:
+            logger.error("Error finding large files: %s", e)
+            result["error"] = f"Failed to find large files: {e}"
+
+    return result

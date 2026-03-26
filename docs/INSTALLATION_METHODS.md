@@ -2,6 +2,8 @@
 
 FastSearch MCP supports **three installation methods** depending on your use case:
 
+> **Note**: See [`docs/MCPB_STATUS.md`](MCPB_STATUS.md) for detailed explanation of why MCPB format has limited adoption and how prompt templates can be replicated with other methods.
+
 ## 1. Local Installation (Development)
 
 **Use Case**: Development, contributing, custom builds
@@ -139,7 +141,9 @@ pip install fastsearch-mcp
 
 ## 3. MCPB Package (Claude Desktop Only)
 
-**Use Case**: Claude Desktop users
+**Use Case**: Claude Desktop users who want one-click installation
+
+> ⚠️ **Important**: See [`docs/MCPB_STATUS.md`](MCPB_STATUS.md) for detailed explanation of why MCPB format has limited adoption and how prompt templates can be replicated with other methods.
 
 ### Prerequisites
 
@@ -175,13 +179,17 @@ Start-Service FastSearchMCP
 
 **Option A: Drag & Drop (Easiest)**
 
+> ⚠️ **Note**: The "drag-and-drop into Claude Desktop settings UI" UX is unconventional and not intuitive. Consider using NPX installation (Method 2) instead, which works with Claude Desktop too and uses standard MCP configuration.
+
 1. Download `fastsearch-mcp-0.4.0.mcpb` from GitHub Releases
 2. Open Claude Desktop
-3. Drag and drop the `.mcpb` file into Claude Desktop
-4. Claude Desktop will:
+3. Navigate to Settings → Extensions
+4. Drag and drop the `.mcpb` file into the extensions panel
+5. Claude Desktop will:
    - Extract the package
    - Install Python dependencies from `requirements.txt`
    - Configure the MCP server
+   - Load prompt templates (system prompts, user guides, examples)
    - Connect to the service
 
 **Option B: MCPB CLI**
@@ -269,8 +277,103 @@ If the service is not available, FastSearch MCP will:
 3. Reinstall MCPB package
 4. Check Claude Desktop logs
 
+## Using Prompt Templates with Non-MCPB Installations
+
+MCPB packages include prompt templates (`prompts/system.md`, `prompts/user.md`, `prompts/examples.json`) that provide **structured usage scenarios** and example interactions. These templates are **automatically loaded** with MCPB, providing Claude with:
+
+- **System context**: Architecture, capabilities, constraints
+- **Usage scenarios**: Complete interaction patterns, not just parameter examples
+- **Example conversations**: Real conversation flows with expected responses
+
+### Why Prompt Templates Are Better Than Docstrings Alone
+
+While tool docstrings can replicate *some* functionality (parameter examples, basic usage), prompt templates provide:
+
+1. **Structured scenarios**: Complete usage patterns showing how tools work together
+2. **Example interactions**: Real conversation flows (`prompts/examples.json`)
+3. **Cross-tool relationships**: How tools complement each other
+4. **User guidance**: Step-by-step usage patterns (`prompts/user.md`)
+
+### Option 1: Reference Documentation
+
+The prompt templates are available in the repository at `prompts/`:
+- Read `prompts/system.md` to understand capabilities and architecture
+- Reference `prompts/user.md` for complete usage scenarios
+- Use `prompts/examples.json` as a reference for interaction patterns
+
+**Location**: `prompts/` directory in repository root  
+**Limitation**: Claude won't automatically load these - they're just documentation.
+
+### Option 2: Manual Claude Desktop Configuration
+
+For Claude Desktop users using standard MCP config (not MCPB), you can manually reference prompts:
+
+```json
+{
+  "mcpServers": {
+    "fastsearch-mcp": {
+      "command": "python",
+      "args": ["-m", "fastsearch_mcp"],
+      "env": {
+        "PYTHONPATH": "${PWD}/src"
+      },
+      "prompts": {
+        "system": "file:///path/to/prompts/system.md",
+        "user": "file:///path/to/prompts/user.md"
+      }
+    }
+  }
+}
+```
+
+**Note**: Claude Desktop's support for prompts in standard MCP config is limited compared to MCPB, but this is better than nothing.
+
+### Option 3: Embed in Tool Docstrings (Partial Replication)
+
+Include key prompt content in tool docstrings. FastMCP automatically exposes these to all MCP clients:
+
+```python
+@mcp.tool()
+async def fastsearch_search(...) -> Dict[str, Any]:
+    """
+    Search for files using direct NTFS Master File Table access.
+    
+    This tool provides lightning-fast file search by reading directly
+    from the NTFS MFT, bypassing traditional filesystem traversal.
+    
+    Examples:
+        - Search for Python files: pattern="*.py", path="C:\\Users"
+        - Find config files: pattern="*.config", path="D:\\Projects"
+    
+    Architecture:
+        Uses FastSearch Windows service for direct MFT access.
+        Requires service to be running (check with service_status tool).
+    """
+```
+
+**Advantage**: Works with ALL MCP clients, not just Claude Desktop.  
+**Limitation**: Docstrings provide parameter-level examples, not complete usage scenarios or interaction patterns.
+
+### Recommendation: Hybrid Approach
+
+For maximum compatibility and best Claude understanding:
+
+1. **Rich docstrings**: Include detailed examples and architecture info (works everywhere)
+2. **Prompt templates**: Keep `prompts/` directory - useful for MCPB users and as documentation
+3. **Manual configuration**: Document how to reference prompts in standard MCP config
+4. **Examples in README**: Include usage scenarios in project documentation
+
+This way:
+- ✅ MCPB users get full prompt template benefits (structured scenarios, example interactions)
+- ✅ Standard MCP users can reference prompts manually
+- ✅ All users benefit from rich docstrings
+- ✅ Documentation provides usage scenarios for reference
+
+See [`docs/MCPB_STATUS.md`](MCPB_STATUS.md) for more details on why prompt templates provide value beyond docstrings.
+
 ## Related Documentation
 
+- [MCPB Status & Limitations](MCPB_STATUS.md) - Why MCPB failed to gain adoption and prompt template alternatives
 - [Release Installation](RELEASE_INSTALLATION.md)
 - [Service Installation](../service/README.md)
 - [MCPB Packaging](mcpb-packaging/README.md)

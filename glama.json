@@ -1,0 +1,42 @@
+{
+  "$schema": "https://glama.ai/mcp/schemas/server.json",
+  "maintainers": ["sandraschi"],
+  "name": "fastsearch-mcp",
+  "description": "File search for Claude Desktop via direct NTFS Master File Table access. Zero indexing, zero caching, sub-second search across millions of files. Beta status.",
+  "type": "mcp_server",
+  "status": "beta",
+  "framework": "FastMCP 2.13+",
+  "tools": 4,
+  "transport": ["stdio"],
+  "keywords": [
+    "search",
+    "file-search",
+    "ntfs",
+    "mft",
+    "filesystem",
+    "windows",
+    "mcp-server",
+    "fastmcp"
+  ],
+  "features": {
+    "direct_mft_access": {
+      "enabled": true,
+      "note": "Direct NTFS MFT reads, no indexing"
+    },
+    "zero_indexing": {
+      "enabled": true
+    },
+    "zero_persistence": {
+      "enabled": true
+    },
+    "privilege_separation": {
+      "enabled": true,
+      "note": "Elevated C++ service + Python bridge"
+    },
+    "performance": {
+      "enabled": true,
+      "note": "Sub-second search, <50MB memory"
+    }
+  }
+}
+

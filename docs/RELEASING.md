@@ -26,7 +26,7 @@ This document outlines the process for creating new releases of FastSearch MCP.
 
    ```powershell
    # Run the test script
-   .\test-release.ps1
+   .\tests\scripts\test-release.ps1
    ```
 
    This will:

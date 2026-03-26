@@ -10,11 +10,12 @@ from ctypes import wintypes
 from typing import List
 
 import psutil
+import pywintypes
 import win32file
 import win32security
 
 from ..exceptions import McpError
-from . import ToolRegistry, tool
+from ..mcp_instance import mcp
 
 # Constants
 FSCTL_GET_NTFS_VOLUME_DATA = 0x00090064
@@ -49,24 +50,48 @@ class NtfsError(McpError):
 
 
 def _get_volume_handle(volume_path: str) -> int:
-    """Get a handle to the specified volume."""
-    if not volume_path.endswith("\\"):
-        volume_path += "\\"
+    """Get a handle to the specified volume.
 
-    handle = win32file.CreateFile(
-        f"\\\\.\\{volume_path}",
-        win32file.GENERIC_READ | win32file.GENERIC_WRITE,
-        win32file.FILE_SHARE_READ | win32file.FILE_SHARE_WRITE,
-        None,
-        win32file.OPEN_EXISTING,
-        0,
-        None,
-    )
+    Args:
+        volume_path: Volume path like 'C:', 'C:\\', or 'C:\\Windows'
 
-    if handle == win32file.INVALID_HANDLE_VALUE:
-        raise NtfsError(f"Failed to open volume {volume_path}")
+    Returns:
+        Handle to the volume
+    """
+    # Normalize volume path - extract just the drive letter and colon
+    # Handle formats: "C:", "C:\\", "C:\\Windows", etc.
+    normalized_path = volume_path.strip().rstrip("\\")
+    if len(normalized_path) >= 2 and normalized_path[1] == ":":
+        # Extract just the drive letter and colon (e.g., "C:")
+        drive_letter = normalized_path[0].upper()
+        volume_name = f"\\\\.\\{drive_letter}:"
+    else:
+        # If format is unexpected, try to use as-is
+        volume_name = f"\\\\.\\{normalized_path}"
 
-    return handle
+    try:
+        # Only need GENERIC_READ for reading volume info - no backup privilege needed
+        handle = win32file.CreateFile(
+            volume_name,
+            win32file.GENERIC_READ,  # Read-only access is sufficient
+            win32file.FILE_SHARE_READ | win32file.FILE_SHARE_WRITE,
+            None,
+            win32file.OPEN_EXISTING,
+            win32file.FILE_FLAG_BACKUP_SEMANTICS,  # Required for volume access
+            None,
+        )
+
+        if handle == win32file.INVALID_HANDLE_VALUE:
+            # Get the last error using kernel32
+            error_code = ctypes.windll.kernel32.GetLastError()
+            raise NtfsError(
+                f"Failed to open volume {volume_path} "
+                f"(tried {volume_name}): Windows error {error_code}"
+            )
+
+        return handle
+    except pywintypes.error as e:
+        raise NtfsError(f"Failed to open volume {volume_path} (tried {volume_name}): {e}") from e
 
 
 def _get_volume_info(volume_path: str) -> dict:
@@ -213,10 +238,9 @@ def _get_ntfs_permissions(volume_path: str) -> dict:
         raise NtfsError(f"Failed to check NTFS permissions: {e}") from e
 
 
-@tool("ntfs.volume_info", "Get information about an NTFS volume")
-async def get_volume_info(volume_path: str) -> dict:
-    """
-    Get detailed information about an NTFS volume.
+@mcp.tool
+async def ntfs_volume_info(volume_path: str) -> dict:
+    """Get information about an NTFS volume.
 
     Args:
         volume_path: The volume path (e.g., 'C:' or 'C:\\')
@@ -230,10 +254,9 @@ async def get_volume_info(volume_path: str) -> dict:
         raise NtfsError(f"Failed to get volume info: {e}") from e
 
 
-@tool("ntfs.check_health", "Check the health of an NTFS volume")
-async def check_volume_health(volume_path: str) -> dict:
-    """
-    Check the health of an NTFS volume.
+@mcp.tool
+async def ntfs_check_health(volume_path: str) -> dict:
+    """Check the health of an NTFS volume.
 
     Args:
         volume_path: The volume path (e.g., 'C:' or 'C:\\')
@@ -284,10 +307,9 @@ async def check_volume_health(volume_path: str) -> dict:
         raise NtfsError(f"Failed to check volume health: {e}") from e
 
 
-@tool("ntfs.list_volumes", "List all NTFS volumes on the system")
-async def list_ntfs_volumes() -> List[dict]:
-    """
-    List all NTFS volumes on the system.
+@mcp.tool
+async def ntfs_list_volumes() -> List[dict]:
+    """List all NTFS volumes on the system.
 
     Returns:
         List of dictionaries containing volume information
@@ -316,9 +338,4 @@ async def list_ntfs_volumes() -> List[dict]:
         raise NtfsError(f"Failed to list NTFS volumes: {e}") from e
 
 
-# Register all tools
-def register_tools(registry: ToolRegistry) -> None:
-    """Register all NTFS health check tools."""
-    registry.register(get_volume_info)
-    registry.register(check_volume_health)
-    registry.register(list_ntfs_volumes)
+# Tools are registered via @mcp.tool decorator when imported

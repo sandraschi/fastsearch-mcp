@@ -550,7 +550,8 @@ For now, you can safely ignore any signing-related steps in the MCPB documentati
 
 ```text
 your-mcp/
-   ├── mcpb.json           # MCPB configuration
+   ├── mcpb/
+   │   ├── mcpb.json       # MCPB configuration
    ├── pyproject.toml     # Python project metadata
    ├── src/               # Source code
    │   └── your_package/  # Your Python package

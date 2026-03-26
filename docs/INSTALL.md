@@ -71,7 +71,7 @@ The compiled service binary is generated at `service\build\bin\Release\FastSearc
 With the virtual environment activated:
 
 ```powershell
-python start_server.py
+python scripts/start_server.py
 ```
 
 Claude Desktop can now attach to FastSearch MCP using the command defined in `mcp.config.json`.

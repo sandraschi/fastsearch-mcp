@@ -14,19 +14,18 @@ def get_logger(name: str) -> logging.Logger:
     return logging.getLogger(name)
 
 
-def setup_logging(
-    log_level: str = "INFO", console: bool = True, format_string: Optional[str] = None
-) -> None:
-    """Set up logging configuration."""
+def setup_logging(log_level: str = "INFO", format_string: Optional[str] = None) -> None:
+    """Set up logging configuration.
+
+    Logs to stderr for Claude Desktop visibility.
+    """
     if format_string is None:
         format_string = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 
     level = getattr(logging, log_level.upper(), logging.INFO)
 
-    # Configure root logger
-    logging.basicConfig(
-        level=level, format=format_string, stream=sys.stderr if console else None, force=True
-    )
+    # Configure root logger - always use stderr for Claude Desktop logs
+    logging.basicConfig(level=level, format=format_string, stream=sys.stderr, force=True)
 
 
 def struct_message(message: str, **kwargs) -> str:

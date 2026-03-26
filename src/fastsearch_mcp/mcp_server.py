@@ -258,7 +258,7 @@ class McpServer:
                 if isinstance(result, dict) and "_session" in result:
                     del response["result"]["_session"]
 
-                return json.dumps(response)
+                return json.dumps(response, ensure_ascii=True)
 
             else:
                 return json.dumps(
@@ -266,7 +266,8 @@ class McpServer:
                         "jsonrpc": "2.0",
                         "id": request_id,
                         "error": {"code": -32601, "message": f"Method not found: {method}"},
-                    }
+                    },
+                    ensure_ascii=True,
                 )
 
         except json.JSONDecodeError as e:
@@ -275,7 +276,8 @@ class McpServer:
                     "jsonrpc": "2.0",
                     "id": None,
                     "error": {"code": -32700, "message": "Parse error", "data": str(e)},
-                }
+                },
+                ensure_ascii=True,
             )
 
         except Exception as e:
@@ -284,28 +286,20 @@ class McpServer:
                     "jsonrpc": "2.0",
                     "id": request_id if "request_id" in locals() else None,
                     "error": {"code": -32603, "message": "Internal error", "data": str(e)},
-                }
+                },
+                ensure_ascii=True,
             )
 
     def _register_tools(self):
         """Register all tools with FastMCP 2.13."""
         # Register fastsearch.search
-        self.app.tool(
-            name="fastsearch.search",
-            description="Search files using direct MFT access. Requires FastSearch service.",
-        )(self.handle_search)
+        self.app.tool(name="fastsearch.search")(self.handle_search)
 
         # Register getStatus
-        self.app.tool(
-            name="getStatus",
-            description="Get the current status of the FastSearch service, including availability and error details.",
-        )(self.get_status)
+        self.app.tool(name="getStatus")(self.get_status)
 
-        # Register fastsearch.search_basic
-        self.app.tool(
-            name="fastsearch.search_basic",
-            description="Basic file search that works without the FastSearch service",
-        )(self.basic_file_search)
+        # Note: No fallback search tool - direct MFT access via service is REQUIRED
+        # Treewalking fallbacks violate the architecture (direct NTFS MFT access only)
 
     async def handle_search(
         self,
@@ -388,7 +382,6 @@ class McpServer:
         except Exception as e:
             raise RuntimeError(f"Search failed: {e}") from e
 
-
     async def get_status(self) -> Dict[str, Any]:
         """Get the current status of the FastSearch service.
 
@@ -401,18 +394,38 @@ class McpServer:
         try:
             import os
 
-        import win32api
-        import win32con
-        import win32service
-        import win32serviceutil
+            import win32api
+            import win32con
+            import win32service
+            import win32serviceutil
 
-        service_name = "FastSearch"
-        status = {"service_available": False, "status": "Unknown", "details": {}, "suggestions": []}
+            service_name = "FastSearch"
+            status = {
+                "service_available": False,
+                "status": "Unknown",
+                "details": {},
+                "suggestions": [],
+            }
 
-        # Check if service is installed and get its status
-        try:
-            service_status = win32serviceutil.QueryServiceStatus(service_name)
-            state = service_status[1]
+            # Check if service is installed and get its status
+            try:
+                service_status = win32serviceutil.QueryServiceStatus(service_name)
+                state = service_status[1]
+            except Exception as service_error:
+                # Service query failed
+                if "service does not exist" in str(service_error).lower():
+                    return {
+                        "service_available": False,
+                        "status": "Service not installed",
+                        "details": {
+                            "error": "The FastSearch service is not installed on this system"
+                        },
+                        "suggestions": [
+                            "Install the FastSearch service using the installer",
+                            "Check if the installation completed successfully",
+                        ],
+                    }
+                raise
 
             # Map Windows service states to human-readable strings
             state_map = {
@@ -489,18 +502,6 @@ class McpServer:
             return status
 
         except Exception as e:
-            # Service query failed, check if it's because the service doesn't exist
-            if "service does not exist" in str(e).lower():
-                return {
-                    "service_available": False,
-                    "status": "Service not installed",
-                    "details": {"error": "The FastSearch service is not installed on this system"},
-                    "suggestions": [
-                        "Install the FastSearch service using the installer",
-                        "Check if the installation completed successfully",
-                    ],
-                }
-
             # Other error checking service status
             return {
                 "service_available": False,
@@ -512,75 +513,24 @@ class McpServer:
                 ],
             }
 
-    except ImportError:
-        # Fallback for non-Windows or missing pywin32
-        return {
-            "service_available": False,
-            "status": "Windows service API not available",
-            "details": {"error": "This feature requires Windows and pywin32 package"},
-            "suggestions": [
-                "Install pywin32: pip install pywin32",
-                "This feature is only available on Windows",
-            ],
-        }
-
-    async def basic_file_search(
-        self, query: str, path: str = ".", max_depth: int = 3
-    ) -> Dict[str, Any]:
-        """Basic file search that works without the FastSearch service.
-
-        This is a simple recursive file search that doesn't require the FastSearch service.
-        It's slower than the service-based search but works when the service isn't available.
-        """
-        import os
-        import time
-
-        start_time = time.time()
-        results = []
-        scanned_dirs = 0
-
-        try:
-            query_lower = query.lower()
-            for root, dirs, files in os.walk(path):
-                current_depth = root.count(os.sep) - path.count(os.sep)
-                if current_depth > max_depth:
-                    del dirs[:]  # Don't recurse deeper than max_depth
-                    continue
-
-                scanned_dirs += 1
-
-                for file in files:
-                    if query_lower in file.lower():
-                        results.append(os.path.join(root, file))
-
-                        # Limit results to prevent UI freezing
-                        if len(results) >= 1000:
-                            break
-
-                if len(results) >= 1000:
-                    break
-
-        except Exception as e:
-            logger.warning(f"Basic search failed: {e}")
-            raise RuntimeError(f"Basic search failed: {e}") from e
-
-        search_time = (time.time() - start_time) * 1000  # Convert to ms
-
-        return {
-            "results": results,
-            "stats": {
-                "scanned_directories": scanned_dirs,
-                "matched_files": len(results),
-                "search_time_ms": search_time,
-            },
-        }
+        except ImportError:
+            # Fallback for non-Windows or missing pywin32
+            return {
+                "service_available": False,
+                "status": "Windows service API not available",
+                "details": {"error": "This feature requires Windows and pywin32 package"},
+                "suggestions": [
+                    "Install pywin32: pip install pywin32",
+                    "This feature is only available on Windows",
+                ],
+            }
 
     async def get_capabilities(self) -> Dict[str, Any]:
         """Return capabilities of the FastSearch service."""
         capabilities = {
             "fastsearch": {
                 "version": "1.0.0",
-                "capabilities": ["search", "search_basic", "status"],
+                "capabilities": ["search", "status"],
                 "search_types": ["glob", "regex", "exact", "fuzzy"],
                 "service_available": getattr(self, "service_available", False),
             }

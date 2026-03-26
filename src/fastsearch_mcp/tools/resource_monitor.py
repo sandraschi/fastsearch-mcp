@@ -5,12 +5,12 @@ import os
 import platform
 import time
 from datetime import datetime
-from typing import Dict, List, Union
+from typing import Dict, List, Optional, Union
 
 import psutil
 
 from fastsearch_mcp.logging_config import get_logger
-from fastsearch_mcp.tools.base import BaseTool, ToolCategory, ToolParameter, tool
+from fastsearch_mcp.mcp_instance import mcp
 
 logger = get_logger(__name__)
 
@@ -314,376 +314,416 @@ class SystemMetricsCollector:
         return metrics
 
 
-@tool(
-    name="monitor_system_resources",
-    description="Monitor system resources including CPU, memory, disk, and network usage",
-    category=ToolCategory.SYSTEM,
-    parameters=[
-        ToolParameter(
-            name="interval",
-            type=float,
-            description="Sampling interval in seconds",
-            default=1.0,
-            min=0.1,
-            max=60.0,
-        ),
-        ToolParameter(
-            name="duration",
-            type=float,
-            description="Duration to monitor in seconds (0 for single snapshot)",
-            default=0,
-            min=0,
-        ),
-        ToolParameter(
-            name="include_processes",
-            type=bool,
-            description="Include process information",
-            default=True,
-        ),
-        ToolParameter(
-            name="process_limit",
-            type=int,
-            description="Maximum number of processes to include",
-            default=10,
-            min=1,
-            max=100,
-        ),
-        ToolParameter(
-            name="include_cpu", type=bool, description="Include CPU metrics", default=True
-        ),
-        ToolParameter(
-            name="include_memory", type=bool, description="Include memory metrics", default=True
-        ),
-        ToolParameter(
-            name="include_disk", type=bool, description="Include disk metrics", default=True
-        ),
-        ToolParameter(
-            name="include_network", type=bool, description="Include network metrics", default=True
-        ),
-        ToolParameter(
-            name="include_system", type=bool, description="Include system information", default=True
-        ),
-        ToolParameter(
-            name="callback_url",
-            type=str,
-            description="URL to send metrics to (for continuous monitoring)",
-            required=False,
-        ),
-    ],
-    return_type=Dict,
-    return_description="System resource metrics",
-)
-class SystemResourceMonitorTool(BaseTool):
-    """Tool for monitoring system resources."""
+# Global collector instance
+_collector = SystemMetricsCollector()
+_monitoring = False
 
-    def __init__(self):
-        self._collector = SystemMetricsCollector()
-        self._monitoring = False
 
-    async def execute(self, **kwargs) -> Dict:
-        """Execute the system resource monitoring."""
-        if kwargs.get("duration", 0) > 0:
-            return await self._monitor_continuous(**kwargs)
-        return await self._get_snapshot(**kwargs)
+@mcp.tool
+async def monitor_system_resources(
+    interval: float = 1.0,
+    duration: float = 0,
+    include_processes: bool = True,
+    process_limit: int = 10,
+    include_cpu: bool = True,
+    include_memory: bool = True,
+    include_disk: bool = True,
+    include_network: bool = True,
+    include_system: bool = True,
+    callback_url: Optional[str] = None,
+) -> Dict:
+    """MONITOR_SYSTEM_RESOURCES — CPU, memory, disk, network, and optional top processes.
 
-    async def _get_snapshot(self, **kwargs) -> Dict:
-        """Get a single snapshot of system metrics."""
-        include_processes = kwargs.get("include_processes", True)
-        process_limit = kwargs.get("process_limit", 10)
+    **Duration semantics:** ``duration <= 0`` (default ``0``) returns **one synchronous
+    snapshot** and completes immediately—no blocking loop and no streaming. Use this
+    for ad-hoc health checks.
 
-        # Get a single snapshot
-        metrics = self._collector.collect_all_metrics(
-            include_processes=include_processes, process_limit=process_limit
+    **When ``duration > 0``:** starts a **background** asyncio task that samples every
+    ``interval`` seconds until the window elapses. The tool **returns immediately** with
+    ``status`` ``monitoring_started``, ``samples`` initially empty, then fills in the
+    background—callers cannot rely on ``samples`` in the same MCP response. This is not
+    a blocking “continuous tail”; for long captures, poll with repeated
+    ``duration=0`` snapshots or extend the client.
+
+    Args:
+        interval: Seconds between samples when ``duration > 0`` (minimum ~0.1 enforced).
+        duration: Seconds of background sampling; **0 or negative = single snapshot only.**
+        include_processes: Include top-N process rows (by CPU) in the snapshot.
+        process_limit: Max processes in snapshot (not paginated; cap raises load).
+        include_cpu / include_memory / include_disk / include_network / include_system:
+            Toggle metric sections in the returned dict.
+        callback_url: **Reserved.** HTTP POST of samples is not implemented; value is ignored.
+
+    Returns:
+        Snapshot: ``timestamp``, ``timestamp_iso``, plus requested sections (``cpu``,
+        ``memory``, ``disk``, ``network``, ``system``, optional ``processes`` list).
+
+        Timed run: ``status``, ``start_time``, ``end_time``, ``interval``, ``samples``
+        (list filled asynchronously), later ``sample_count`` when the loop finishes.
+
+    Recovery: Empty ``cpu``/``memory`` on error—check logs; on Windows without ``getloadavg``,
+    ``load_avg`` may be omitted.
+    """
+    global _monitoring
+    if duration > 0:
+        return await _monitor_continuous(
+            interval,
+            duration,
+            include_processes,
+            process_limit,
+            include_cpu,
+            include_memory,
+            include_disk,
+            include_network,
+            include_system,
+            callback_url,
+        )
+    return await _get_snapshot(
+        include_processes,
+        process_limit,
+        include_cpu,
+        include_memory,
+        include_disk,
+        include_network,
+        include_system,
+    )
+
+
+async def _get_snapshot(
+    include_processes: bool = True,
+    process_limit: int = 10,
+    include_cpu: bool = True,
+    include_memory: bool = True,
+    include_disk: bool = True,
+    include_network: bool = True,
+    include_system: bool = True,
+) -> Dict:
+    """Get a single snapshot of system metrics."""
+    # Get a single snapshot
+    metrics = _collector.collect_all_metrics(
+        include_processes=include_processes, process_limit=process_limit
+    )
+
+    # Filter metrics based on include_* parameters
+    filtered_metrics = {
+        "timestamp": metrics["timestamp"],
+        "timestamp_iso": metrics["timestamp_iso"],
+    }
+
+    if include_cpu:
+        filtered_metrics["cpu"] = metrics.get("cpu", {})
+    if include_memory:
+        filtered_metrics["memory"] = metrics.get("memory", {})
+    if include_disk:
+        filtered_metrics["disk"] = metrics.get("disk", {})
+    if include_network:
+        filtered_metrics["network"] = metrics.get("network", {})
+    if include_system:
+        filtered_metrics["system"] = metrics.get("system", {})
+    if include_processes and "processes" in metrics:
+        filtered_metrics["processes"] = metrics["processes"]
+
+    return filtered_metrics
+
+
+async def _monitor_continuous(
+    interval: float,
+    duration: float,
+    include_processes: bool,
+    process_limit: int,
+    include_cpu: bool,
+    include_memory: bool,
+    include_disk: bool,
+    include_network: bool,
+    include_system: bool,
+    callback_url: Optional[str],
+) -> Dict:
+    """Monitor system resources continuously for the specified duration."""
+    global _monitoring
+    interval = max(0.1, float(interval))
+
+    if duration <= 0:
+        return await _get_snapshot(
+            include_processes,
+            process_limit,
+            include_cpu,
+            include_memory,
+            include_disk,
+            include_network,
+            include_system,
         )
 
-        # Filter metrics based on include_* parameters
-        filtered_metrics = {
-            "timestamp": metrics["timestamp"],
-            "timestamp_iso": metrics["timestamp_iso"],
-        }
+    # Mark that we're monitoring
+    _monitoring = True
 
-        if kwargs.get("include_cpu", True):
-            filtered_metrics["cpu"] = metrics.get("cpu", {})
-        if kwargs.get("include_memory", True):
-            filtered_metrics["memory"] = metrics.get("memory", {})
-        if kwargs.get("include_disk", True):
-            filtered_metrics["disk"] = metrics.get("disk", {})
-        if kwargs.get("include_network", True):
-            filtered_metrics["network"] = metrics.get("network", {})
-        if kwargs.get("include_system", True):
-            filtered_metrics["system"] = metrics.get("system", {})
-        if kwargs.get("include_processes", True) and "processes" in metrics:
-            filtered_metrics["processes"] = metrics["processes"]
+    # Prepare the result structure
+    result = {
+        "status": "monitoring_started",
+        "start_time": time.time(),
+        "end_time": time.time() + duration,
+        "interval": interval,
+        "samples": [],
+    }
 
-        return filtered_metrics
+    # Start monitoring in the background
+    asyncio.create_task(
+        _monitor_loop(
+            result,
+            interval,
+            duration,
+            include_processes,
+            process_limit,
+            include_cpu,
+            include_memory,
+            include_disk,
+            include_network,
+            include_system,
+            callback_url,
+        )
+    )
 
-    async def _monitor_continuous(self, **kwargs) -> Dict:
-        """Monitor system resources continuously for the specified duration."""
-        interval = max(0.1, float(kwargs.get("interval", 1.0)))
-        duration = float(kwargs.get("duration", 0))
-        # callback_url = kwargs.get('callback_url')  # Reserved for future use
-
-        if duration <= 0:
-            return await self._get_snapshot(**kwargs)
-
-        # Mark that we're monitoring
-        self._monitoring = True
-
-        # Prepare the result structure
-        result = {
-            "status": "monitoring_started",
-            "start_time": time.time(),
-            "end_time": time.time() + duration,
-            "interval": interval,
-            "samples": [],
-        }
-
-        # Start monitoring in the background
-        asyncio.create_task(self._monitor_loop(result, **kwargs))
-
-        return result
-
-    async def _monitor_loop(self, result: Dict, **kwargs) -> None:
-        """Background monitoring loop."""
-        interval = float(kwargs.get("interval", 1.0))
-        duration = float(kwargs.get("duration", 0))
-        callback_url = kwargs.get("callback_url")
-
-        try:
-            start_time = time.time()
-            end_time = start_time + duration
-
-            while self._monitoring and time.time() < end_time:
-                # Get a snapshot
-                snapshot = await self._get_snapshot(**kwargs)
-                result["samples"].append(snapshot)
-
-                # If we have a callback URL, send the data there
-                if callback_url:
-                    try:
-                        # In a real implementation, you would use an HTTP client to send the data
-                        # For example: await self._send_metrics(callback_url, snapshot)
-                        pass
-                    except Exception as e:
-                        logger.error("Error sending metrics to callback URL: %s", e)
-
-                # Sleep for the remaining interval time
-                sleep_time = max(0, interval - (time.time() - start_time) % interval)
-                await asyncio.sleep(sleep_time)
-
-                # Check if we should stop
-                if not self._monitoring or time.time() >= end_time:
-                    break
-
-            # Update the result status
-            result["status"] = "monitoring_completed"
-            result["end_time"] = time.time()
-            result["sample_count"] = len(result["samples"])
-
-        except Exception as e:
-            logger.exception("Error in monitoring loop")
-            result["status"] = "error"
-            result["error"] = str(e)
-
-        finally:
-            self._monitoring = False
-
-    def stop_monitoring(self) -> None:
-        """Stop continuous monitoring."""
-        self._monitoring = False
+    return result
 
 
-@tool(
-    name="get_process_info",
-    description="Get detailed information about running processes",
-    category=ToolCategory.SYSTEM,
-    parameters=[
-        ToolParameter(
-            name="pids",
-            type=list,
-            description="List of process IDs to get info for (empty for all)",
-            default=[],
-        ),
-        ToolParameter(
-            name="name",
-            type=str,
-            description="Filter processes by name (supports wildcards)",
-            required=False,
-        ),
-        ToolParameter(
-            name="user", type=str, description="Filter processes by username", required=False
-        ),
-        ToolParameter(
-            name="limit",
-            type=int,
-            description="Maximum number of processes to return",
-            default=100,
-            min=1,
-            max=1000,
-        ),
-        ToolParameter(
-            name="sort_by",
-            type=str,
-            description="Sort processes by this field",
-            default="cpu_percent",
-            choices=["cpu_percent", "memory_percent", "name", "pid", "username", "create_time"],
-        ),
-        ToolParameter(
-            name="sort_desc", type=bool, description="Sort in descending order", default=True
-        ),
-    ],
-    return_type=List[Dict],
-    return_description="List of process information dictionaries",
-)
-class ProcessInfoTool(BaseTool):
-    """Tool for getting information about running processes."""
+async def _monitor_loop(
+    result: Dict,
+    interval: float,
+    duration: float,
+    include_processes: bool,
+    process_limit: int,
+    include_cpu: bool,
+    include_memory: bool,
+    include_disk: bool,
+    include_network: bool,
+    include_system: bool,
+    callback_url: Optional[str],
+) -> None:
+    """Background monitoring loop."""
+    global _monitoring
+    try:
+        start_time = time.time()
+        end_time = start_time + duration
 
-    async def execute(self, **kwargs) -> List[Dict]:
-        """Get information about running processes."""
-        pids = kwargs.get("pids", [])
-        name_filter = kwargs.get("name")
-        user_filter = kwargs.get("user")
-        limit = int(kwargs.get("limit", 100))
-        sort_by = kwargs.get("sort_by", "cpu_percent")
-        sort_desc = bool(kwargs.get("sort_desc", True))
-
-        processes = []
-
-        # If specific PIDs are provided, only get those processes
-        if pids:
-            for pid in pids:
-                try:
-                    proc = psutil.Process(pid)
-                    processes.append(proc)
-                except (psutil.NoSuchProcess, psutil.AccessDenied, ValueError):
-                    continue
-        else:
-            # Get all processes
-            processes = list(
-                psutil.process_iter(
-                    [
-                        "pid",
-                        "name",
-                        "username",
-                        "cpu_percent",
-                        "memory_percent",
-                        "status",
-                        "create_time",
-                    ]
-                )
+        while _monitoring and time.time() < end_time:
+            # Get a snapshot
+            snapshot = await _get_snapshot(
+                include_processes,
+                process_limit,
+                include_cpu,
+                include_memory,
+                include_disk,
+                include_network,
+                include_system,
             )
+            result["samples"].append(snapshot)
 
-        # Filter and format processes
-        result = []
-        for proc in processes:
-            try:
-                with proc.oneshot():
-                    # Apply filters
-                    if name_filter and not self._match_name(proc.name(), name_filter):
-                        continue
+            # If we have a callback URL, send the data there
+            if callback_url:
+                try:
+                    # In a real implementation, you would use an HTTP client to send the data
+                    # For example: await _send_metrics(callback_url, snapshot)
+                    pass
+                except Exception as e:
+                    logger.error("Error sending metrics to callback URL: %s", e)
 
-                    if user_filter and proc.username() != user_filter:
-                        continue
+            # Sleep for the remaining interval time
+            sleep_time = max(0, interval - (time.time() - start_time) % interval)
+            await asyncio.sleep(sleep_time)
 
-                    # Get process info
-                    pinfo = {
-                        "pid": proc.pid,
-                        "name": proc.name(),
-                        "exe": proc.exe(),
-                        "cmdline": proc.cmdline(),
-                        "username": proc.username(),
-                        "status": proc.status(),
-                        "create_time": proc.create_time(),
-                        "cpu_percent": proc.cpu_percent(),
-                        "memory_percent": proc.memory_percent(),
-                        "memory_info": {
-                            "rss": proc.memory_info().rss,
-                            "vms": proc.memory_info().vms,
-                            "shared": proc.memory_info().shared
-                            if hasattr(proc.memory_info(), "shared")
-                            else None,
-                            "text": proc.memory_info().text
-                            if hasattr(proc.memory_info(), "text")
-                            else None,
-                            "lib": proc.memory_info().lib
-                            if hasattr(proc.memory_info(), "lib")
-                            else None,
-                            "data": proc.memory_info().data
-                            if hasattr(proc.memory_info(), "data")
-                            else None,
-                            "dirty": proc.memory_info().dirty
-                            if hasattr(proc.memory_info(), "dirty")
-                            else None,
-                        },
-                        "io_counters": {
-                            "read_count": proc.io_counters().read_count,
-                            "write_count": proc.io_counters().write_count,
-                            "read_bytes": proc.io_counters().read_bytes,
-                            "write_bytes": proc.io_counters().write_bytes,
-                        }
-                        if hasattr(proc, "io_counters") and proc.io_counters()
-                        else None,
-                        "num_threads": proc.num_threads(),
-                        "num_fds": proc.num_fds() if hasattr(proc, "num_fds") else None,
-                        "cpu_affinity": proc.cpu_affinity()
-                        if hasattr(proc, "cpu_affinity")
-                        else None,
-                        "cpu_num": proc.cpu_num() if hasattr(proc, "cpu_num") else None,
-                        "ppid": proc.ppid(),
-                        "parent": proc.parent().name() if proc.parent() else None,
-                        "children": [
-                            {"pid": child.pid, "name": child.name(), "status": child.status()}
-                            for child in proc.children()
-                        ],
-                        "connections": [
-                            {
-                                "fd": conn.fd,
-                                "family": conn.family.name
-                                if hasattr(conn.family, "name")
-                                else str(conn.family),
-                                "type": conn.type.name
-                                if hasattr(conn.type, "name")
-                                else str(conn.type),
-                                "laddr": f"{conn.laddr.ip}:{conn.laddr.port}"
-                                if conn.laddr
-                                else None,
-                                "raddr": f"{conn.raddr.ip}:{conn.raddr.port}"
-                                if conn.raddr
-                                else None,
-                                "status": conn.status,
-                            }
-                            for conn in proc.connections()
-                        ]
-                        if hasattr(proc, "connections")
-                        else [],
-                    }
-
-                    result.append(pinfo)
-
-            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
-                continue
-
-            # Limit the number of results
-            if len(result) >= limit * 2:  # Get some extra before sorting
+            # Check if we should stop
+            if not _monitoring or time.time() >= end_time:
                 break
 
-        # Sort the results
-        reverse = sort_desc if sort_by != "name" else not sort_desc
-        result.sort(key=lambda x: x.get(sort_by, 0), reverse=reverse)
+        # Update the result status
+        result["status"] = "monitoring_completed"
+        result["end_time"] = time.time()
+        result["sample_count"] = len(result["samples"])
 
-        # Apply final limit
-        return result[:limit]
+    except Exception as e:
+        logger.exception("Error in monitoring loop")
+        result["status"] = "error"
+        result["error"] = str(e)
 
-    def _match_name(self, name: str, pattern: str) -> bool:
-        """Check if a process name matches a pattern with wildcards."""
-        if not pattern:
-            return True
+    finally:
+        _monitoring = False
 
-        # Simple wildcard matching
-        if "*" in pattern or "?" in pattern:
-            import fnmatch
 
-            return fnmatch.fnmatch(name.lower(), pattern.lower())
+@mcp.tool
+async def get_process_info(
+    pids: Optional[List[int]] = None,
+    name: Optional[str] = None,
+    user: Optional[str] = None,
+    limit: int = 100,
+    sort_by: str = "cpu_percent",
+    sort_desc: bool = True,
+) -> List[Dict]:
+    """GET_PROCESS_INFO — Detailed rows for selected or filtered processes (psutil).
 
-        # Exact match
-        return name.lower() == pattern.lower()
+    **Pagination:** There is **no cursor**. At most ``limit`` rows are returned after
+    sort (default 100). The implementation may briefly consider up to ``limit * 2``
+    candidates before sorting—tune ``limit`` if you need a wider net or a smaller response.
+
+    Args:
+        pids: If non-empty, only these PIDs are resolved (others ignored). If empty,
+            scans all accessible processes then applies ``name`` / ``user`` filters.
+        name: Optional ``fnmatch`` pattern (``*``, ``?``) or exact name (case-insensitive).
+        user: Exact username filter (``proc.username()``); omit for any user.
+        limit: Hard cap on rows **after** sort (default 100).
+        sort_by: Dict key to sort by, e.g. ``cpu_percent``, ``memory_percent``, ``name``,
+            ``pid``. Must exist on the built row.
+        sort_desc: Descending order except ``name`` uses inverted default for readability.
+
+    Returns:
+        List of dicts with ``pid``, ``name``, ``exe``, ``cmdline``, ``username``,
+        ``cpu_percent``, ``memory_percent``, ``memory_info``, optional ``io_counters``,
+        ``connections``, ``children``, etc.
+
+    Recovery: Skips inaccessible or vanished PIDs silently; empty list may mean filters
+    matched nothing or permissions denied for all candidates.
+    """
+    if pids is None:
+        pids = []
+    name_filter = name
+    user_filter = user
+
+    processes = []
+
+    # If specific PIDs are provided, only get those processes
+    if pids:
+        for pid in pids:
+            try:
+                proc = psutil.Process(pid)
+                processes.append(proc)
+            except (psutil.NoSuchProcess, psutil.AccessDenied, ValueError):
+                continue
+    else:
+        # Get all processes
+        processes = list(
+            psutil.process_iter(
+                [
+                    "pid",
+                    "name",
+                    "username",
+                    "cpu_percent",
+                    "memory_percent",
+                    "status",
+                    "create_time",
+                ]
+            )
+        )
+
+    # Filter and format processes
+    result = []
+    for proc in processes:
+        try:
+            with proc.oneshot():
+                # Apply filters
+                if name_filter and not _match_process_name(proc.name(), name_filter):
+                    continue
+
+                if user_filter and proc.username() != user_filter:
+                    continue
+
+                # Get process info
+                pinfo = {
+                    "pid": proc.pid,
+                    "name": proc.name(),
+                    "exe": proc.exe(),
+                    "cmdline": proc.cmdline(),
+                    "username": proc.username(),
+                    "status": proc.status(),
+                    "create_time": proc.create_time(),
+                    "cpu_percent": proc.cpu_percent(),
+                    "memory_percent": proc.memory_percent(),
+                    "memory_info": {
+                        "rss": proc.memory_info().rss,
+                        "vms": proc.memory_info().vms,
+                        "shared": proc.memory_info().shared
+                        if hasattr(proc.memory_info(), "shared")
+                        else None,
+                        "text": proc.memory_info().text
+                        if hasattr(proc.memory_info(), "text")
+                        else None,
+                        "lib": proc.memory_info().lib
+                        if hasattr(proc.memory_info(), "lib")
+                        else None,
+                        "data": proc.memory_info().data
+                        if hasattr(proc.memory_info(), "data")
+                        else None,
+                        "dirty": proc.memory_info().dirty
+                        if hasattr(proc.memory_info(), "dirty")
+                        else None,
+                    },
+                    "io_counters": {
+                        "read_count": proc.io_counters().read_count,
+                        "write_count": proc.io_counters().write_count,
+                        "read_bytes": proc.io_counters().read_bytes,
+                        "write_bytes": proc.io_counters().write_bytes,
+                    }
+                    if hasattr(proc, "io_counters") and proc.io_counters()
+                    else None,
+                    "num_threads": proc.num_threads(),
+                    "num_fds": proc.num_fds() if hasattr(proc, "num_fds") else None,
+                    "cpu_affinity": proc.cpu_affinity()
+                    if hasattr(proc, "cpu_affinity")
+                    else None,
+                    "cpu_num": proc.cpu_num() if hasattr(proc, "cpu_num") else None,
+                    "ppid": proc.ppid(),
+                    "parent": proc.parent().name() if proc.parent() else None,
+                    "children": [
+                        {"pid": child.pid, "name": child.name(), "status": child.status()}
+                        for child in proc.children()
+                    ],
+                    "connections": [
+                        {
+                            "fd": conn.fd,
+                            "family": conn.family.name
+                            if hasattr(conn.family, "name")
+                            else str(conn.family),
+                            "type": conn.type.name
+                            if hasattr(conn.type, "name")
+                            else str(conn.type),
+                            "laddr": f"{conn.laddr.ip}:{conn.laddr.port}"
+                            if conn.laddr
+                            else None,
+                            "raddr": f"{conn.raddr.ip}:{conn.raddr.port}"
+                            if conn.raddr
+                            else None,
+                            "status": conn.status,
+                        }
+                        for conn in proc.connections()
+                    ]
+                    if hasattr(proc, "connections")
+                    else [],
+                }
+
+                result.append(pinfo)
+
+        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+            continue
+
+        # Limit the number of results
+        if len(result) >= limit * 2:  # Get some extra before sorting
+            break
+
+    # Sort the results
+    reverse = sort_desc if sort_by != "name" else not sort_desc
+    result.sort(key=lambda x: x.get(sort_by, 0), reverse=reverse)
+
+    # Apply final limit
+    return result[:limit]
+
+
+def _match_process_name(name: str, pattern: str) -> bool:
+    """Check if a process name matches a pattern with wildcards."""
+    if not pattern:
+        return True
+
+    # Simple wildcard matching
+    if "*" in pattern or "?" in pattern:
+        import fnmatch
+
+        return fnmatch.fnmatch(name.lower(), pattern.lower())
+
+    # Exact match
+    return name.lower() == pattern.lower()

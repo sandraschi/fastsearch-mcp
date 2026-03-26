@@ -203,7 +203,7 @@ The MCP bridge provides 15 tools:
 **Check:**
 1. C++ service is running: `Get-Service -Name FastSearchMCP`
 2. Named pipe exists: `\\.\pipe\FastSearchMCP`
-3. Service logs: `python read_service_logs.py`
+3. Service logs: `python tests/read_service_logs.py`
 
 ## Next Steps
 

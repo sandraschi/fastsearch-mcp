@@ -29,9 +29,9 @@ class TestServiceManagerIntegration:
             assert hasattr(service, "display_name")
             assert hasattr(service, "status")
 
-    @patch("win32serviceutil.QueryServiceStatus")
-    @patch("win32serviceutil.OpenService")
-    @patch("win32serviceutil.EnumServicesStatus")
+    @patch("fastsearch_mcp.tools.service_manager.win32serviceutil.QueryServiceStatus")
+    @patch("fastsearch_mcp.tools.service_manager.win32serviceutil.OpenService")
+    @patch("fastsearch_mcp.tools.service_manager.win32serviceutil.EnumServicesStatus")
     def test_get_services_mocked(
         self, mock_enum_services, mock_open_service, mock_query_status, service_manager
     ):
@@ -56,8 +56,8 @@ class TestServiceManagerIntegration:
         assert services[0].name == "MockService1"
         assert services[1].name == "MockService2"
 
-    @patch("win32serviceutil.StartService")
-    @patch("win32serviceutil.OpenService")
+    @patch("fastsearch_mcp.tools.service_manager.win32serviceutil.StartService")
+    @patch("fastsearch_mcp.tools.service_manager.win32serviceutil.OpenService")
     def test_start_service(self, mock_open_service, mock_start_service, service_manager):
         """Test starting a service with mocked Windows API."""
         # Setup mocks
@@ -73,8 +73,8 @@ class TestServiceManagerIntegration:
         assert result["status"] == "success" or "pending" in result["status"].lower()
         mock_start_service.assert_called_once()
 
-    @patch("win32serviceutil.ControlService")
-    @patch("win32serviceutil.OpenService")
+    @patch("fastsearch_mcp.tools.service_manager.win32serviceutil.ControlService")
+    @patch("fastsearch_mcp.tools.service_manager.win32serviceutil.OpenService")
     def test_stop_service(self, mock_open_service, mock_control_service, service_manager):
         """Test stopping a service with mocked Windows API."""
         # Setup mocks
@@ -90,8 +90,8 @@ class TestServiceManagerIntegration:
         assert result["status"] == "success" or "pending" in result["status"].lower()
         mock_control_service.assert_called_once_with(mock_service, 1)  # 1 = SERVICE_CONTROL_STOP
 
-    @patch("win32serviceutil.ChangeServiceConfig")
-    @patch("win32serviceutil.OpenService")
+    @patch("fastsearch_mcp.tools.service_manager.win32serviceutil.ChangeServiceConfig")
+    @patch("fastsearch_mcp.tools.service_manager.win32serviceutil.OpenService")
     def test_set_startup_type(self, mock_open_service, mock_change_config, service_manager):
         """Test setting the startup type of a service."""
         # Setup mocks

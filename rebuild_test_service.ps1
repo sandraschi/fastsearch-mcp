@@ -63,7 +63,7 @@ Write-Host ""
 
 # Read logs
 Write-Host "5. Reading service logs..." -ForegroundColor Cyan
-python read_service_logs.py
+python tests\read_service_logs.py
 Write-Host ""
 
 # Read System logs

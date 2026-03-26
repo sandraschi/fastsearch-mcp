@@ -6,10 +6,13 @@
         "-m",
         "fastsearch_mcp"
       ],
-      "env": {
-        "PYTHONPATH": "${PWD}",
-        "PYTHONUNBUFFERED": "1"
-      }
+      "cwd": "D:\\Dev\\repos\\fastsearch-mcp",
+          "env": {
+            "PYTHONPATH": "D:\\Dev\\repos\\fastsearch-mcp\\src",
+            "PYTHONUNBUFFERED": "1",
+            "PYTHONIOENCODING": "ascii:replace",
+            "FASTMCP_NO_BANNER": "1"
+          }
     }
   }
 }

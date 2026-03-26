@@ -268,7 +268,7 @@ When users install our MCPB package, they're prompted for:
 
 ### **PowerShell Build Script**
 
-**Location**: `scripts/build-mcpb-package.ps1`
+**Location**: `mcpb/scripts/build-mcpb-package.ps1`
 
 **Features**:
 - Automated validation

@@ -120,10 +120,27 @@ Service-specific smoke tests can be run using the helper scripts:
 .\debug-service-startup.ps1
 ```
 
+## MCP Client Development Tips
+
+### Cursor IDE vs Claude Desktop
+
+**Cursor IDE** provides better MCP server lifecycle management:
+- ✅ **Hot reload**: Disable/enable MCP server to see tool changes immediately
+- ✅ **No restart required**: Faster iteration during development
+- ✅ **Hover tooltips**: Hovering over tool names shows docstrings (great for quick reference!)
+- ✅ **Better DX**: Use Cursor IDE for tool development
+
+**Claude Desktop** requires full restart:
+- ❌ **Full restart needed**: Must restart Claude Desktop to see tool changes
+- ❌ **Slower iteration**: Restart takes time, interrupts workflow
+- ⚠️ **Use for final testing**: Use Claude Desktop for production testing
+
+**Recommendation**: Develop and test tool changes in Cursor IDE, then verify in Claude Desktop before release.
+
 ## Debugging
 
 ### Python bridge
-- Use `pdb` or VS Code’s debugger (`start_server.py` is the usual entry point).
+- Use `pdb` or VS Code's debugger (`scripts/start_server.py` is the usual entry point).
 - Enable verbose logging via `FASTSEARCH_LOG_LEVEL=debug`.
 
 ### C++ service

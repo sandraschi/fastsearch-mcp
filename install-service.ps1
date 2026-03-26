@@ -356,7 +356,7 @@ function Resolve-ServiceIssues {
     
     # Suggest solutions
     Write-ColorOutput "`nRecommended solutions:" $InfoColor
-    Write-ColorOutput "1. Check event logs: .\read-service-logs.ps1" $InfoColor
+    Write-ColorOutput "1. Check event logs: .\scripts\read-service-logs.ps1" $InfoColor
     Write-ColorOutput "2. Run comprehensive test: .\test-service-comprehensive.ps1" $InfoColor
     Write-ColorOutput "3. Debug startup: .\debug-service-startup.ps1" $InfoColor
     Write-ColorOutput "4. Wait 30 seconds and try again (Windows cleanup delay)" $InfoColor

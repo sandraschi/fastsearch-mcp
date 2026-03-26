@@ -17,12 +17,12 @@ import winerror
 
 from ..exceptions import McpError
 from ..logging_config import get_logger
-from . import ToolRegistry, tool
+from ..mcp_instance import mcp
 
 logger = get_logger(__name__)
 
 # Constants
-SERVICE_NAME = "FastSearchService"
+SERVICE_NAME = "FastSearchMCP"  # Must match service_client.py
 SERVICE_DISPLAY_NAME = "FastSearch NTFS Indexing Service"
 SERVICE_DESCRIPTION = "Provides fast NTFS file system indexing and search capabilities."
 
@@ -60,13 +60,13 @@ def _get_service_executable() -> Path:
     return Path(sys.executable).parent / "fastsearch-service.exe"
 
 
-@tool("service.status", "Get the status of the FastSearch service")
-async def get_service_status() -> Dict[str, Union[str, bool, int]]:
-    """
-    Get the current status of the FastSearch service.
+@mcp.tool
+async def service_status_fastsearch() -> Dict[str, Union[str, bool, int]]:
+    """Get the status of the FastSearch service.
 
     Returns:
-        Dictionary containing service status information
+        Dictionary containing service status information with 'installed' field
+        indicating whether the service exists, and 'status' indicating current state
     """
     try:
         status = win32serviceutil.QueryServiceStatus(SERVICE_NAME)
@@ -80,25 +80,76 @@ async def get_service_status() -> Dict[str, Union[str, bool, int]]:
             win32service.SERVICE_PAUSED: "paused",
         }
 
+        # QueryServiceStatus returns (serviceType, currentState, controlsAccepted,
+        # win32ExitCode, serviceSpecificExitCode, checkPoint, waitHint)
+        # For PID, we need to use QueryServiceStatusEx
+        current_state = status[1]
+        current_status = status_codes.get(current_state, "unknown")
+
+        # Get PID if service is running
+        pid = None
+        if current_state == win32service.SERVICE_RUNNING:
+            try:
+                # Use QueryServiceStatusEx to get process ID
+                scm_handle = win32service.OpenSCManager(None, None, win32service.SC_MANAGER_CONNECT)
+                try:
+                    service_handle = win32service.OpenService(
+                        scm_handle, SERVICE_NAME, win32service.SERVICE_QUERY_STATUS
+                    )
+                    try:
+                        status_ex = win32service.QueryServiceStatusEx(service_handle)
+                        pid = status_ex.get("ProcessId") if isinstance(status_ex, dict) else None
+                    finally:
+                        win32service.CloseServiceHandle(service_handle)
+                finally:
+                    win32service.CloseServiceHandle(scm_handle)
+            except Exception:
+                pass  # PID not critical, continue without it
+
         return {
-            "status": status_codes.get(status[1], "unknown"),
-            "pid": status[8] if status[1] == win32service.SERVICE_RUNNING else None,
+            "status": current_status,
+            "installed": True,  # Service exists
+            "pid": pid,
             "can_control": _is_admin(),
         }
     except Exception as e:
         if hasattr(e, "winerror") and e.winerror == winerror.ERROR_SERVICE_DOES_NOT_EXIST:
-            return {"status": "not_installed", "can_install": _is_admin()}
+            return {
+                "status": "not_installed",
+                "installed": False,
+                "can_install": _is_admin()
+            }
         raise ServiceError(f"Failed to get service status: {e}") from e
 
 
-@tool("service.start", "Start the FastSearch service")
-async def start_service() -> Dict[str, Union[str, bool]]:
-    """
-    Start the FastSearch service.
+@mcp.tool
+async def service_start_fastsearch(dry_run: bool = False) -> Dict[str, Union[str, bool]]:
+    """SERVICE_START_FASTSEARCH — Start the FastSearch NTFS indexing Windows service.
+
+    Requires local **Administrator** (elevated). Use ``service_status`` first to see
+    whether the service is installed and running. This is narrower than generic
+    ``start_service`` (disabled in default builds): it only targets ``FastSearchMCP``.
+
+    Args:
+        dry_run: If True, does not call SCM; returns whether the caller is admin and the
+            target service name (use before mutating).
 
     Returns:
-        Dictionary with operation result
+        ``success`` True and ``message`` on OK; raises ``ServiceError`` on failure or
+        non-admin (unless ``dry_run``).
+
+    Recovery: Not installed → install flow; access denied → elevate shell; already running
+    is typically a no-op at SCM level—check ``service_status``.
     """
+    if dry_run:
+        return {
+            "success": True,
+            "dry_run": True,
+            "service": SERVICE_NAME,
+            "is_admin": _is_admin(),
+            "message": f"Would start {SERVICE_NAME} (admin={_is_admin()})",
+        }
+
     if not _is_admin():
         raise ServiceError("Administrator privileges are required to start the service")
 
@@ -109,14 +160,30 @@ async def start_service() -> Dict[str, Union[str, bool]]:
         raise ServiceError(f"Failed to start service: {e}") from e
 
 
-@tool("service.stop", "Stop the FastSearch service")
-async def stop_service() -> Dict[str, Union[str, bool]]:
-    """
-    Stop the FastSearch service.
+@mcp.tool
+async def service_stop_fastsearch(dry_run: bool = False) -> Dict[str, Union[str, bool]]:
+    """SERVICE_STOP_FASTSEARCH — Stop the FastSearch indexing service (admin).
+
+    Stopping the service pauses background indexing until started again; active MCP
+    clients may lose connectivity to the local indexer depending on deployment.
+
+    Args:
+        dry_run: If True, reports admin capability without stopping.
 
     Returns:
-        Dictionary with operation result
+        ``success`` True on stop; ``ServiceError`` on failure.
+
+    Recovery: In use → retry after closing consumers; access denied → elevate.
     """
+    if dry_run:
+        return {
+            "success": True,
+            "dry_run": True,
+            "service": SERVICE_NAME,
+            "is_admin": _is_admin(),
+            "message": f"Would stop {SERVICE_NAME} (admin={_is_admin()})",
+        }
+
     if not _is_admin():
         raise ServiceError("Administrator privileges are required to stop the service")
 
@@ -127,14 +194,30 @@ async def stop_service() -> Dict[str, Union[str, bool]]:
         raise ServiceError(f"Failed to stop service: {e}") from e
 
 
-@tool("service.restart", "Restart the FastSearch service")
-async def restart_service() -> Dict[str, Union[str, bool]]:
-    """
-    Restart the FastSearch service.
+@mcp.tool
+async def service_restart_fastsearch(dry_run: bool = False) -> Dict[str, Union[str, bool]]:
+    """SERVICE_RESTART_FASTSEARCH — Restart FastSearch (single SCM restart call; admin).
+
+    Equivalent to a stop+start from the perspective of dependent apps; brief outage while
+    the process recycles.
+
+    Args:
+        dry_run: If True, reports admin capability without restarting.
 
     Returns:
-        Dictionary with operation result
+        ``success`` True on restart; ``ServiceError`` on failure.
+
+    Recovery: Same as stop/start; verify ``service_status`` after errors.
     """
+    if dry_run:
+        return {
+            "success": True,
+            "dry_run": True,
+            "service": SERVICE_NAME,
+            "is_admin": _is_admin(),
+            "message": f"Would restart {SERVICE_NAME} (admin={_is_admin()})",
+        }
+
     if not _is_admin():
         raise ServiceError("Administrator privileges are required to restart the service")
 
@@ -145,12 +228,11 @@ async def restart_service() -> Dict[str, Union[str, bool]]:
         raise ServiceError(f"Failed to restart service: {e}") from e
 
 
-@tool("service.install", "Install the FastSearch service")
-async def install_service(
+@mcp.tool
+async def service_install_fastsearch(
     executable_path: Optional[str] = None, auto_start: bool = True
 ) -> Dict[str, Union[str, bool]]:
-    """
-    Install the FastSearch service.
+    """Install the FastSearch service.
 
     Args:
         executable_path: Path to the service executable (default: auto-detect)
@@ -204,10 +286,9 @@ async def install_service(
         raise ServiceError(f"Failed to install service: {e}") from e
 
 
-@tool("service.uninstall", "Uninstall the FastSearch service")
-async def uninstall_service() -> Dict[str, Union[str, bool]]:
-    """
-    Uninstall the FastSearch service.
+@mcp.tool
+async def service_uninstall_fastsearch() -> Dict[str, Union[str, bool]]:
+    """Uninstall the FastSearch service.
 
     Returns:
         Dictionary with operation result
@@ -230,10 +311,9 @@ async def uninstall_service() -> Dict[str, Union[str, bool]]:
         raise ServiceError(f"Failed to uninstall service: {e}") from e
 
 
-@tool("service.repair", "Repair the FastSearch service installation")
-async def repair_service() -> Dict[str, Union[str, bool]]:
-    """
-    Repair the FastSearch service installation.
+@mcp.tool
+async def service_repair_fastsearch() -> Dict[str, Union[str, bool]]:
+    """Repair the FastSearch service installation.
 
     This will reinstall the service with default settings.
 
@@ -260,18 +340,9 @@ async def repair_service() -> Dict[str, Union[str, bool]]:
             win32serviceutil.RemoveService(SERVICE_NAME)
 
         # Reinstall
-        return await install_service()
+        return await service_install_fastsearch()
     except Exception as e:
         raise ServiceError(f"Failed to repair service: {e}") from e
 
 
-# Register all tools
-def register_tools(registry: ToolRegistry) -> None:
-    """Register all service management tools."""
-    registry.register(get_service_status)
-    registry.register(start_service)
-    registry.register(stop_service)
-    registry.register(restart_service)
-    registry.register(install_service)
-    registry.register(uninstall_service)
-    registry.register(repair_service)
+# Tools are registered via @mcp.tool decorator when imported

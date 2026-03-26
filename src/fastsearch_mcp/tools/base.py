@@ -78,6 +78,21 @@ class ToolDefinition:
         }
 
 
+def _sanitize_for_json(obj: Any) -> Any:
+    """Recursively sanitize data structure to ensure all strings are ASCII-safe."""
+    if isinstance(obj, str):
+        # Replace non-ASCII characters with ASCII equivalents or remove them
+        return obj.encode("ascii", errors="replace").decode("ascii")
+    elif isinstance(obj, dict):
+        return {_sanitize_for_json(k): _sanitize_for_json(v) for k, v in obj.items()}
+    elif isinstance(obj, (list, tuple)):
+        return type(obj)(_sanitize_for_json(item) for item in obj)
+    elif isinstance(obj, bytes):
+        return obj.decode("ascii", errors="replace")
+    else:
+        return obj
+
+
 class BaseTool(abc.ABC):
     """Base class for all MCP tools."""
 

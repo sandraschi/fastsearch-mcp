@@ -40,7 +40,7 @@
 
 ## 🔍 Diagnostics & Logs
 - Always review Event Viewer: `Applications and Services Logs → FastSearchMCP` for initialization failures.
-- Use repository helpers such as `.\\debug-service-startup.ps1` and `.\\read-service-logs.ps1` to gather supporting data.
+- Use repository helpers such as `.\\debug-service-startup.ps1` and `.\\scripts\\read-service-logs.ps1` to gather supporting data.
 - Capture call stacks and module loads before filing issues.
 
 ## 🚨 Architecture Guardrails (Non-Negotiable)

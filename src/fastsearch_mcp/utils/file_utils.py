@@ -4,10 +4,13 @@ File utilities for FastSearch MCP.
 This module provides file system utilities following FastMCP 2.13 patterns.
 """
 
+import logging
 import os
 import re
 from pathlib import Path
 from typing import Iterator, List, Optional, Pattern
+
+logger = logging.getLogger(__name__)
 
 
 def find_files(
@@ -72,7 +75,7 @@ def find_files(
                     count += 1
 
     except Exception as e:
-        print(f"Error searching files: {e}")
+        logger.error(f"Error searching files: {e}")
 
 
 def search_in_file(
@@ -153,7 +156,7 @@ def search_in_file(
                     )
 
     except Exception as e:
-        print(f"Error searching in file {file_path}: {e}")
+        logger.error(f"Error searching in file {file_path}: {e}")
 
     return matches
 

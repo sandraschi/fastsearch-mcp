@@ -21,8 +21,10 @@
       "command": "python",
       "args": ["-m", "fastsearch_mcp"],
       "env": {
-        "PYTHONPATH": "${PWD}",
-        "PYTHONUNBUFFERED": "1"
+        "PYTHONPATH": "${__dirname}/src",
+        "PYTHONUNBUFFERED": "1",
+        "PYTHONIOENCODING": "ascii:replace",
+        "FASTMCP_NO_BANNER": "1"
       }
     }
   },

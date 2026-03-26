@@ -74,7 +74,7 @@ Get-EventLog -LogName System -Source "Service Control Manager" |
 
 ### Python Log Reader
 ```powershell
-python read_service_logs.py
+python tests/read_service_logs.py
 ```
 
 ## Troubleshooting

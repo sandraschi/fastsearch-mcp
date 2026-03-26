@@ -49,10 +49,10 @@ WIN32_EXIT_CODE: 1067 (0x42b)
 
 ## Test Scripts Created
 
-1. **`test_service_full.ps1`** - Full test with auto-elevation
-2. **`run_service_test.ps1`** - Simple test script
+1. **`tests/scripts/test_service_full.ps1`** - Full test with auto-elevation
+2. **`tests/scripts/run_service_test.ps1`** - Simple test script
 3. **`test_service_with_logs.py`** - Python test with log reading
-4. **`read_service_logs.py`** - Simple log reader
+4. **`tests/read_service_logs.py`** - Simple log reader
 
 ## How to Run Full Test
 
@@ -60,11 +60,11 @@ WIN32_EXIT_CODE: 1067 (0x42b)
 1. Right-click PowerShell
 2. Select "Run as Administrator"
 3. Navigate to project directory
-4. Run: `.\run_service_test.ps1`
+4. Run: `.\tests\scripts\run_service_test.ps1`
 
 ### Option 2: Use the auto-elevating script
 ```powershell
-.\test_service_full.ps1
+.\tests\scripts\test_service_full.ps1
 ```
 (Will prompt for UAC elevation)
 
@@ -104,5 +104,5 @@ The C++ service logs to Windows Event Log:
 
 ---
 
-**To test with admin:** Run PowerShell as Administrator and execute `.\run_service_test.ps1`
+**To test with admin:** Run PowerShell as Administrator and execute `.\tests\scripts\run_service_test.ps1`
 

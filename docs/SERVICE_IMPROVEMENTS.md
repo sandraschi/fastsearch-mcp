@@ -1,6 +1,6 @@
 # FastSearch MCP Service Improvements
 
-**Date**: 2025-01-27  
+**Date**: 2025-11-27  
 **Status**: All improvements implemented
 
 ## Summary
@@ -88,7 +88,7 @@ Comprehensive improvements have been implemented to enhance service installation
 
 ### 5. Event Log Reading Utility ✅
 
-**Created**: `read-service-logs.ps1`
+**Created**: `scripts/read-service-logs.ps1`
 
 **Features**:
 - Reads FastSearch MCP service events from Windows Event Log
@@ -99,8 +99,8 @@ Comprehensive improvements have been implemented to enhance service installation
 
 **Usage**:
 ```powershell
-.\read-service-logs.ps1
-.\read-service-logs.ps1 -MaxEvents 100 -Level Error
+.\scripts\read-service-logs.ps1
+.\scripts\read-service-logs.ps1 -MaxEvents 100 -Level Error
 ```
 
 ### 6. Service Startup Debugger ✅
@@ -148,7 +148,7 @@ Comprehensive improvements have been implemented to enhance service installation
 
 4. **If Service Fails to Start**:
    ```powershell
-   .\read-service-logs.ps1 -Level Error
+   .\scripts\read-service-logs.ps1 -Level Error
    .\install-service.ps1 diagnose
    ```
 
@@ -179,7 +179,7 @@ Comprehensive improvements have been implemented to enhance service installation
 
 2. **Test Installation**: Use the new test scripts to verify everything works
 
-3. **Monitor Event Logs**: Use `read-service-logs.ps1` to monitor service health
+3. **Monitor Event Logs**: Use `scripts/read-service-logs.ps1` to monitor service health
 
 4. **Debug Startup Issues**: If service still crashes, use enhanced logging to identify the exact failure point
 
@@ -187,7 +187,7 @@ Comprehensive improvements have been implemented to enhance service installation
 
 ### Created:
 - `test-service-comprehensive.ps1` - Comprehensive test suite
-- `read-service-logs.ps1` - Event log reader
+- `scripts/read-service-logs.ps1` - Event log reader
 - `debug-service-startup.ps1` - Startup debugger
 - `docs/SERVICE_IMPROVEMENTS.md` - This document
 

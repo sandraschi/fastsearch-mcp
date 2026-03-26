@@ -1,0 +1,14 @@
+================================================================================
+TEST SUMMARY
+================================================================================
+Passed: 1
+Failed: 0
+Skipped: 3
+
+PASSED TESTS:
+  ✓ NTFS List Volumes (3468.9ms) Found 10 NTFS volume(s): C:\, D:\, E:\...
+
+SKIPPED TESTS:
+  ⊘ NTFS Volume Info - C:: Requested UAC elevation - please approve and re-run
+  ⊘ NTFS Volume Info - D:: Requested UAC elevation - please approve and re-run
+  ⊘ NTFS Check Health - C:: Requested UAC elevation - please approve and re-run

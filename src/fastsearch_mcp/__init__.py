@@ -1,9 +1,9 @@
 """
-FastSearch MCP Server - FastMCP 2.13 compliant NTFS search service.
+FastSearch MCP Server - FastMCP 3.x NTFS search service.
 
-This package provides a FastMCP 2.13 compliant implementation of the Model Context Protocol (MCP)
-for the FastSearch NTFS search service. It includes direct NTFS Master File Table access,
-real-time search capabilities, and various filesystem analysis tools.
+FastMCP 3.1 compliant: supports sampling (client-side LLM), agentic workflows,
+and unified gateway (run as proxy via fastsearch_mcp.gateway). Includes direct
+NTFS Master File Table access, real-time search, and filesystem analysis tools.
 
 Architecture:
 - Direct NTFS MFT access (no indexing/caching)
@@ -33,66 +33,23 @@ if __name__ == "__main__":
     if str(src_path) not in sys.path:
         sys.path.insert(0, str(src_path))
 
-# FastMCP 2.13 imports
+# FastMCP 3.x imports
 try:
     from fastmcp import FastMCP
 except ImportError as e:
     raise ImportError(
-        "FastMCP 2.13 is required but not installed. Install with: pip install fastmcp>=2.13.0"
+        "FastMCP 3.x is required. Install with: pip install 'fastmcp>=3.0.0,<4'"
     ) from e
 
-# Local imports
-from .server import FastSearchServer
-from .tools import (
-    DiskAnalyzerTool,
-    DuplicateFileFinderTool,
-    FileContentSearchTool,
-    FileIntegrityCheckerTool,
-    GetServiceLogsTool,
-    GetServiceTool,
-    ListServicesTool,
-    RestartServiceTool,
-    SetServiceStartupTypeTool,
-    StartServiceTool,
-    StopServiceTool,
-    SystemResourceMonitorTool,
-)
+# Local imports - import server to register tools
+from .server import server
 
 # Public API
 __all__ = [
-    # Core classes
-    "FastSearchServer",
+    # Server instance
+    "server",
+    # FastMCP class
     "FastMCP",
-    # Tools
-    "FileContentSearchTool",
-    "DiskAnalyzerTool",
-    "DuplicateFileFinderTool",
-    "FileIntegrityCheckerTool",
-    "SystemResourceMonitorTool",
-    "ListServicesTool",
-    "GetServiceTool",
-    "StartServiceTool",
-    "StopServiceTool",
-    "RestartServiceTool",
-    "SetServiceStartupTypeTool",
-    "GetServiceLogsTool",
     # Version
     "__version__",
 ]
-
-
-# Create default server instance
-def create_server() -> FastSearchServer:
-    """Create a new FastSearch MCP server instance."""
-    return FastSearchServer()
-
-
-# Main entry point
-def main() -> None:
-    """Main entry point for the FastSearch MCP server."""
-    server = create_server()
-    server.run()
-
-
-if __name__ == "__main__":
-    main()

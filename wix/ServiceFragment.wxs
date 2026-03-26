@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi"
+     xmlns:util="http://schemas.microsoft.com/wix/UtilExtension">
+  
+  <!-- Service installation fragment -->
+  <Fragment>
+    <ComponentGroup Id="ServiceComponents" Directory="INSTALLFOLDER">
+      <Component Id="ServiceInstall" Guid="A1B2C3D4-E5F6-7890-ABCD-EF1234567890">
+        <File Id="ServiceExe" 
+              Source="$(var.FastSearchServiceNew.TargetPath)" 
+              KeyPath="yes" />
+        
+        <!-- Install and start Windows Service -->
+        <util:ServiceInstall
+          Id="FastSearchMCPService"
+          Name="FastSearchMCP"
+          DisplayName="FastSearch MCP Service"
+          Description="Provides high-performance NTFS file search capabilities using direct MFT access"
+          Type="ownProcess"
+          Start="auto"
+          Account="LocalSystem"
+          ErrorControl="normal"
+          Interactive="no">
+          <util:ServiceConfig
+            FirstFailureActionType="restart"
+            SecondFailureActionType="restart"
+            ThirdFailureActionType="restart"
+            ResetPeriodInDays="1"
+            RestartServiceDelayInSeconds="30" />
+        </util:ServiceInstall>
+        
+        <util:ServiceControl
+          Id="StartService"
+          Name="FastSearchMCP"
+          Start="install"
+          Stop="both"
+          Remove="uninstall"
+          Wait="yes" />
+      </Component>
+    </ComponentGroup>
+  </Fragment>
+  
+</Wix>
+

@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 from fastsearch_mcp.logging_config import get_logger
-from fastsearch_mcp.tools.base import BaseTool, ToolCategory, ToolParameter, tool
+from fastsearch_mcp.mcp_instance import mcp
 from fastsearch_mcp.utils.file_utils import find_files
 
 logger = get_logger(__name__)
@@ -60,7 +60,7 @@ def get_file_hash(file_path: Path, fast_check: bool = False) -> Optional[str]:
         return None
 
 
-def find_duplicate_files(
+def _find_duplicate_files_impl(
     search_dir: str,
     min_size: int = 0,
     max_size: Optional[int] = None,
@@ -131,181 +131,151 @@ def find_duplicate_files(
     }
 
 
-@tool(
-    name="find_duplicate_files",
-    description="Find duplicate files based on content hashing",
-    category=ToolCategory.FILESYSTEM,
-    parameters=[
-        ToolParameter(
-            name="search_dir",
-            type=str,
-            description="Directory to search for duplicates",
-            required=True,
-        ),
-        ToolParameter(
-            name="min_size",
-            type=int,
-            description="Minimum file size in bytes to consider",
-            default=1024,  # 1KB
-            min=0,
-        ),
-        ToolParameter(
-            name="max_size",
-            type=int,
-            description="Maximum file size in bytes to consider",
-            required=False,
-            min=1,
-        ),
-        ToolParameter(
-            name="file_pattern",
-            type=str,
-            description="File pattern to match (e.g., '*.jpg' or '*.{jpg,png}')",
-            default="*",
-        ),
-        ToolParameter(
-            name="exclude_dirs",
-            type=list,
-            description="List of directory patterns to exclude from search",
-            default=["**/__pycache__", "**/.git", "**/node_modules"],
-        ),
-        ToolParameter(
-            name="fast_mode",
-            type=bool,
-            description="Use faster but less accurate hashing (checks only start/end of files)",
-            default=True,
-        ),
-        ToolParameter(
-            name="compare_content",
-            type=bool,
-            description="Compare file contents (slower but more accurate)",
-            default=True,
-        ),
-        ToolParameter(
-            name="min_duplicate_group",
-            type=int,
-            description="Minimum number of duplicates to report",
-            default=2,
-            min=2,
-        ),
-        ToolParameter(
-            name="max_results",
-            type=int,
-            description="Maximum number of duplicate groups to return",
-            default=100,
-            min=1,
-        ),
-    ],
-    return_type=Dict,
-    return_description="Dictionary with hash as key and list of duplicate file paths as value",
-)
-class DuplicateFileFinderTool(BaseTool):
-    """Tool for finding duplicate files based on content hashing."""
+@mcp.tool
+async def find_duplicate_files(
+    search_dir: str,
+    min_size: int = 1024,
+    max_size: Optional[int] = None,
+    file_pattern: str = "*",
+    exclude_dirs: Optional[List[str]] = None,
+    fast_mode: bool = True,
+    compare_content: bool = True,
+    min_duplicate_group: int = 2,
+    max_results: int = 100,
+) -> Dict:
+    """Find duplicate files based on content hashing.
 
-    async def execute(self, **kwargs) -> Dict:
-        """Execute the duplicate file search."""
-        return await asyncio.get_event_loop().run_in_executor(
-            None, self._find_duplicates_sync, **kwargs
+    Searches for duplicate files by comparing file sizes and content hashes.
+    Can use fast mode for quicker results or full content comparison for accuracy.
+
+    Args:
+        search_dir: Directory to search for duplicates
+        min_size: Minimum file size in bytes to consider
+        max_size: Maximum file size in bytes to consider
+        file_pattern: File pattern to match (e.g., '*.jpg' or '*.{jpg,png}')
+        exclude_dirs: List of directory patterns to exclude from search
+        fast_mode: Use faster but less accurate hashing (checks only start/end of files)
+        compare_content: Compare file contents (slower but more accurate)
+        min_duplicate_group: Minimum number of duplicates to report
+        max_results: Maximum number of duplicate groups to return
+
+    Returns:
+        Dictionary with hash as key and list of duplicate file paths as value
+    """
+    if exclude_dirs is None:
+        exclude_dirs = ["**/__pycache__", "**/.git", "**/node_modules"]
+
+    return await asyncio.to_thread(
+        _find_duplicates_sync,
+        search_dir,
+        min_size,
+        max_size,
+        file_pattern,
+        exclude_dirs,
+        fast_mode,
+        compare_content,
+        min_duplicate_group,
+        max_results,
+    )
+
+
+def _find_duplicates_sync(
+    search_dir: str,
+    min_size: int = 1024,
+    max_size: Optional[int] = None,
+    file_pattern: str = "*",
+    exclude_dirs: Optional[List[str]] = None,
+    fast_mode: bool = True,
+    compare_content: bool = True,
+    min_duplicate_group: int = 2,
+    max_results: int = 100,
+) -> Dict:
+    """Synchronous implementation of duplicate file search."""
+    if exclude_dirs is None:
+        exclude_dirs = []
+
+    result = {
+        "search_dir": search_dir,
+        "total_files_processed": 0,
+        "duplicate_groups": 0,
+        "duplicate_files": 0,
+        "duplicates": {},
+    }
+
+    try:
+        # Find all duplicate files
+        duplicates = _find_duplicate_files_impl(
+            search_dir=search_dir,
+            min_size=min_size,
+            max_size=max_size,
+            file_pattern=file_pattern,
+            exclude_dirs=exclude_dirs,
+            fast_mode=fast_mode,
+            compare_content=compare_content,
         )
 
-    def _find_duplicates_sync(
-        self,
-        search_dir: str,
-        min_size: int = 1024,
-        max_size: Optional[int] = None,
-        file_pattern: str = "*",
-        exclude_dirs: Optional[List[str]] = None,
-        fast_mode: bool = True,
-        compare_content: bool = True,
-        min_duplicate_group: int = 2,
-        max_results: int = 100,
-        **kwargs,
-    ) -> Dict:
-        """Synchronous implementation of duplicate file search."""
-        if exclude_dirs is None:
-            exclude_dirs = []
+        # Sort by number of duplicates (descending) and limit results
+        sorted_duplicates = sorted(
+            duplicates.items(),
+            key=lambda x: (
+                len(x[1]),
+                sum(os.path.getsize(f) for f in x[1] if os.path.exists(f)),
+            ),
+            reverse=True,
+        )
 
-        result = {
-            "search_dir": search_dir,
-            "total_files_processed": 0,
-            "duplicate_groups": 0,
-            "duplicate_files": 0,
-            "duplicates": {},
-        }
+        # Filter and format results
+        duplicate_count = 0
+        for hash_val, files in sorted_duplicates:
+            if len(files) < min_duplicate_group:
+                continue
 
-        try:
-            # Find all duplicate files
-            duplicates = find_duplicate_files(
-                search_dir=search_dir,
-                min_size=min_size,
-                max_size=max_size,
-                file_pattern=file_pattern,
-                exclude_dirs=exclude_dirs,
-                fast_mode=fast_mode,
-                compare_content=compare_content,
-            )
+            # Get file sizes and calculate total wasted space
+            files_with_size = []
+            total_size = 0
 
-            # Sort by number of duplicates (descending) and limit results
-            sorted_duplicates = sorted(
-                duplicates.items(),
-                key=lambda x: (
-                    len(x[1]),
-                    sum(os.path.getsize(f) for f in x[1] if os.path.exists(f)),
-                ),
-                reverse=True,
-            )
-
-            # Filter and format results
-            duplicate_count = 0
-            for hash_val, files in sorted_duplicates:
-                if len(files) < min_duplicate_group:
+            for file_path in files:
+                try:
+                    file_size = os.path.getsize(file_path)
+                    files_with_size.append(
+                        {
+                            "path": file_path,
+                            "size": file_size,
+                            "size_human": f"{file_size / (1024 * 1024):.2f} MB",
+                        }
+                    )
+                    total_size += file_size
+                except OSError:
                     continue
 
-                # Get file sizes and calculate total wasted space
-                files_with_size = []
-                total_size = 0
+            if len(files_with_size) < min_duplicate_group:
+                continue
 
-                for file_path in files:
-                    try:
-                        file_size = os.path.getsize(file_path)
-                        files_with_size.append(
-                            {
-                                "path": file_path,
-                                "size": file_size,
-                                "size_human": f"{file_size / (1024 * 1024):.2f} MB",
-                            }
-                        )
-                        total_size += file_size
-                    except OSError:
-                        continue
+            # Add to results
+            result["duplicates"][hash_val] = {
+                "file_count": len(files_with_size),
+                "total_size": total_size,
+                "total_size_human": f"{total_size / (1024 * 1024):.2f} MB",
+                "wasted_space": total_size - (total_size // len(files_with_size)),
+                "files": files_with_size,
+            }
 
-                if len(files_with_size) < min_duplicate_group:
-                    continue
+            duplicate_count += 1
+            if duplicate_count >= max_results:
+                break
 
-                # Add to results
-                result["duplicates"][hash_val] = {
-                    "file_count": len(files_with_size),
-                    "total_size": total_size,
-                    "total_size_human": f"{total_size / (1024 * 1024):.2f} MB",
-                    "wasted_space": total_size - (total_size // len(files_with_size)),
-                    "files": files_with_size,
-                }
+        # Update summary
+        result["duplicate_groups"] = len(result["duplicates"])
+        result["duplicate_files"] = sum(
+            len(group["files"]) for group in result["duplicates"].values()
+        )
+        result["total_wasted"] = sum(
+            group["wasted_space"] for group in result["duplicates"].values()
+        )
+        result["total_wasted_human"] = f"{result['total_wasted'] / (1024 * 1024):.2f} MB"
 
-                duplicate_count += 1
-                if duplicate_count >= max_results:
-                    break
+    except Exception as e:
+        logger.exception("Error finding duplicate files")
+        result["error"] = str(e)
 
-            # Update summary
-            result["duplicate_groups"] = len(result["duplicates"])
-            result["duplicate_files"] = sum(
-                len(group["files"]) for group in result["duplicates"].values()
-            )
-            result["total_wasted"] = sum(
-                group["wasted_space"] for group in result["duplicates"].values()
-            )
-            result["total_wasted_human"] = f"{result['total_wasted'] / (1024 * 1024):.2f} MB"
-
-        except Exception as e:
-            logger.exception("Error finding duplicate files")
-            result["error"] = str(e)
-
-        return result
+    return result

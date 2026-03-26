@@ -49,7 +49,7 @@ cd installer
 .\build_installer.ps1
 
 # 2. Build MCPB package
-.\scripts\build-mcpb-package.ps1 -NoSign
+.\mcpb\scripts\build-mcpb-package.ps1 -NoSign
 
 # Output:
 # - dist/fastsearch-mcp-setup.msi

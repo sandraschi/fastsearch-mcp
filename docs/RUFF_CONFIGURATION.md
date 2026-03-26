@@ -1,13 +1,25 @@
-# Ruff Linting Configuration
+# Ruff Linting and Formatting Configuration
 
-**Date:** November 15, 2025  
-**Status:** Updated to new format
+**Status:** ✅ Active and configured  
+**Location:** Configuration in `pyproject.toml`  
+**Version:** Ruff 0.1.6+ (via dev dependencies)
+
+---
+
+## Overview
+
+Ruff is used for both **linting** and **formatting** in this project, replacing Black, isort, and flake8.
+
+---
 
 ## Configuration
 
-The ruff configuration is in `pyproject.toml` under `[tool.ruff.lint]`.
+The ruff configuration is in `pyproject.toml` under:
+- `[tool.ruff]` - General settings
+- `[tool.ruff.format]` - Formatting options
+- `[tool.ruff.lint]` - Linting rules
 
-### Selected Rules
+### Selected Linting Rules
 
 We enable comprehensive linting rules:
 
@@ -19,45 +31,7 @@ We enable comprehensive linting rules:
 - **C4** - flake8-comprehensions
 - **UP** - pyupgrade
 
-### Ignored Rules
-
-We ignore only 2 rules with good justification:
-
-#### ~~E501 - Line too long~~ (REMOVED)
-**Previous Reason:** Handled by Black formatter  
-**Status:** ✅ **REMOVED** - Ruff now handles formatting and line length checking
-
-#### B008 - Function calls in argument defaults
-**Reason:** Only one instance: `type(None)` in `base.py` line 162  
-**Instance:** `return_type: type = type(None)`  
-**Status:** ✅ Safe - `type(None)` is a builtin, not a mutable call  
-**Note:** This is a false positive - `type(None)` is safe to use in defaults
-
-#### C901 - Too complex
-**Reason:** One function legitimately needs complexity  
-**Instance:** `get_status()` in `mcp_server.py` (complexity 19)  
-**Status:** ⚠️ Could be refactored, but function handles multiple service states  
-**Note:** This function checks service installation, state, registry, and provides suggestions
-
-## Current Issues
-
-**Total:** 222 errors found  
-**Fixable:** 210 (95%)  
-**Unfixable:** 12 (5%)
-
-### Breakdown:
-- 172 W293 - Blank line whitespace (fixable)
-- 16 I001 - Unsorted imports (fixable)
-- 14 F401 - Unused imports (manual fix)
-- 8 F541 - F-string missing placeholders (fixable)
-- 6 E722 - Bare except (manual fix)
-- 3 F841 - Unused variables (manual fix)
-- 2 E402 - Module import not at top (manual fix)
-- 1 UP015 - Redundant open modes (fixable)
-
-## Formatting Configuration
-
-Ruff is now used for both linting and formatting (replacing Black):
+### Formatting Configuration
 
 ```toml
 [tool.ruff.format]
@@ -67,24 +41,165 @@ skip-magic-trailing-comma = false
 line-ending = "auto"
 ```
 
-**Line length:** 100 characters (enforced by Ruff, E501 is checked)
+**Line length:** 100 characters (enforced by Ruff)
 
-## Recommendations
+### Per-File Ignores
 
-### Should We Remove Any Ignores?
+Some files have legitimate reasons to ignore certain rules:
 
-**B008:** Keep - `type(None)` is safe  
-**C901:** Consider refactoring `get_status()` to reduce complexity, but keep ignore for now
+- **E402** (Module import not at top) - Required for FastMCP 2.13+ pattern
+- **F401** (Unused imports) - Side-effect imports for tool registration
+- **C901** (Too complex) - Some functions legitimately need complexity
 
-### Should We Add More Ignores?
+See `pyproject.toml` for specific file-level ignores.
 
-**No** - The current ignore list is minimal and justified. Most issues are fixable.
+---
 
-## Auto-Fix
+## Usage
 
-Run `ruff check --fix .` to automatically fix 210 issues (95% of all issues).
+### Check for Issues
 
-## Migration to New Format
+```powershell
+# Check all files
+uv run ruff check .
 
-✅ **Updated:** Configuration moved from top-level `[tool.ruff]` to `[tool.ruff.lint]` section to match Ruff's new format and eliminate deprecation warnings.
+# Check specific directory
+uv run ruff check src/ tests/
+
+# Check with auto-fix
+uv run ruff check . --fix
+```
+
+### Format Code
+
+```powershell
+# Format all files
+uv run ruff format .
+
+# Format specific directory
+uv run ruff format src/ tests/
+
+# Check formatting without changing files
+uv run ruff format --check .
+```
+
+### Pre-Commit Hooks
+
+Ruff is configured in `.pre-commit-config.yaml`:
+
+```yaml
+- repo: https://github.com/astral-sh/ruff-pre-commit
+  rev: v0.1.15
+  hooks:
+    - id: ruff
+      args: [--fix, --exit-non-zero-on-fix]
+    - id: ruff-format
+```
+
+**Install hooks:**
+```powershell
+pip install pre-commit
+pre-commit install
+```
+
+---
+
+## CI/CD Integration
+
+Ruff runs automatically in CI (`.github/workflows/ci.yml`):
+
+1. **Linting check:** `ruff check src/ tests/`
+2. **Formatting check:** `ruff format --check src/ tests/`
+
+Both must pass for CI to succeed.
+
+---
+
+## Development Workflow
+
+### Before Committing
+
+1. **Run linting:**
+   ```powershell
+   uv run ruff check .
+   ```
+
+2. **Auto-fix issues:**
+   ```powershell
+   uv run ruff check . --fix
+   ```
+
+3. **Format code:**
+   ```powershell
+   uv run ruff format .
+   ```
+
+### After Adding/Modifying Code
+
+- **ALWAYS run ruff check** after tool addition/modification
+- **ALWAYS run ruff format** after linting passes
+- **ZERO errors required** before committing
+
+---
+
+## Common Issues and Solutions
+
+### Unused Imports (F401)
+
+**Fix:**
+```powershell
+uv run ruff check . --fix
+# Or manually remove unused imports
+```
+
+### Import Sorting (I001)
+
+**Fix:**
+```powershell
+uv run ruff check . --fix
+# Automatically sorts imports
+```
+
+### Line Too Long (E501)
+
+**Fix:**
+- Break long lines
+- Ruff will format automatically if possible
+- Line length limit: 100 characters
+
+### Blank Line Whitespace (W293)
+
+**Fix:**
+```powershell
+uv run ruff check . --fix
+# Automatically removes trailing whitespace
+```
+
+---
+
+## Why Ruff?
+
+**Benefits:**
+- ⚡ **Fast** - 10-100x faster than Black + isort + flake8
+- 🔧 **All-in-one** - Linting + formatting in single tool
+- 🎯 **Compatible** - Drop-in replacement for Black/isort
+- 📦 **Single dependency** - One tool instead of three
+
+**Replaces:**
+- ❌ Black (formatting)
+- ❌ isort (import sorting)
+- ❌ flake8 (linting)
+
+---
+
+## References
+
+- **Ruff Documentation:** https://docs.astral.sh/ruff/
+- **Configuration:** `pyproject.toml` `[tool.ruff]` section
+- **Pre-commit:** `.pre-commit-config.yaml`
+- **CI Workflow:** `.github/workflows/ci.yml`
+
+---
+
+*Last Updated: 2025-01-15*
 

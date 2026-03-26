@@ -7,57 +7,67 @@ following FastMCP 2.13 patterns and conventions.
 """
 
 import asyncio
+import logging
+import os
 import sys
 from pathlib import Path
 
-# Add src to path for development
-src_path = Path(__file__).parent.parent
-if str(src_path) not in sys.path:
-    sys.path.insert(0, str(src_path))
 
-from fastsearch_mcp import FastSearchServer, __version__  # noqa: E402
+def _setup_path() -> None:
+    """Setup Python path for development."""
+    src_path = Path(__file__).parent.parent
+    if str(src_path) not in sys.path:
+        sys.path.insert(0, str(src_path))
 
 
-def print_banner() -> None:
-    """Print the FastSearch MCP server banner."""
-    print(f"""
-╔══════════════════════════════════════════════════════════════╗
-║                    FastSearch MCP Server                   ║
-║                      Version {__version__}                      ║
-║                                                              ║
-║  🚀 Direct NTFS MFT Access • Real-time Search              ║
-║  ⚡ Sub-100ms Performance • <50MB Memory                    ║
-║  🎯 Instant Startup • FastMCP 2.13 Compliant              ║
-╚══════════════════════════════════════════════════════════════╝
-""")
+def _setup_encoding() -> None:
+    """Setup encoding for Windows console compatibility."""
+    if sys.platform == "win32":
+        os.environ["PYTHONIOENCODING"] = "ascii:replace"
+
+
+# Setup before imports
+_setup_encoding()
+_setup_path()
+
+# Now imports are at top level
+from fastsearch_mcp import __version__
+from fastsearch_mcp.logging_config import setup_logging, struct_message
+from fastsearch_mcp.server import server
+from .transport import run_server_async
+
+# Setup logging before creating logger
+setup_logging(log_level="INFO")
+logger = logging.getLogger(__name__)
 
 
 async def main() -> None:
     """Main async entry point."""
-    print_banner()
+    logger.info(struct_message("Starting FastSearch MCP server", version=__version__))
 
     try:
-        # Create and run the server
-        server = FastSearchServer()
-        await server.start()
+        # Run the server
+        await run_server_async(server, server_name="fastsearch-mcp")
 
     except KeyboardInterrupt:
         # Server was interrupted - this is normal
-        pass
+        logger.info("Server interrupted by user")
     except Exception as e:
-        print(f"❌ Server error: {e}", file=sys.stderr)
+        logger.exception(struct_message("Server error", error=str(e), error_type=type(e).__name__))
+        # Also print to stderr for Claude Desktop logs
+        print(f"[ERROR] Server error: {e}", file=sys.stderr)
         raise
 
 
 def cli_main() -> None:
-    """CLI entry point."""
+    """CLI entry point (sync). Runs async main so Cursor/uvx can start the server."""
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        # Don't print to stdout after interruption - it may be closed
         pass
     except Exception as e:
-        print(f"❌ Fatal error: {e}", file=sys.stderr)
+        logger.exception(struct_message("Fatal error", error=str(e), error_type=type(e).__name__))
+        print(f"[ERROR] Fatal error: {e}", file=sys.stderr)
         sys.exit(1)
 
 
