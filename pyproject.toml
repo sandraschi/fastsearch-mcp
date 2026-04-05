@@ -83,45 +83,6 @@ warn_no_return = true
 warn_unreachable = true
 strict_equality = true
 
-[tool.ruff]
-target-version = "py38"
-line-length = 100
-extend-exclude = ["build", "dist", ".eggs", ".git", ".hg", ".mypy_cache", ".tox", ".venv", "__pycache__"]
-
-[tool.ruff.format]
-quote-style = "double"
-indent-style = "space"
-skip-magic-trailing-comma = false
-line-ending = "auto"
-
-[tool.ruff.lint]
-select = [
-    "E",  # pycodestyle errors
-    "W",  # pycodestyle warnings
-    "F",  # pyflakes
-    "I",  # isort
-    "B",  # flake8-bugbear
-    "C4", # flake8-comprehensions
-    "UP", # pyupgrade
-]
-ignore = []
-
-[tool.ruff.lint.per-file-ignores]
-# FastMCP 2.13 pattern: imports after mcp instance creation and side-effect imports
-"src/fastsearch_mcp/server.py" = ["E402", "F401"]  # E402: imports after mcp instance, F401: side-effect imports
-"src/fastsearch_mcp/tools/__init__.py" = ["F401"]  # F401: imports for side effects (tool registration)
-"src/fastsearch_mcp/__main__.py" = ["E402"]  # E402: imports after sys.path manipulation
-# Test files often have complex setup/teardown logic
-"test_*.py" = ["C901", "E402"]  # E402: imports after sys.path manipulation are necessary
-"*_test.py" = ["C901", "E402"]
-"tests/**/*.py" = ["C901", "E402"]
-# Source files with legitimate complexity (service status, file search, etc.)
-"src/fastsearch_mcp/mcp_server.py" = ["C901"]  # get_status handles multiple service states
-"src/fastsearch_mcp/tools/file_search.py" = ["C901"]  # _search_sync handles complex file filtering
-"src/fastsearch_mcp/tools/integrity_checker.py" = ["C901"]  # Complex file integrity checking logic
-"src/fastsearch_mcp/tools/service_manager.py" = ["C901"]  # Windows service management complexity
-"src/fastsearch_mcp/utils/file_utils.py" = ["C901"]  # Complex file finding logic
-
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py", "*_test.py"]
@@ -142,3 +103,32 @@ addopts = [
     "service: marks tests that require the FastSearch service",
     "admin: marks tests that require administrator privileges",
   ]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+# Hardened v13.1 Rule Set
+select = [
+    "E", "F", "I", "UP", "B", "S", "A", "ANN", "COM", "C4", "DTZ", "PIE", "T20", "PYI", "Q", "RSE", "RET", "SLF", "SIM", "TID", "ARG", "PTH", "ERA", "PD", "PGH", "PL", "TRY", "FLY", "PERF", "FURB", "LOG", "RUF"
+]
+ignore = [
+    "ANN101", # Missing type annotation for self
+    "ANN102", # Missing type annotation for cls
+    "COM812", # Trailing comma missing (handled by formatter)
+    "ISC001", # Single line implicit string concatenation (handled by formatter)
+    "PLR0913", # Too many arguments
+    "S101",   # Use of assert (standard for pytest)
+    "TRY003", # Avoid specifying long messages in exceptions
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101", "ANN", "PLR", "TRY", "S105", "S106", "SLF001", "ARG002", "PLC0415"]
+"server.py" = ["T20", "ARG001", "ARG002"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"

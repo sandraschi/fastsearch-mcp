@@ -1,6 +1,6 @@
 # FastSearch MCP
 
-⚡ Lightning-fast file search for Claude Desktop via direct NTFS Master File Table access — no indexing, no caching, no compromises.
+ Lightning-fast file search for Claude Desktop via direct NTFS Master File Table access  no indexing, no caching, no compromises.
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -8,7 +8,7 @@
 
 > **Core Principle:** FastSearch MCP follows the WizFile philosophy. Every request reads straight from the NTFS MFT. We never build background indexes, caches, or persistent file databases.
 
-## 🚀 Why FastSearch MCP
+##  Why FastSearch MCP
 
 - **Direct NTFS MFT reads** for sub-second search across millions of files.
 - **Zero indexing & zero persistence** keeps startup instant and memory under 50 MB.
@@ -17,15 +17,15 @@
 - **Fast service checks** - <1ms overhead per search (optimized from 5 seconds).
 - **Clear error messages** - Actionable guidance when service is unavailable.
 
-## 🏗 Architecture Overview
+##  Architecture Overview
 
 ```
 Claude Desktop
-      │ JSON-RPC (stdin/stdout)
+       JSON-RPC (stdin/stdout)
 Python MCP Bridge (user privileges)
-      │ Named pipe (`\\.\pipe\FastSearchMCP`)
+       Named pipe (`\\.\pipe\FastSearchMCP`)
 C++ Windows Service (LocalSystem)
-      │
+      
 NTFS Master File Table (live)
 ```
 
@@ -42,7 +42,7 @@ NTFS Master File Table (live)
   - Fast service availability checks (<1ms) before each search.
   - Clear error messages when service is unavailable (no silent fallbacks).
 
-## 🚨 Architecture Guardrails (Non-Negotiable)
+##  Architecture Guardrails (Non-Negotiable)
 
 - **Never add indexing, background scanning, or persistent metadata stores.**
 - **Never introduce in-memory caches of file lists or search results.**
@@ -66,19 +66,19 @@ See `docs/WIZFILE_COMPARISON.md` for the rationale.
   ```
   Optional: `FASTSEARCH_GATEWAY_CONFIG` for multi-server JSON config; `MCP_TRANSPORT`, `MCP_HOST`, `MCP_PORT` to run the gateway over HTTP.
 
-## 🚀 Installation
+##  Installation
 
 ### Prerequisites
 - [uv](https://docs.astral.sh/uv/) installed (RECOMMENDED)
 - Python 3.12+
 
-### 📦 Quick Start
+###  Quick Start
 Run immediately via `uvx`:
 ```bash
 uvx fastsearch-mcp
 ```
 
-### 🎯 Claude Desktop Integration
+###  Claude Desktop Integration
 Add to your `claude_desktop_config.json`:
 ```json
 "mcpServers": {
@@ -90,15 +90,15 @@ Add to your `claude_desktop_config.json`:
 ```
 ### Quick Start
 
-#### For IDE Users (Cursor, Windsurf, Zed) ⭐ **Recommended**
+#### For IDE Users (Cursor, Windsurf, Zed)  **Recommended**
 
-1. Install service: Download `fastsearch-mcp-setup.msi` → Run as Administrator
+1. Install service: Download `fastsearch-mcp-setup.msi`  Run as Administrator
 2. Install Python package: `pip install fastsearch-mcp`
 3. Configure IDE: `npx -y fastsearch-mcp`
 
 #### For Claude Desktop Users
 
-1. Install service: Download `fastsearch-mcp-setup.msi` → Run as Administrator
+1. Install service: Download `fastsearch-mcp-setup.msi`  Run as Administrator
 2. Install extension: Drag `fastsearch-mcp-0.4.0.mcpb` into Claude Desktop
    - **Note**: MCPB format is Claude Desktop specific. The "drag-and-drop into settings UI" UX is unconventional.
    - **Benefit**: MCPB includes prompt templates (system prompts, user guides) that help Claude understand capabilities.
@@ -109,7 +109,7 @@ Add to your `claude_desktop_config.json`:
 
 See [Local Installation](docs/INSTALLATION_METHODS.md#1-local-installation-development) for full setup.
 
-## ▶️ Running the MCP Server Locally
+##  Running the MCP Server Locally
 
 ```powershell
 .venv\Scripts\Activate.ps1
@@ -118,7 +118,7 @@ python scripts/start_server.py
 
 Add `fastsearch-mcp` to Claude Desktop's MCP configuration (see `mcp.config.json`) to auto-launch with Claude.
 
-## 🧪 Development Notes
+##  Development Notes
 
 - `pytest` runs the Python test suite (18/18 tests passing). With the FastSearch service running (Windows), `pytest tests/test_live_pipe.py -v` runs live pipe + search integration tests.
 - **Tests page:** In the webapp, open `/tests` to run the same live tests from the UI.
@@ -129,18 +129,18 @@ Add `fastsearch-mcp` to Claude Desktop's MCP configuration (see `mcp.config.json
 
 See `docs/RECENT_IMPROVEMENTS.md` for details on recent improvements.
 
-## 📚 Key Documentation
+##  Key Documentation
 
-- `docs/RECENT_IMPROVEMENTS.md` – **NEW** - Recent improvements and search functionality status.
-- `docs/STATUS_REPORT.md` – Current project status and what's working.
-- `docs/TECHNICAL_ARCHITECTURE.md` – deep dive into the C++ + MCP bridge design.
-- `docs/PRODUCT_REQUIREMENTS.md` – product goals and non-negotiable principles.
-- `docs/SERVICE_AVAILABILITY_CHECKS.md` – How service availability is checked and error handling.
-- `docs/PIPE_CONNECTION_TROUBLESHOOTING.md` – Pipe not found (error 2): diagnosis, Event Log, fixes.
-- `docs/STATUS_NOTE_MEMOPS.md` – Short ops status note for pipe connect failures.
-- `docs/WIZFILE_COMPARISON.md` – why direct MFT access beats indexing.
+- `docs/RECENT_IMPROVEMENTS.md`  **NEW** - Recent improvements and search functionality status.
+- `docs/STATUS_REPORT.md`  Current project status and what's working.
+- `docs/TECHNICAL_ARCHITECTURE.md`  deep dive into the C++ + MCP bridge design.
+- `docs/PRODUCT_REQUIREMENTS.md`  product goals and non-negotiable principles.
+- `docs/SERVICE_AVAILABILITY_CHECKS.md`  How service availability is checked and error handling.
+- `docs/PIPE_CONNECTION_TROUBLESHOOTING.md`  Pipe not found (error 2): diagnosis, Event Log, fixes.
+- `docs/STATUS_NOTE_MEMOPS.md`  Short ops status note for pipe connect failures.
+- `docs/WIZFILE_COMPARISON.md`  why direct MFT access beats indexing.
 
-## 🤝 Contributing
+##  Contributing
 
 We welcome contributions that preserve the direct-MFT architecture.
 
@@ -150,12 +150,12 @@ We welcome contributions that preserve the direct-MFT architecture.
 4. Run `pytest` and the markdown linter (`scripts/lint-markdown.ps1`).
 5. Submit a PR referencing the relevant docs.
 
-## 📄 License
+##  License
 
-MIT – see [LICENSE](LICENSE).
+MIT  see [LICENSE](LICENSE).
 
 
-## 🌐 Webapp Dashboard
+##  Webapp Dashboard
 
 This MCP server includes a free, premium web interface for monitoring and control.
 By default, the web dashboard runs on port **10844**.
