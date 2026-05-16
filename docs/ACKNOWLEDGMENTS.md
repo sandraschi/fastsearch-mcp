@@ -8,6 +8,6 @@ FastSearch's MFT reading capabilities are inspired by the innovative work of the
 
 ## Other Credits
 
-- FastMCP 2.13 specification for the MCP protocol
+- FastMCP 3.2 framework for the MCP server implementation
 - Microsoft NTFS documentation and reference implementations for low-level MFT access
 - Python's win32file for Windows system integration
