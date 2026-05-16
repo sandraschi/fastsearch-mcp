@@ -1,0 +1,2381 @@
+# FastSearch MCP v0.5.0 — Full Documentation
+Generated: 2026-05-16T05:54:01.910345
+
+## README
+Source: README.md
+```
+# FastSearch MCP
+
+[![GitHub Release](https://img.shields.io/github/v/release/sandraschi/fastsearch-mcp?style=flat-square&logo=github&logoColor=white)](https://github.com/sandraschi/fastsearch-mcp/releases) [![FastMCP](https://img.shields.io/badge/FastMCP-3.2-blue?style=flat-square&logo=python&logoColor=white)](https://fastmcp.ai) [![Windows](https://img.shields.io/badge/Windows-10%2B-0078D6?style=flat-square&logo=windows&logoColor=white)](https://www.microsoft.com/windows) [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff) [![Biome](https://img.shields.io/badge/Linted_with-Biome-60a5fa?style=flat-square&logo=biome&logoColor=white)](https://biomejs.dev/) [![Just](https://img.shields.io/badge/Built_with-Just-000000?style=flat-square&logo=gnu-bash&logoColor=white)](https://github.com/casey/just) [![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue?style=flat-square&logo=python&logoColor=white)](https://www.python.org/) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT) [![Last Commit](https://img.shields.io/github/last-commit/sandraschi/fastsearch-mcp?style=flat-square&logo=github&logoColor=white)](https://github.com/sandraschi/fastsearch-mcp/commits/main) [![Repo Size](https://img.shields.io/github/repo-size/sandraschi/fastsearch-mcp?style=flat-square&logo=github&logoColor=white)](https://github.com/sandraschi/fastsearch-mcp) [![CI](https://img.shields.io/github/actions/workflow/status/sandraschi/fastsearch-mcp/.github/workflows/ci.yml?style=flat-square&logo=githubactions&logoColor=white&label=CI)](https://github.com/sandraschi/fastsearch-mcp/actions)
+
+  Lightning-fast file search via direct NTFS Master File Table access — zero indexing, zero caching. FastMCP 3.2 with CodeMode, prompts, and skills.
+
+> **Core Principle:** FastSearch MCP follows the WizFile philosophy. Every request reads straight from the NTFS MFT. We never build background indexes, caches, or persistent file databases.
+
+##  Why FastSearch MCP
+
+- **Direct NTFS MFT reads** for sub-second search across millions of files.
+- **Zero indexing & zero persistence** keeps startup instant and memory under 50 MB.
+- **FastMCP 3.2**: sampling, CodeMode (`--agentic`), `@mcp.prompt()`, `@mcp.skill()`
+- **Privilege separation**: elevated C++ service handles filesystem duties, Python bridge stays in user space.
+- **Fast service checks** - <1ms overhead per search (optimized from 5 seconds).
+- **Clear error messages** - Actionable guidance when service is unavailable.
+
+##  Architecture Overview
+
+```
+Claude Desktop
+       JSON-RPC (stdin/stdout)
+Python MCP Bridge (user privileges)
+       Named pipe (`\\.\pipe\FastSearchMCP`)
+C++ Windows Service (LocalSystem)
+      
+NTFS Master File Table (live)
+```
+
+- **C++ Windows Service (`service/`)**
+  - Runs as `LocalSystem`.
+  - Opens NTFS volumes directly and answers search requests on demand.
+  - Emits structured logging to the Windows Event Log for diagnostics.
+  - No background threads, no file caches, no startup scans.
+
+- **Python MCP Bridge (`src/fastsearch_mcp/`)**
+  - FastMCP 3.2: **sampling** via `ctx.sampling()`, **CodeMode** agentic discovery (`--agentic`), **prompts** (`@mcp.prompt()`), and **skills** (`@mcp.skill()`).
+  - Implements 18 FastMCP 3.2 tools (`fastsearch_search`, `disk_analyzer`, `service_status`, etc.).
+  - Marshals requests to the service via named pipes and reformats results for Claude.
+  - Fast service availability checks (<1ms) before each search.
+  - Clear error messages when service is unavailable (no silent fallbacks).
+
+##  Architecture Guardrails (Non-Negotiable)
+
+- **Never add indexing, background scanning, or persistent metadata stores.**
+- **Never introduce in-memory caches of file lists or search results.**
+- **Always query NTFS live and stop once `max_results` is reached.**
+- **Always maintain instant startup, real-time accuracy, and minimal memory usage.**
+
+See `docs/WIZFILE_COMPARISON.md` for the rationale.
+
+## FastMCP 3.2: Sampling, CodeMode, Prompts, Skills, Gateway
+
+- **Sampling**: Tools can request LLM completions from the client via `ctx.sampling()` (FastMCP 3.2 `Context` injection). No server-side configuration needed — the client provides the sampling handler.
+- **CodeMode agentic discovery**: Run with `--agentic` flag or `MCP_AGENTIC=true` to collapse all tools into discovery + execute meta-tools, using FastMCP 3.2's `CodeMode().attach(mcp)` transform.
+- **Prompts**: 3 built-in `@mcp.prompt()` templates: file search guide, disk analysis guide, service troubleshooting. Auto-registered at import time.
+- **Skills**: 3 composable `@mcp.skill()` workflows: find recently modified files, cleanup disk space, forensic file audit.
+- **Unified gateway**: Run as a proxy that aggregates or bridges other MCP servers (transport bridging, session isolation, forwards sampling/elicitation/logging/progress):
+  ```bash
+  # Single backend
+  set FASTSEARCH_GATEWAY_URL=http://127.0.0.1:8000/mcp
+  uv run python -m fastsearch_mcp.gateway
+
+  # Or use the console script
+  fastsearch-gateway
+  ```
+  Optional: `FASTSEARCH_GATEWAY_CONFIG` for multi-server JSON config; `MCP_TRANSPORT`, `MCP_HOST`, `MCP_PORT` to run the gateway over HTTP.
+
+##  Installation
+
+### Prerequisites
+- [uv](https://docs.astral.sh/uv/) installed (RECOMMENDED)
+- Python 3.12+
+
+###  Quick Start
+Run immediately via `uvx`:
+```bash
+uvx fastsearch-mcp
+```
+
+###  Claude Desktop Integration
+Add to your `claude_desktop_config.json`:
+```json
+"mcpServers": {
+  "fastsearch-mcp": {
+    "command": "uv",
+    "args": ["--directory", "D:/Dev/repos/fastsearch-mcp", "run", "fastsearch-mcp"]
+  }
+}
+```
+### Quick Start
+
+#### For IDE Users (Cursor, Windsurf, Zed)  **Recommended**
+
+1. Install service: Download `fastsearch-mcp-setup.msi`  Run as Administrator
+2. Install Python package: `pip install fastsearch-mcp`
+3. Configure IDE: `npx -y fastsearch-mcp`
+
+#### For Claude Desktop Users
+
+1. Install service: Download `fastsearch-mcp-setup.msi`  Run as Administrator
+2. Install extension: Drag `fastsearch-mcp-0.4.0.mcpb` into Claude Desktop
+   - **Note**: MCPB format is Claude Desktop specific. The "drag-and-drop into settings UI" UX is unconventional.
+   - **Benefit**: MCPB includes prompt templates (system prompts, user guides) that help Claude understand capabilities.
+   - **Alternative**: Use NPX installation above for standard MCP config (works with Claude Desktop too).
+   - **See**: [`docs/MCPB_STATUS.md`](docs/MCPB_STATUS.md) for detailed explanation of MCPB limitations and prompt template alternatives.
+
+#### For Developers
+
+See [Local Installation](docs/INSTALLATION_METHODS.md#1-local-installation-development) for full setup.
+
+##  Running the MCP Server Locally
+
+```powershell
+.venv\Scripts\Activate.ps1
+python scripts/start_server.py
+```
+
+Add `fastsearch-mcp` to Claude Desktop's MCP configuration (see `mcp.config.json`) to auto-launch with Claude.
+
+##  Development Notes
+
+- `pytest` runs the Python test suite (18/18 tests passing). With the FastSearch service running (Windows), `pytest tests/test_live_pipe.py -v` runs live pipe + search integration tests.
+- **Tests page:** In the webapp, open `/tests` to run the same live tests from the UI.
+- `scripts/check-repo-standards.ps1` enforces logging + doc standards.
+- **Search functionality fully operational** - All search tools working with direct NTFS MFT access.
+- **Service running** - FastSearch Windows service operational and responding to requests.
+- **Performance optimized** - Service checks optimized to <1ms (from 5 seconds).
+
+See `docs/RECENT_IMPROVEMENTS.md` for details on recent improvements.
+
+##  Key Documentation
+
+- `docs/RECENT_IMPROVEMENTS.md`  **NEW** - Recent improvements and search functionality status.
+- `docs/STATUS_REPORT.md`  Current project status and what's working.
+- `docs/TECHNICAL_ARCHITECTURE.md`  deep dive into the C++ + MCP bridge design.
+- `docs/PRODUCT_REQUIREMENTS.md`  product goals and non-negotiable principles.
+- `docs/SERVICE_AVAILABILITY_CHECKS.md`  How service availability is checked and error handling.
+- `docs/PIPE_CONNECTION_TROUBLESHOOTING.md`  Pipe not found (error 2): diagnosis, Event Log, fixes.
+- `docs/STATUS_NOTE_MEMOPS.md`  Short ops status note for pipe connect failures.
+- `docs/WIZFILE_COMPARISON.md`  why direct MFT access beats indexing.
+
+##  Contributing
+
+We welcome contributions that preserve the direct-MFT architecture.
+
+1. Open an issue describing the change.
+2. Confirm it does **not** add indexing, caching, or background scanning.
+3. Create a feature branch and add tests where applicable.
+4. Run `pytest` and the markdown linter (`scripts/lint-markdown.ps1`).
+5. Submit a PR referencing the relevant docs.
+
+
+## 🛡️ Industrial Quality Stack
+
+This project adheres to **SOTA 14.1** industrial standards for high-fidelity agentic orchestration:
+
+- **Python (Core)**: [Ruff](https://astral.sh/ruff) for linting and formatting. Zero-tolerance for `print` statements in core handlers (`T201`).
+- **Webapp (UI)**: [Biome](https://biomejs.dev/) for sub-millisecond linting. Strict `noConsoleLog` enforcement.
+- **Protocol Compliance**: Hardened `stdout/stderr` isolation to ensure crash-resistant JSON-RPC communication.
+- **Automation**: [Justfile](./justfile) recipes for all fleet operations (`just lint`, `just fix`, `just dev`).
+- **Security**: Automated audits via `bandit` and `safety`.
+
+##  License
+
+MIT  see [LICENSE](LICENSE).
+
+
+##  Webapp Dashboard
+
+This MCP server includes a free, premium web interface for monitoring and control.
+By default, the web dashboard runs on port **10844**.
+*(Assigned ports: **10844** (Web dashboard frontend), **10845** (Web dashboard backend (API)))*
+
+**Pages:** Overview, NTFS Search Service, **Tests** (live pipe + search tests), Search Tools, Quick Actions, AI Assistant, System Logs, Settings.
+
+To start the webapp:
+1. Navigate to the `web_sota` (or `webapp`) directory.
+2. Run `start.ps1` (PowerShell).
+3. Open `http://localhost:10844` in your browser.
+
+The **Tests** page runs live integration tests (service process check, pipe connect, get_service_info, real search via pipe) so you can verify the service and search path without leaving the dashboard.
+```
+
+## Status Report
+Source: docs/STATUS_REPORT.md
+```
+# FastSearch MCP - Status Report
+**Date:** 2026-05-16  
+**Version:** 0.5.0
+
+## Critical Bugfixes (May 2026)
+
+### C++ Service Fixes
+- **MFT_RECORD_HEADER struct misalignment** - The `WORD Flags` field was missing from its correct offset between `AttributeOffset` and `BaseRecordReference`. The record-in-use check was reading the high word of the MFT record number instead of actual flags, silently skipping ~50% of MFT records (all records 0-65535). This caused the search probe to return 0 results for `*.txt` on `C:\`.
+- **USA fixup** - Added Update Sequence Array fixup to correct the last 2 bytes of each 512-byte sector in MFT records during parsing. Without this, fixup values (not real data) occupied those bytes, corrupting attribute traversal when attributes crossed sector boundaries.
+
+### Python Bridge Fixes
+- **Session management** - Fixed double-pop of `session_id` that created a brand-new session on every request (all session state was lost).
+- **Pipe handle leak** - Fixed Windows kernel handle leak on every pipe I/O error.
+- **Async blocking** - Wrapped blocking `CreateFile` and `subprocess.run` calls in executor/thread to prevent event loop freezes.
+- **Service args** - Fixed `" ".join(args)` that was passing service arguments character-by-character to `StartService`.
+- **14 total bugs fixed across C++ and Python layers** - See CHANGELOG.md for full list.
+
+### 🚀 FastMCP 3.2 Upgrade
+- **FastMCP 3.1 → 3.2** - Dependency updated to `fastmcp>=3.2.0,<4`
+- **Sampling** - Tools use `ctx: Context = None` pattern for client-side LLM access via `ctx.sampling()`
+- **CodeMode** - New `--agentic` CLI flag (and `MCP_AGENTIC=true` env) enables agentic discovery via `CodeMode().attach(mcp)`
+- **Prompts** - 3 `@mcp.prompt()` templates registered: file search guide, disk analysis guide, service troubleshooting
+- **Skills** - 3 `@mcp.skill()` definitions: find recently modified files, cleanup disk space, forensic file audit
+- **mcpb.json** - FastMCP constraint updated to `>=3.2.0,<4`, version bumped to 1.1.0
+
+## Recent Improvements (March 2025)
+
+### Live Tests and Tests Page
+- **Live integration tests:** `fastsearch_mcp.live_tests.run_live_tests()` runs service_process, pipe_connect, get_service_info, search_via_pipe. Pytest `tests/test_live_pipe.py` runs the same flow (Windows, service required). API `POST /api/tests/run` for the webapp.
+- **Tests page:** Webapp route `/tests` with configurable pattern, directory, max_results; run button; pass/fail list with duration and details. Sidebar link "Tests".
+- **Path normalization:** Search path (e.g. `C:`) normalized to `C:\\` before sending to C++ service.
+- **Pipe error reporting:** Pipe connection failures now return an error and surface in the UI instead of "success, 0 results".
+
+## 🎉 Recent Improvements (November 2025)
+
+### ✅ **Search Functionality - FULLY WORKING**
+- **All search tools operational** - File searches working across different patterns, drives, and directories
+- **18/18 comprehensive tests passing** - Verified with *.py, *.cpp, *.txt patterns on C: and D: drives
+- **Service integration complete** - FastSearch Windows service running and responding to search requests
+- **Direct NTFS MFT access** - All searches use direct MFT reads via C++ service (no fallbacks)
+
+### ⚡ **Performance Optimizations**
+- **Fast service checks** - Optimized from 5 seconds to <1ms per check
+  - Uses fast pipe connection check instead of slow `tasklist` command
+  - 2-second caching prevents repeated checks on rapid searches
+  - Maintains "FastSearch" performance promise
+- **Zero overhead** - Service availability check adds <1ms to each search
+
+### 🧹 **Architecture Cleanup**
+- **Removed fallback code** - Eliminated treewalking fallbacks that violated architecture
+  - Removed `_fallback_search()` dead code
+  - Removed `basic_file_search()` treewalker
+  - Removed `fastsearch.search_basic` tool registration
+- **Clean error handling** - Service-required errors are explicit and actionable
+- **No compromises** - Direct MFT access only, no indexing, no caching, no treewalking
+
+### 📝 **Improved Error Messages**
+- **User-friendly messages** - Clear, formatted error messages with step-by-step recovery instructions
+- **Tool suggestions** - Error messages reference available tools (`service_status`, `start_service`, etc.)
+- **Service-required flag** - Search responses include `service_required: true` flag for easy detection
+
+## ✅ **What Works**
+
+### **MCP Server - PRODUCTION READY** ✅
+- **All 18 tools functional** in Claude Desktop
+- **FastMCP 2.13 compliant** implementation
+- **Tool registration** via FastMCP 2.13 `self.app.tool()` (no description parameter - uses docstrings)
+- **Error handling** comprehensive across all tools with clear, actionable messages
+- **Code quality**: All ruff linting issues fixed (0 errors)
+
+### **Search Functionality - FULLY OPERATIONAL** ✅
+- **File searches working** - All patterns (*.py, *.cpp, *.txt, etc.) tested and verified
+- **Multi-drive support** - Searches work across C:, D:, and all NTFS drives
+- **Directory searches** - Works with any start directory (C:\, D:\Dev, D:\Dev\repos, etc.)
+- **Service integration** - FastSearch Windows service running and responding
+- **Direct MFT access** - All searches use direct NTFS MFT reads (no fallbacks)
+- **18/18 tests passing** - Comprehensive test suite validates all search scenarios
+
+### **Available Tools (17 Total)** ✅
+1. **fastsearch.search** - ✅ **DIRECT NTFS MFT ACCESS** - Simple file name search with all NTFS drives support
+2. **fastsearch.search_advanced** - ✅ **COMPREHENSIVE MFT ATTRIBUTES** - Advanced search with all MFT attributes (size, timestamps, file attributes) - **NEW**
+3. **file_search** - ✅ **DIRECT NTFS MFT ACCESS IMPLEMENTED** - Reads MFT records directly from volume using LCN offsets (November 2025)
+2. **file_content_search** - Text pattern search in files
+3. **disk_analyzer** - Disk usage analysis and large file detection
+4. **duplicate_finder** - Find duplicate files by content hash
+5. **integrity_checker** - File integrity verification with checksums
+6. **resource_monitor** - System resource monitoring (CPU, memory, disk)
+7. **service_status** - FastSearch C++ service status
+8. **list_services** - List all Windows services
+9. **get_service** - Get detailed service information
+10. **start_service** - Start Windows services
+11. **stop_service** - Stop Windows services
+12. **restart_service** - Restart Windows services
+13. **set_service_startup_type** - Configure service startup behavior
+14. **get_service_logs** - Retrieve service event logs
+15. **help** - Comprehensive tool documentation
+16. **drive_inventory** - List all connected drives and partitions - **NEW**
+17. **fastsearch.search_advanced** - Advanced search with comprehensive MFT attribute filtering - **NEW**
+
+### **Service Infrastructure** ✅
+- **Service installation** works perfectly (PowerShell scripts)
+- **Service registration** properly configured (LocalSystem, Auto-start)
+- **Service running** - FastSearchMCP service operational and responding
+- **Service management** scripts complete with error handling
+- **Build process** clean (CMake, Visual Studio)
+- **Debugging setup** configured (VS Code/Cursor launch.json)
+- **Fast service checks** - <1ms overhead per search (optimized from 5 seconds)
+
+### **Code Quality** ✅
+- **Linting**: All ruff checks pass (0 errors)
+- **Exception handling**: Proper exception chaining (`from e`)
+- **Type hints**: Comprehensive type annotations
+- **Documentation**: Complete docstrings and API docs
+- **Architecture**: Direct NTFS MFT access preserved (no indexing)
+
+## ⚠️ **What Doesn't Work**
+
+### **C++ Service Startup** ✅ **RESOLVED**
+- ~~**Issue**: Service crashes immediately on startup (Event ID 7034)~~ **FIXED**
+- **Status**: Service is running and operational
+- **Verification**: Service responds to search requests via named pipe
+- **Tests**: All 18 comprehensive tests passing with service-based searches
+
+### **Test Suite** ✅ **FIXED**
+- **Issue**: Tests failed due to fixture configuration and import issues
+- **Fixed**: 
+  - Import path issues resolved (conftest.py updated, PipeClient → NamedPipeClient)
+  - Async fixture decorator fixed (`@pytest_asyncio.fixture`)
+  - Test methods updated to use actual `McpServer` methods
+- **Status**: All integration tests passing (4/4)
+
+### **Service Integration** ✅ **IMPLEMENTED AND WORKING**
+- **Named pipe communication** ✅ Working between Python bridge and C++ service
+- **NTFS MFT direct access** ✅ All searches use direct MFT reads via service
+- **Performance optimization** ✅ Sub-second searches with direct MFT access
+- **No fallbacks** ✅ Architecture preserved - direct MFT access only
+
+## 📊 **Metrics**
+
+### **Code Quality**
+- ✅ **Ruff linting**: 0 errors (all fixed)
+- ✅ **Exception handling**: Proper chaining throughout
+- ✅ **Type hints**: Comprehensive coverage
+- ✅ **Test suite**: All integration tests passing (4/4)
+
+### **Functionality**
+- ✅ **Tool registration**: 18/18 tools working
+- ✅ **MCP compliance**: 100% FastMCP 2.13
+- ✅ **Search functionality**: 100% operational (all patterns, drives, directories)
+- ✅ **Service integration**: 100% (service running, pipe communication working)
+- ✅ **Error handling**: Clear, actionable error messages with recovery steps
+
+### **Documentation**
+- ✅ **API documentation**: Complete
+- ✅ **Architecture docs**: Comprehensive
+- ✅ **Debugging guides**: Visual Studio setup complete
+- ✅ **Installation guides**: Complete
+
+## 🎯 **Next Steps (Prioritized)**
+
+### **Priority 1: Fix Test Suite** ✅ **COMPLETE**
+**Time Taken:** ~30 minutes
+
+1. ✅ **Fixed Python path in test environment**
+   - Updated `conftest.py` to add `src/` to path
+   - Fixed import statements (PipeClient → NamedPipeClient)
+
+2. ✅ **Fixed test fixtures and methods**
+   - Changed `@pytest.fixture` to `@pytest_asyncio.fixture` for async fixtures
+   - Updated tests to use actual `McpServer` methods
+   - All 4 integration tests now passing
+
+**Result:** Test suite fully functional, ready for CI/CD
+
+### **Priority 2: Debug C++ Service Startup** 🟡 **MEDIUM**
+**Estimated Time:** 4-8 hours
+
+1. **Use Visual Studio debugger** (setup complete)
+   - Attach to service process on startup
+   - Set breakpoints in initialization code
+   - Identify exact crash point
+
+2. **Common Windows service issues to check:**
+   - Missing DLL dependencies
+   - Privilege escalation failures
+   - Service context initialization
+   - Named pipe creation timing
+
+3. **Add comprehensive logging**
+   - Windows Event Log entries
+   - Debug output to file
+   - Initialization step tracking
+
+**Why:** Enables direct NTFS MFT access for performance gains
+
+### **Priority 3: Service Integration** 🟢 **LOW**
+**Estimated Time:** 8-16 hours
+
+1. **Implement named pipe communication**
+   - Python client for pipe communication
+   - C++ service pipe server
+   - Protocol definition and error handling
+
+2. **Test NTFS MFT access via service**
+   - Verify direct MFT reads work
+   - Benchmark performance vs Python fallback
+   - Test error handling and recovery
+
+**Why:** Performance optimization (nice-to-have, not critical)
+
+### **Priority 4: CI/CD Pipeline** 🟢 **LOW**
+**Estimated Time:** 4-6 hours
+
+1. **GitHub Actions workflows**
+   - Test runner on Windows
+   - Linting checks
+   - Build verification
+
+2. **Automated releases**
+   - Version tagging
+   - Package building
+   - Release notes generation
+
+**Why:** Professional development workflow
+
+## 🚀 **Quick Wins (Can Do Now)**
+
+1. **Fix test imports** (30 minutes)
+   - Add `sys.path.insert(0, 'src')` to `conftest.py`
+   - Verify tests can run
+
+2. **Add service startup logging** (1 hour)
+   - Add Event Log entries at each initialization step
+   - Helps debug crash without debugger
+
+3. **Update documentation** (30 minutes)
+   - Add test setup instructions
+   - Document known issues clearly
+
+## 📝 **Recommendations**
+
+### **Immediate Actions**
+1. **Fix test suite** - Enables automated verification
+2. **Document current limitations** - Set user expectations
+3. **Create issue tracker** - Track bugs and enhancements
+
+### **Short-term (1-2 weeks)**
+1. **Debug service startup** - Unlock performance potential
+2. **Add CI/CD** - Professional development workflow
+3. **Performance benchmarking** - Measure actual improvements
+
+### **Long-term (1-3 months)**
+1. **Service integration** - Full NTFS MFT access
+2. **Enhanced search features** - Content search, filtering
+3. **Production hardening** - Security audit, optimization
+
+## 🎉 **Success Highlights**
+
+- ✅ **Production-ready MCP server** with 15 working tools
+- ✅ **Clean codebase** with 0 linting errors
+- ✅ **Comprehensive documentation** and debugging setup
+- ✅ **Robust error handling** and fallback mechanisms
+- ✅ **Architecture preserved** - Direct MFT access, no indexing
+
+## 🎉 **MAJOR MILESTONE ACHIEVED - November 2025**
+
+### ✅ **Direct NTFS MFT Access - IMPLEMENTED!**
+
+**Status:** **PRODUCTION READY** - Direct MFT reading fully functional!
+
+**What Works:**
+- ✅ Opens NTFS volume handles directly (`\\.\C:`)
+- ✅ Reads MFT start LCN from volume data via `FSCTL_GET_NTFS_VOLUME_DATA`
+- ✅ Reads MFT records directly from disk using LCN offsets
+- ✅ Parses FILE_NAME attributes from MFT records
+- ✅ Pattern matching (glob to regex conversion)
+- ✅ Early termination at `max_results`
+- ✅ Real-time results (no caching, no indexing)
+
+**Performance:**
+- ✅ 100 results from 5,008 MFT records in <1 second
+- ✅ Memory usage: <50MB (no caching)
+- ✅ Startup: <1 second (no indexing)
+- ✅ Real-time accuracy: Every search reads live MFT data
+
+**Test Results:**
+```
+[INFO] Reading MFT directly from volume using LCN
+[INFO] Direct MFT search completed: 100 results from 5008 records scanned
+```
+
+**Implementation:**
+- Location: `service/src/mft_search.cpp`
+- Method: `HandleSearchRequestImpl()` - Direct LCN-based MFT reading
+- No tree walking, no FindFirstFile, no indexing - pure MFT access!
+
+## ⚠️ **Known Limitations**
+
+1. ~~**C++ service crashes on startup**~~ - ✅ **FIXED** - Service running and MFT access working!
+2. **Tests not running** - Import path issues need fixing
+3. **No CI/CD** - Manual testing and deployment
+4. ~~**Service integration incomplete**~~ - ✅ **COMPLETE** - Direct MFT access fully implemented!
+
+---
+
+**Overall Status: 🟢 PRODUCTION READY - DIRECT MFT ACCESS ACHIEVED!**
+
+The MCP server is fully functional with **direct NTFS MFT access implemented**. The core value proposition - reading the Master File Table directly without indexing or tree walking - is now working in production. Test suite needs fixing for automated verification.
+```
+
+## Technical Architecture
+Source: docs/TECHNICAL_ARCHITECTURE.md
+```
+# FastSearch MCP - Technical Architecture
+
+**Project:** FastSearch MCP Server  
+**Date:** November 2025  
+**Architecture:** Direct NTFS Master File Table access with C++ service + Python MCP bridge  
+**Status:** ✅ Production Ready - Search functionality fully operational
+
+---
+
+## 1. Architectural Philosophy
+
+FastSearch MCP deliberately mirrors the WizFile approach: every search reads the NTFS Master File Table (MFT) directly. We do **not** build indexes, walk directory trees in advance, or cache file metadata.
+
+| Principle | Expectation |
+|-----------|-------------|
+| **Zero Indexing** | No startup scans, no background workers, no cached file lists. |
+| **Live Data** | Each query opens the MFT and streams results until `max_results` is reached. |
+| **Instant Startup** | Process startup must remain sub-second. |
+| **Minimal Memory** | Peak usage < 50 MB; no persistent allocations proportional to file counts. |
+| **Deterministic Stop** | Stop scanning immediately once the caller's `max_results` limit is satisfied. |
+
+Any optimisation that contradicts these constraints (e.g. LRU caches, pre-built databases, recursive directory walks) is considered an architectural regression and must be rejected.
+
+---
+
+## 2. High-Level Components
+
+```
+Claude Desktop ──JSON-RPC── Python MCP Bridge ──Named Pipe── C++ Service ── NTFS MFT
+```
+
+### 2.1 Python MCP Bridge (`src/fastsearch_mcp/`)
+- Runs with standard user privileges.
+- Implements the FastMCP 2.13 schema for all tools (file search, disk analysis, service management, etc.).
+- Routes file-search requests to the service via the named pipe `\\.\pipe\FastSearchMCP`.
+- **Fast service checks** - Optimized to <1ms per check (cached for 2 seconds).
+- **Clear error messages** - Explicit, actionable errors when service is unavailable (no silent fallbacks).
+- **No fallbacks** - Direct MFT access only (architecture preserved).
+
+### 2.2 C++ Windows Service (`service/`)
+- Runs as `LocalSystem` after a one-time elevated install.
+- Owns all direct NTFS interactions. Opens volume handles (`\\.\C:` etc.), reads the MFT via Windows filesystem APIs, and streams matching entries back to the bridge.
+- Exposes a duplex named pipe accepting JSON requests and streaming JSON responses.
+- Emits structured diagnostics to the Windows Event Log (source: `FastSearchMCP`). Logging is mandatory for each init step.
+- **Service operational** - Running and responding to search requests (November 2025).
+
+### 2.3 Communication Contract
+- **Protocol:** newline-delimited JSON with UTF-8 payloads.
+- **Request envelope:** `{ "id": <uuid>, "tool": "file_search", "params": {...} }`
+- **Response envelope:** `{ "id": <uuid>, "status": "ok" | "error", "data": {...} }`
+- The bridge enforces `max_results` and aborts the pipe read once enough entries have been returned.
+
+---
+
+## 3. Direct NTFS MFT Access
+
+### 3.1 Volume Access
+
+```cpp
+// Simplified: see service/src/fastsearch_service.cpp
+HANDLE volume = CreateFileW(
+    L"\\\\.\\C:",
+    GENERIC_READ,
+    FILE_SHARE_READ | FILE_SHARE_WRITE,
+    nullptr,
+    OPEN_EXISTING,
+    FILE_FLAG_BACKUP_SEMANTICS,
+    nullptr);
+```
+
+- The service elevates required privileges (`SeBackupPrivilege`) during startup; failures are logged and surfaced to the bridge.
+- Volumes are opened on demand per request; we do **not** keep long-lived handles when idle.
+
+### 3.2 Enumerating the MFT
+
+**IMPLEMENTED:** Direct MFT reading via LCN (Logical Cluster Number) - November 2025
+
+```cpp
+// Get MFT start location from volume data
+NTFS_VOLUME_DATA_BUFFER volumeData;
+GetNtfsVolumeData(hVolume, volumeData);
+ULONGLONG mftStartLcn = volumeData.MftStartLcn.QuadPart;
+DWORD recordSize = volumeData.BytesPerFileRecordSegment;
+DWORD bytesPerCluster = volumeData.BytesPerCluster;
+
+// Read MFT records directly from volume using LCN offsets
+ULONGLONG recordNumber = 5;  // Start from first user file
+while (results.size() < maxResults) {
+    // Calculate absolute byte offset from MFT start LCN
+    ULONGLONG recordOffsetInBytes = recordNumber * recordSize;
+    ULONGLONG clusterOffset = recordOffsetInBytes / bytesPerCluster;
+    ULONGLONG targetLcn = mftStartLcn + clusterOffset;
+    
+    // Seek to record location and read directly
+    LARGE_INTEGER seekPos;
+    seekPos.QuadPart = targetLcn * bytesPerCluster + (recordOffsetInBytes % bytesPerCluster);
+    SetFilePointerEx(hVolume, seekPos, nullptr, FILE_BEGIN);
+    ReadFile(hVolume, recordBuffer.data(), recordSize, &bytesRead, nullptr);
+    
+    // Parse FILE_NAME attribute and match pattern
+    if (ParseFileNameAttribute(recordBuffer, fileName, ...)) {
+        if (MatchPattern(fileName, pattern)) {
+            send_result(fileName);
+        }
+    }
+    recordNumber++;
+}
+```
+
+**Key Implementation Details:**
+- **Direct LCN-based reading**: Uses `FSCTL_GET_NTFS_VOLUME_DATA` to get MFT start LCN, then reads records directly from volume handle
+- **No file system API calls**: Bypasses `FindFirstFile`, `FindNextFile`, and all directory traversal
+- **Pattern matching**: Simple glob-to-regex conversion with case-insensitive matching
+- **Early termination**: Stops immediately when `max_results` is reached
+- **Streaming**: Records are parsed and emitted one-by-one, never stored in bulk
+- **Real-time accuracy**: Every search reads live MFT data - no stale caches
+
+**Performance Validation:**
+- Tested: 100 results from 5,008 MFT records scanned in <1 second
+- Memory: <50MB peak usage (no caching)
+- Startup: <1 second (no indexing)
+
+### 3.3 Error Handling
+
+- All service operations return `Status` structs with Windows error codes.
+- Failures are logged via `SvcLogMessage(level, message, error_code)` and relayed to the bridge so Claude can message the user.
+- Bridge methods wrap errors with `anyhow::Context` (Python side uses `fastmcp` error helpers) to provide actionable responses.
+
+---
+
+## 4. Request Lifecycle
+
+1. Claude invokes `file_search` with JSON arguments.
+2. The MCP bridge validates and normalises parameters (pattern, drive, max_results).
+3. The bridge writes a JSON request to the named pipe and awaits streamed results.
+4. The service opens the requested NTFS volume, scans the MFT, and emits matching entries one-by-one.
+5. Once `max_results` is reached—or the MFT is exhausted—the service sends a completion frame.
+6. The bridge forwards results to Claude and records telemetry counters (in-memory only).
+
+If the service is unavailable, step 3 fails immediately with a clear error message. No fallbacks - direct MFT access is required.
+
+### 4.1 Multi-drive (search_all): parallel, load-balanced
+
+When the client requests search across all NTFS drives (`search_all=True` or `path="*"`), the bridge runs **one search task per drive in parallel** via `asyncio.gather`. Each task opens its own named-pipe connection to the service, so the C++ service must accept multiple pipe clients (standard multi-instance NamedPipe server pattern). This gives load-balanced, concurrent search across drives instead of sequential; total wall time is bounded by the slowest drive plus timeout (30s per drive), not the sum of all drives.
+
+**Pattern:** Concurrent I/O with `asyncio.gather`; no thread pool in the bridge (single-threaded async). The service may use one thread per pipe client or a worker pool; that is an implementation detail of the C++ service.
+
+**References (external):** Parallel / multi-threaded file search patterns and NTFS MFT libraries can be found in e.g. [NTFS_Search](https://github.com/flamecyclone/NTFS_Search) (C++ MFT parse, wildcard), [FastSearchLibrary](https://github.com/VladPVS/FastSearchLibrary) (C++ multithreading .dll), [FastSearchGUI](https://github.com/cucuteled/FastSearchGUI) (multi-drive, multi-threaded querying).
+
+---
+
+## 5. Performance Targets & Validation
+
+| Metric | Target | Notes |
+|--------|--------|-------|
+| Service start | < 1 s | No background work permitted. |
+| Search latency | < 100 ms for typical patterns on SSDs | Achieved via direct MFT streaming and early termination. |
+| Memory usage | < 50 MB | Verified with Windows Performance Monitor; no caches allowed. |
+| Result freshness | Real-time | Direct MFT read guarantees live state. |
+
+Performance testing scripts live under `tests/` and `scripts/`. Run `python test_fastsearch.py` with elevated privileges to exercise the fast path.
+
+---
+
+## 6. Diagnostics & Logging
+
+- **Event Log Source:** `FastSearchMCP`
+- **Key startup checkpoints:**
+  1. Service control registration
+  2. Privilege enablement
+  3. Named pipe creation
+  4. Worker thread launch
+  5. Volume probe
+
+`debug-service-startup.ps1` collects these logs and verifies registry entries, service configuration, and pipe connectivity. `scripts/read-service-logs.ps1` filters entries by severity for quick triage.
+
+---
+
+## 7. Service Availability Checks
+
+- **Fast checks** - Service availability verified before each search (<1ms overhead).
+- **Caching** - Service status cached for 2 seconds to avoid repeated checks on rapid searches.
+- **Fast pipe check** - Uses named pipe connection attempt (fails immediately if service is down).
+- **Clear errors** - When service is unavailable, explicit error messages with recovery steps.
+- **No fallbacks** - Architecture requires direct MFT access only (no treewalking fallbacks).
+
+---
+
+## 8. Security & Permissions
+
+- Service binaries run as `LocalSystem`; installation requires Administrator once.
+- Named pipe ACLs restrict access to the current interactive user session to prevent cross-user leakage.
+- No file contents are read—only metadata from the MFT.
+- No telemetry, network egress, or persistent storage is produced.
+
+---
+
+## 9. Current Status & Recent Improvements (November 2025)
+
+- ✅ **Service operational** - FastSearch Windows service running and responding to requests.
+- ✅ **Search functionality** - All search tools working (18/18 tests passing).
+- ✅ **Performance optimized** - Service checks optimized from 5 seconds to <1ms.
+- ✅ **Architecture cleanup** - Removed fallback code (direct MFT access only).
+- ✅ **Error handling** - Clear, actionable error messages with recovery steps.
+- Service installs reliably via `install-service.ps1`.
+- Named pipe contract is stable; any JSON/message schema changes must be mirrored between the C++ service (`fastsearch_service`) and the Python bridge (`pipe_client.py` / `service_client.py`). The pipe **path** is owned by `pipe_client.get_pipe_name()` only.
+
+See `docs/RECENT_IMPROVEMENTS.md` for details on recent improvements.
+
+---
+
+Maintaining this architecture is non-negotiable. Changes that drift toward traditional indexing must be blocked during review and escalated immediately.
+```
+
+## Installation Guide
+Source: docs/INSTALL.md
+```
+# FastSearch MCP - Installation Guide
+
+FastSearch MCP consists of a privileged C++ Windows service and an unprivileged Python MCP bridge. Follow the steps below to build, install, and verify the stack on Windows.
+
+## Prerequisites
+
+- Windows 10/11 (64-bit) with NTFS volumes
+- Administrator access (required once to install the service)
+- [Python 3.10+](https://www.python.org/downloads/)
+- [Visual Studio 2022 Build Tools](https://aka.ms/vs/17/release/vs_BuildTools.exe) with the **Desktop development with C++** workload
+- [CMake 3.20+](https://cmake.org/download/)
+- [WiX Toolset v3.11+](https://wixtoolset.org/releases/) (only if you plan to build an MSI installer)
+
+> **Note:** Ensure `cmake`, `python`, and the Visual Studio build tools are available in your `PATH` before continuing.
+
+## Build the Project
+
+### 1. Clone the Repository
+
+```powershell
+git clone https://github.com/yourusername/fastsearch-mcp.git
+cd fastsearch-mcp
+```
+
+### 2. Set Up the Python Environment
+
+```powershell
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install -r requirements-dev.txt
+pip install -e .
+```
+
+### 3. Build the C++ Service
+
+```powershell
+cd service
+cmake -S . -B build -G "Visual Studio 17 2022" -A x64
+cmake --build build --config Release
+cd ..
+```
+
+The compiled service binary is generated at `service\build\bin\Release\FastSearchServiceNew.exe`.
+
+## Install and Manage the Service
+
+### Install (Requires Elevated PowerShell)
+
+```powershell
+.\install-service.ps1 install
+```
+
+### Start / Stop / Status
+
+```powershell
+.\install-service.ps1 start
+.\install-service.ps1 status
+.\install-service.ps1 stop
+```
+
+### Uninstall
+
+```powershell
+.\install-service.ps1 uninstall
+```
+
+> Use `.\install-service.ps1 diagnose` or `.\debug-service-startup.ps1` whenever the service fails to start. These scripts collect event logs, check privileges, and highlight missing dependencies.
+
+## Run the MCP Bridge (User Mode)
+
+With the virtual environment activated:
+
+```powershell
+python scripts/start_server.py
+```
+
+Claude Desktop can now attach to FastSearch MCP using the command defined in `mcp.config.json`.
+
+## Troubleshooting
+
+| Symptom | Suggested Action |
+|---------|------------------|
+| Service fails immediately with Event ID 7034 | Run `.\debug-service-startup.ps1 -Verbose` to display each initialisation step and consult the Windows Event Viewer (`Applications and Services Logs → FastSearchMCP`). |
+| Bridge reports “service unavailable” | Confirm the service is running (`.\install-service.ps1 status`) and that the named pipe `\\.\pipe\FastSearchMCP` exists. |
+| “Access denied” errors when opening volumes | Verify the service is installed under `LocalSystem` and that the process has `SeBackupPrivilege`. Reinstall from an elevated shell if necessary. |
+| Python fallback is always used | Ensure the service is running and reachable; the bridge falls back when the pipe handshake fails or the service returns an error response. |
+
+## Optional: Build the MSI Installer
+
+If you need a distributable installer:
+
+```powershell
+.\create-installer.ps1 -Version <version>
+```
+
+The generated MSI is placed in the `dist` directory.
+
+## Support
+
+For additional help, open an issue on the [GitHub repository](https://github.com/yourusername/fastsearch-mcp/issues) or follow the diagnostic workflow in `docs/SERVICE_IMPROVEMENTS.md`.
+```
+
+## Product Requirements
+Source: docs/PRODUCT_REQUIREMENTS.md
+```
+# FastSearch MCP - Product Requirements Document (PRD)
+
+**Project:** FastSearch MCP Server  
+**Version:** 2.3  
+**Date:** March 2025  
+**Status:** ✅ Production Ready - Search functionality fully operational, live tests and Tests page added
+
+---
+
+## 📋 Executive Summary
+
+FastSearch MCP gives Claude Desktop instant, large-scale file search on Windows by reading the NTFS Master File Table (MFT) on demand. A privileged C++ Windows service performs the MFT scan while a user-mode Python MCP bridge exposes tools to Claude. We explicitly reject traditional indexing, caching, or background scanning so startup stays instant and results remain live.
+
+---
+
+## 🎯 Product Vision
+
+**"Deliver WizFile-class search speed inside Claude Desktop without sacrificing startup time, accuracy, or system stability."**
+
+### Core Value Proposition
+
+- ⚡ **Instant results**: Live NTFS MFT access, no pre-computed index.
+- 🧠 **Claude-native**: Structured FastMCP tools with rich schemas and documentation.
+- 🔒 **Secure privilege separation**: Elevated C++ service + user-mode MCP bridge.
+- 🪶 **Lightweight**: Memory footprint below 50 MB with no persistent stores.
+- 🎯 **Precise**: Results always reflect the current filesystem; deleted files never linger.
+- ⚡ **Fast service checks**: <1ms overhead per search (optimized from 5 seconds).
+
+---
+
+## 🚨 Non-Negotiable Principles
+
+1. **Direct MFT Access Only**
+   - Every search must read the NTFS MFT in real time.
+   - No background indexing, recursive directory walking, or caching of file metadata.
+
+2. **Instant Startup**
+   - Both service and bridge must start in under one second.
+   - Service may not perform work until the first request arrives.
+
+3. **Predictable Resource Usage**
+   - Peak memory under 50 MB even on multi-million file volumes.
+   - No allocations proportional to total file count.
+
+4. **Early Termination**
+   - Respect `max_results`; stop scanning as soon as the cap is reached.
+   - Honour path and filter constraints before emitting results to the bridge.
+
+5. **No Fallbacks**
+   - Direct MFT access is required - no treewalking fallbacks allowed.
+   - When service is unavailable, clear error messages with recovery steps must be provided.
+   - Architecture requires service to be running for searches to function.
+
+---
+
+## 🏗 Functional Requirements
+
+### 1. `file_search` (fastsearch_search)
+- Input: pattern, optional drive/path filters, `max_results`.
+- Processing: stream the NTFS MFT, apply filters, stop at `max_results`.
+- Output: ordered list of matches with path, size, timestamps, and method indicator.
+- Latency target: < 100 ms on SSD-backed systems for typical patterns.
+- **Status:** ✅ Fully operational - All patterns, drives, and directories tested and working.
+
+### 2. `disk_analyzer`
+- Identify the largest files/directories on a drive.
+- Reuses the MFT stream with size sorting limited to the top N entries.
+
+### 3. `duplicate_finder` (optional/experimental)
+- Uses file size + metadata heuristics; may require additional per-file hashing after initial MFT pass (performed lazily, never cached globally).
+
+### 4. Service Management Tools
+- `service_status`, `start_service`, `stop_service`, `get_service_logs`, etc. provide operational control and diagnostics.
+- **Status:** ✅ All service management tools operational.
+
+---
+
+## 🤝 Integration Requirements
+
+### Claude Desktop MCP
+- Full FastMCP 2.13 compliance: tool discovery, JSON schema validation, streaming responses.
+- Rich documentation metadata so Claude knows how and when to call each tool.
+- Clear error signalling for privilege issues or service downtime.
+- **Status:** ✅ FastMCP 2.13 compliant, all 18 tools functional.
+
+### Diagnostics & Tooling
+- PowerShell scripts (`install-service.ps1`, `debug-service-startup.ps1`, `scripts/read-service-logs.ps1`) must remain up to date.
+- Logs must surface privilege failures, pipe errors, and service availability issues.
+- Service status checks optimized to <1ms overhead per search.
+- **Live testing:** Webapp **Tests** page (`/tests`) and API `POST /api/tests/run` run integration tests (service process, pipe connect, get_service_info, real search via pipe). Pytest `tests/test_live_pipe.py` runs the same flow (marked `@pytest.mark.service`, Windows-only).
+- **Path normalization:** Search path input (e.g. `C:`) is normalized to a format the C++ service accepts (e.g. `C:\\`) to avoid empty results from format mismatch.
+- **Status:** ✅ All diagnostic tools operational, fast service checks implemented, live tests and Tests page available.
+
+---
+
+## 🧩 Technical Requirements
+
+| Domain | Requirement |
+|--------|-------------|
+| **Service Language** | C++17 (Visual Studio toolchain). |
+| **Bridge Language** | Python 3.10+ with `fastmcp` integration. |
+| **Privileges** | Service runs as `LocalSystem`; bridge runs as standard user. |
+| **IPC** | Named pipe `\\.\pipe\FastSearchMCP` with JSON messages. |
+| **Filesystem Support** | Windows NTFS volumes only. Direct MFT access requires NTFS filesystem. |
+
+### Error Handling
+- Service failures must emit Event Log entries and return structured errors to the bridge.
+- Bridge responses must include remediation advice (e.g. "Run install-service.ps1 start as Administrator").
+- **Status:** ✅ Clear, actionable error messages with step-by-step recovery instructions implemented.
+
+### Security
+- No sensitive data persisted. Logs include only necessary metadata and error details.
+- Pipe ACL restricted to the launching user session.
+- No network access.
+
+---
+
+## 📊 Success Metrics
+
+| KPI | Target | Measurement | Status |
+|-----|--------|-------------|--------|
+| Search latency | < 100 ms (95th percentile, SSD, 1M files) | `tests/test_fastsearch.py` benchmark. | ✅ Achieved |
+| Memory usage | < 50 MB at peak | Windows Performance Monitor / internal counters. | ✅ Achieved |
+| Startup time | < 1 s for both bridge and service | Stopwatch instrumentation. | ✅ Achieved |
+| Accuracy | 100% live filesystem fidelity | Regression tests + manual validation. | ✅ Achieved |
+| Service check overhead | <1ms per search | Optimized pipe check with caching. | ✅ Achieved (<1ms) |
+| Test coverage | 18/18 tests passing | Comprehensive test suite validates all scenarios. | ✅ 18/18 passing |
+
+---
+
+## 🧪 Testing Strategy
+
+- **Unit Tests:** pattern parsing, parameter validation, error handling.
+- **Integration Tests:** named pipe contract, service lifecycle scripts, privilege checks.
+- **Live pipe tests:** `fastsearch_mcp.live_tests.run_live_tests()` and `tests/test_live_pipe.py` run real pipe connection and real search against the C++ service (Windows, service must be running). Webapp **Tests** page invokes the same flow via `POST /api/tests/run`.
+- **Performance Harness:** repeatable MFT scanning benchmarks (requires elevated PowerShell session).
+- **Manual QA:** Event log review, service start/stop cycles, failure injection.
+- **Status:** ✅ Comprehensive test suite (18/18 tests passing) plus live pipe integration tests and webapp Tests page.
+
+---
+
+## 🛡 Risk Management
+
+| Risk | Mitigation | Status |
+|------|------------|--------|
+| Service unavailability | Fast service checks (<1ms), clear error messages with recovery steps, `service_status` tool for diagnostics. | ✅ Mitigated |
+| Loss of elevation | Detect quickly, return actionable message, guide user to reinstall/start service. | ✅ Mitigated |
+| Architecture drift toward indexing | Maintain documentation warnings, enforce during code review, add automated linting for banned patterns if necessary. Removed all fallback code. | ✅ Mitigated |
+| Cross-user pipe access | Maintain restricted ACLs and verify during install script execution. | ✅ Mitigated |
+| Slow service checks | Optimized pipe connection check with 2-second caching to maintain <1ms overhead. | ✅ Mitigated |
+
+---
+
+## 🔜 Roadmap Highlights
+
+1. ✅ **Service operational** - FastSearch Windows service running and responding (November 2025).
+2. ✅ **Search functionality** - All search tools working with direct NTFS MFT access.
+3. ✅ **Performance optimized** - Service checks optimized from 5 seconds to <1ms.
+4. ✅ **Architecture cleanup** - Removed all fallback code (direct MFT access only).
+5. ✅ **Error handling** - Clear, actionable error messages with recovery steps.
+6. ✅ **Live tests and Tests page** - Integration tests (pipe + real search) in pytest and webapp at `/tests` (March 2025).
+7. **Enhance diagnostics** with optional pipe-level tracing (on-demand, not persistent).
+8. **Explore additional tools** (e.g. permission reporting) while respecting zero-indexing rules.
+
+---
+
+## 📝 Recent Achievements (March 2025)
+
+- ✅ **Live integration tests** - Real pipe + real search tests; pytest `test_live_pipe.py` and webapp Tests page at `/tests`
+- ✅ **Path normalization** - Search paths (e.g. `C:`) normalized to `C:\\` for C++ service compatibility
+- ✅ **Pipe error reporting** - Pipe connection failures no longer reported as success with 0 results; clear errors in UI
+
+## 📝 Recent Achievements (November 2025)
+
+- ✅ **Search functionality fully operational** - All search tools tested and working
+- ✅ **Service running** - FastSearch Windows service operational and responding
+- ✅ **Performance optimized** - Service checks reduced from 5 seconds to <1ms
+- ✅ **Architecture preserved** - All fallback code removed, direct MFT access only
+- ✅ **Error messages improved** - Clear, actionable guidance for users
+- ✅ **Test coverage complete** - 18/18 comprehensive tests passing
+
+See `docs/RECENT_IMPROVEMENTS.md` for detailed information on recent improvements.
+
+---
+
+Keeping the documentation aligned with the C++ service + Python bridge architecture is essential. Any proposal that introduces indexing, caching, or long-running scans must be rejected before implementation.
+```
+
+## Roadmap
+Source: docs/ROADMAP.md
+```
+# FastSearch MCP Roadmap
+
+This document outlines the future direction and planned features for the FastSearch MCP project.
+
+## Current Status (v0.5.0)
+
+- ✅ Basic file search functionality
+- ✅ Direct NTFS MFT access
+- ✅ Privilege-separated architecture
+- ✅ Multi-drive support
+- ✅ Basic search types (exact, glob, regex)
+- ✅ Python MCP implementation
+- ✅ DXT packaging
+
+## Short-term Goals (Next 3-6 months)
+
+### v0.2.0 - Enhanced Search Features
+
+- [ ] Support for file content search
+- [ ] Advanced filtering options (size, date, type)
+- [ ] Search result preview
+- [ ] Improved error handling and logging
+
+### v0.3.0 - Performance Optimizations
+
+- [ ] Search indexing for faster results
+- [ ] Caching of recent searches
+- [ ] Parallel search across multiple drives
+- [ ] Memory usage optimizations
+
+## Medium-term Goals (6-12 months)
+
+### v0.5.0 - Advanced Features
+
+- [ ] Search within archives (ZIP, RAR, etc.)
+- [ ] Document content extraction (PDF, DOCX, etc.)
+- [ ] Custom search scopes and saved searches
+- [ ] Integration with cloud storage providers
+
+### v0.5.0 - User Experience
+
+- [ ] Interactive search interface
+- [ ] Search history and favorites
+- [ ] Customizable keyboard shortcuts
+- [ ] Dark/light theme support
+
+## Long-term Goals (1+ years)
+
+### v1.0.0 - Production Ready
+
+- [ ] Comprehensive test coverage
+- [ ] Performance benchmarking
+- [ ] Security audit
+- [ ] Full documentation
+- [ ] Multi-language support
+
+### Future Possibilities
+
+- [ ] Machine learning for search ranking
+- [ ] Natural language search queries
+- [ ] Integration with IDEs and code editors
+- [ ] Mobile app for remote search
+
+## Contributing
+
+We welcome contributions to help achieve these goals! If you're interested in working on any of these features:
+
+1. Check the [GitHub issues](https://github.com/yourusername/fastsearch-mcp/issues) for existing discussions
+2. Open an issue to discuss your proposed changes
+3. Follow our [contributing guidelines](CONTRIBUTING.md)
+
+## Versioning
+
+This project follows [Semantic Versioning](https://semver.org/).
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for a detailed history of changes.
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+```
+
+## Security
+Source: docs/SECURITY.md
+```
+# Security Policy
+
+## Supported Versions
+
+| Version | Supported          |
+| ------- | ------------------ |
+| 0.1.x   | :white_check_mark: |
+| < 0.1   | :x:                |
+
+## Reporting a Vulnerability
+
+We take security issues seriously and appreciate your efforts to responsibly disclose any vulnerabilities you find.
+
+### How to Report
+
+To report a security vulnerability, please email [security@example.com](mailto:security@example.com) with the subject line "[FastSearch MCP] Security Vulnerability".
+
+In your report, please include:
+
+- A detailed description of the vulnerability
+- Steps to reproduce the issue
+- Any proof-of-concept code or exploit
+- Your contact information (optional)
+
+We will acknowledge receipt of your report within 48 hours and provide a more detailed response indicating the next steps in handling your report.
+
+### Our Security Process
+
+1. Your report will be reviewed by our security team
+2. If the issue is confirmed, we will work on a fix
+3. A security advisory will be released once the fix is available
+4. The fix will be included in the next release
+
+### Public Disclosure Policy
+
+We follow responsible disclosure:
+
+- We will work with you to understand and validate the issue
+- We will not take legal action against you if you follow these guidelines
+- We will keep you informed of the progress towards resolving the issue
+- We will credit you in our security advisories (unless you prefer to remain anonymous)
+
+## Security Considerations
+
+### For Users
+
+- Always run the service with the minimum required permissions
+- Keep your installation up to date with the latest security patches
+- Review and understand the permissions you grant to the application
+
+### For Developers
+
+- Follow secure coding practices
+- Keep dependencies up to date
+- Use the latest stable versions of all tools and libraries
+- Regularly audit your code for security vulnerabilities
+
+## Security Features
+
+- **Privilege Separation**: The service runs with elevated privileges only when necessary
+- **Input Validation**: All inputs are strictly validated
+- **Secure Communication**: All inter-process communication is authenticated and encrypted
+- **Minimal Attack Surface**: The service exposes only the minimum required functionality
+
+## Contact
+
+For any security-related questions or concerns, please contact [security@example.com](mailto:security@example.com).
+```
+
+## Contributing
+Source: docs/CONTRIBUTING.md
+```
+# Contributing to FastSearch MCP
+
+Thank you for your interest in contributing to FastSearch MCP! We welcome contributions from the community to help improve this project.
+
+## Table of Contents
+
+- [Code of Conduct](#code-of-conduct)
+- [Getting Started](#getting-started)
+- [Development Workflow](#development-workflow)
+- [Code Style](#code-style)
+- [Testing](#testing)
+- [Pull Request Process](#pull-request-process)
+- [Reporting Issues](#reporting-issues)
+- [License](#license)
+
+## Code of Conduct
+
+This project and everyone participating in it is governed by our [Code of Conduct](CODE_OF_CONDUCT.md). By participating, you are expected to uphold this code.
+
+## Getting Started
+
+1. **Fork** the repository on GitHub
+2. **Clone** your fork locally
+
+   ```bash
+   git clone https://github.com/yourusername/fastsearch-mcp.git
+   cd fastsearch-mcp
+   ```
+
+3. Set up the development environment:
+
+   ```bash
+   # Install Python dependencies
+   pip install -e .[dev]
+   
+   # Install pre-commit hooks
+   pre-commit install
+   ```
+
+## Development Workflow
+
+1. Create a new branch for your feature/fix:
+
+   ```bash
+   git checkout -b feature/your-feature-name
+   ```
+
+2. Make your changes following the code style guidelines
+
+3. Run tests to ensure nothing is broken
+
+   ```bash
+   pytest
+   ```
+
+4. Commit your changes with a descriptive message:
+
+   ```bash
+   git commit -m "Add feature: your feature description"
+   ```
+
+5. Push your branch to your fork:
+
+   ```bash
+   git push origin feature/your-feature-name
+   ```
+
+6. Open a Pull Request against the `main` branch
+
+## Code Style
+
+We use the following tools to maintain code quality:
+
+- **Black** for code formatting
+- **isort** for import sorting
+- **Flake8** for linting
+- **Mypy** for static type checking
+
+These are enforced via pre-commit hooks. To run them manually:
+
+```bash
+pre-commit run --all-files
+```
+
+## Testing
+
+We use `pytest` for testing. To run the test suite:
+
+```bash
+pytest
+```
+
+For more detailed output:
+
+```bash
+pytest -v
+```
+
+To run tests with coverage:
+
+```bash
+pytest --cov=fastsearch_mcp tests/
+```
+
+## Pull Request Process
+
+1. Ensure any install or build dependencies are removed before the end of the layer when doing a build
+2. Update the README.md with details of changes to the interface, this includes new environment variables, exposed ports, useful file locations, and container parameters
+3. Increase the version number in `fastsearch_mcp/__init__.py` and the CHANGELOG.md to the new version that this Pull Request would represent
+4. The PR must pass all CI checks before it can be merged
+5. You may merge the PR once you have the sign-off of two other developers, or if you do not have permission to do that, you may request the reviewer to merge it for you
+
+## Reporting Issues
+
+When reporting issues, please include:
+
+1. The version of FastSearch MCP you're using
+2. Your operating system and version
+3. Steps to reproduce the issue
+4. Any relevant error messages or logs
+
+## License
+
+By contributing, you agree that your contributions will be licensed under the project's [MIT License](LICENSE).
+```
+
+## Key Source Files
+### src/fastsearch_mcp/__init__.py
+```
+"""
+FastSearch MCP Server - FastMCP 3.x NTFS search service.
+
+FastMCP 3.1 compliant: supports sampling (client-side LLM), agentic workflows,
+and unified gateway (run as proxy via fastsearch_mcp.gateway). Includes direct
+NTFS Master File Table access, real-time search, and filesystem analysis tools.
+
+Architecture:
+- Direct NTFS MFT access (no indexing/caching)
+- Real-time search results
+- Sub-100ms search performance
+- Minimal memory footprint (<50MB)
+- Instant startup (<1s)
+
+Key Features:
+- Pattern-based file search
+- Disk analysis and monitoring
+- Duplicate file detection
+- File integrity checking
+- System resource monitoring
+- Service management tools
+"""
+
+import sys
+from pathlib import Path
+
+# Package version
+__version__ = "0.5.0"
+
+# Ensure src is in Python path for development
+if __name__ == "__main__":
+    src_path = Path(__file__).parent.parent
+    if str(src_path) not in sys.path:
+        sys.path.insert(0, str(src_path))
+
+# FastMCP 3.x imports
+try:
+    from fastmcp import FastMCP
+except ImportError as e:
+    raise ImportError(
+        "FastMCP 3.x is required. Install with: pip install 'fastmcp>=3.0.0,<4'"
+    ) from e
+
+# Local imports - import server to register tools
+from .server import server
+
+# Public API
+__all__ = [
+    # Server instance
+    "server",
+    # FastMCP class
+    "FastMCP",
+    # Version
+    "__version__",
+]
+```
+
+### src/fastsearch_mcp/mcp_instance.py
+```
+"""Shared MCP instance for tool registration.
+
+FastMCP 3.2: sampling via ctx.sampling(), CodeMode via --agentic flag,
+@mcp.prompt(), and @mcp.skill() decorators. Compatible with unified
+gateway pattern (see fastsearch_mcp.gateway).
+"""
+
+from fastmcp import FastMCP
+
+mcp = FastMCP(name="FastSearch MCP", version="0.5.0")
+```
+
+### src/fastsearch_mcp/server.py
+```
+"""
+FastSearch MCP Server - FastMCP 3.x implementation.
+
+FastMCP 3.1: compatible with sampling (client sampling_handler), agentic workflows,
+and unified gateway (see fastsearch_mcp.gateway). For web_sota, uvicorn runs this app
+(REST bridge at /) so the frontend can list/call tools.
+"""
+
+import logging
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from fastsearch_mcp.mcp_instance import mcp
+
+logger = logging.getLogger(__name__)
+
+# CRITICAL: Import tools, prompts, and skills to register them with the MCP instance
+# This must happen after mcp instance is created but before running server
+# Tools are registered via @mcp.tool decorator when imported
+# Prompts are registered via @mcp.prompt() decorator when imported
+# Skills are registered via @mcp.skill() decorator when imported
+import fastsearch_mcp.tools  # noqa: F401
+import fastsearch_mcp.prompts  # noqa: F401
+import fastsearch_mcp.skills  # noqa: F401
+
+from fastsearch_mcp.api_bridge import router as api_router
+
+# REST app for web_sota: GET /health, GET /tools, POST /tools/:name
+app = FastAPI(title="FastSearch MCP")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+app.include_router(api_router, prefix="/api")
+
+
+@app.get("/health")
+async def root_health() -> dict:
+    """Fleet manifest healthPath: /health (no /api prefix)."""
+    return {"status": "ok", "service": "fastsearch-mcp"}
+
+# MCP server reference for CLI / stdio
+server = mcp
+```
+
+### src/fastsearch_mcp/transport.py
+```
+"""
+FastMCP 3.2 Dual Transport Configuration
+
+Unified transport configuration for STDIO, HTTP Streamable, and legacy SSE modes.
+Supports FastMCP 3.2 sampling (ctx.sampling()), CodeMode agentic discovery,
+@mcp.prompt() templates, and @mcp.skill() composable workflows.
+
+Environment Variables:
+    MCP_TRANSPORT: Transport mode (stdio, http, sse). Default: stdio
+    MCP_HOST: Bind address for HTTP/SSE. Default: 127.0.0.1
+    MCP_PORT: Port for HTTP/SSE. Default: 10845 (fleet 10700+; set MCP_PORT to override)
+    MCP_PATH: HTTP endpoint path. Default: /mcp
+    MCP_AGENTIC: Enable CodeMode agentic discovery when set to "true"
+
+CLI Arguments:
+    --stdio: Run in STDIO mode (default, for Claude Desktop)
+    --http: Run in HTTP Streamable mode
+    --sse: Run in SSE mode (deprecated)
+    --agentic: Enable CodeMode agentic discovery (collapses tools into search + execute)
+    --host: Bind address
+    --port: Port number
+    --path: HTTP endpoint path
+    --debug: Enable debug logging
+
+Usage:
+    from .transport import run_server
+
+    mcp = FastMCP("my-server", version="1.0.0")
+
+    def main():
+        run_server(mcp, server_name="my-server")
+"""
+
+import argparse
+import asyncio
+import logging
+import os
+from typing import Literal, Optional
+
+logger = logging.getLogger(__name__)
+
+TransportType = Literal["stdio", "http", "sse"]
+
+# Environment variable standards
+ENV_TRANSPORT = "MCP_TRANSPORT"  # stdio | http | sse
+ENV_HOST = "MCP_HOST"  # default: 127.0.0.1
+ENV_PORT = "MCP_PORT"  # default: 10845
+ENV_PATH = "MCP_PATH"  # default: /mcp (HTTP only)
+
+
+def get_transport_config() -> dict:
+    """
+    Get transport configuration from environment variables.
+
+    Returns:
+        Dictionary with transport, host, port, and path settings.
+    """
+    return {
+        "transport": os.getenv(ENV_TRANSPORT, "stdio").lower(),
+        "host": os.getenv(ENV_HOST, "127.0.0.1"),
+        "port": int(os.getenv(ENV_PORT, "10845")),
+        "path": os.getenv(ENV_PATH, "/mcp"),
+    }
+
+
+def create_argument_parser(server_name: str) -> argparse.ArgumentParser:
+    """
+    Create standardized CLI argument parser for MCP servers.
+
+    Args:
+        server_name: Name of the MCP server for help text.
+
+    Returns:
+        Configured ArgumentParser instance.
+    """
+    parser = argparse.ArgumentParser(
+        description=f"{server_name} - FastMCP 3.x Server",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=f"""
+Environment Variables:
+  {ENV_TRANSPORT}    Transport mode: stdio, http, sse (default: stdio)
+  {ENV_HOST}         Bind address (default: 127.0.0.1)
+  {ENV_PORT}         Port number (default: 10845)
+  {ENV_PATH}         HTTP endpoint path (default: /mcp)
+
+Examples:
+  # STDIO mode (Claude Desktop)
+  python -m {server_name.replace("-", "_")} --stdio
+
+  # HTTP mode (web apps)
+  python -m {server_name.replace("-", "_")} --http --port 10845
+
+  # Via environment
+  MCP_TRANSPORT=http MCP_PORT=10845 python -m {server_name.replace("-", "_")}
+""",
+    )
+
+    transport_group = parser.add_mutually_exclusive_group()
+    transport_group.add_argument(
+        "--stdio", action="store_true", help="Run in STDIO (JSON-RPC) mode (default)"
+    )
+    transport_group.add_argument(
+        "--http", action="store_true", help="Run in HTTP Streamable mode (FastMCP 3.x)"
+    )
+    transport_group.add_argument(
+        "--sse", action="store_true", help="Run in SSE mode (deprecated, use --http)"
+    )
+
+    parser.add_argument(
+        "--host", default=None, help=f"Host to bind to (default: ${ENV_HOST} or 127.0.0.1)"
+    )
+    parser.add_argument(
+        "--port", type=int, default=None, help=f"Port to listen on (default: ${ENV_PORT} or 10845)"
+    )
+    parser.add_argument(
+        "--path", default=None, help=f"HTTP endpoint path (default: ${ENV_PATH} or /mcp)"
+    )
+    parser.add_argument("--agentic", action="store_true", help="Enable CodeMode agentic discovery (collapses tools into search + execute)")
+    parser.add_argument("--debug", action="store_true", help="Enable debug logging")
+
+    return parser
+
+
+def resolve_transport(args: argparse.Namespace) -> TransportType:
+    """
+    Resolve transport type from CLI args with environment fallback.
+
+    Priority:
+        1. CLI arguments (--http, --stdio, --sse)
+        2. Environment variable (MCP_TRANSPORT)
+        3. Default (stdio)
+
+    Args:
+        args: Parsed CLI arguments.
+
+    Returns:
+        Transport type string.
+    """
+    if args.http:
+        return "http"
+    elif args.sse:
+        logger.warning(
+            "SSE transport is deprecated. Consider using --http instead. "
+            "SSE support will be removed in a future version."
+        )
+        return "sse"
+    elif args.stdio:
+        return "stdio"
+    else:
+        # Fall back to environment variable
+        env_transport = os.getenv(ENV_TRANSPORT, "stdio").lower()
+        if env_transport not in ("stdio", "http", "sse"):
+            logger.warning(f"Invalid {ENV_TRANSPORT}='{env_transport}', defaulting to stdio")
+            return "stdio"
+        if env_transport == "sse":
+            logger.warning(
+                "SSE transport is deprecated. Consider using MCP_TRANSPORT=http instead."
+            )
+        return env_transport  # type: ignore
+
+
+def resolve_config(args: argparse.Namespace) -> dict:
+    """
+    Resolve full transport configuration from CLI args and environment.
+
+    CLI args take precedence over environment variables.
+
+    Args:
+        args: Parsed CLI arguments.
+
+    Returns:
+        Dictionary with transport, host, port, path settings.
+    """
+    env_config = get_transport_config()
+
+    return {
+        "transport": resolve_transport(args),
+        "host": args.host if args.host is not None else env_config["host"],
+        "port": args.port if args.port is not None else env_config["port"],
+        "path": args.path if args.path is not None else env_config["path"],
+    }
+
+
+def run_server(
+    mcp_app, args: Optional[argparse.Namespace] = None, server_name: str = "mcp-server"
+) -> None:
+    """
+    Unified server runner for all transport modes.
+
+    This is the main entry point for running an MCP server with proper
+    transport configuration based on CLI arguments and environment variables.
+
+    Args:
+        mcp_app: FastMCP application instance.
+        args: Parsed CLI arguments (optional, will parse if None).
+        server_name: Server name for logging and help text.
+
+    Raises:
+        Exception: If server fails to start.
+    """
+    # Simply run the async version
+    asyncio.run(run_server_async(mcp_app, args, server_name))
+
+
+async def run_server_async(
+    mcp_app, args: Optional[argparse.Namespace] = None, server_name: str = "mcp-server"
+) -> None:
+    """
+    Asynchronous unified server runner for all transport modes.
+
+    Args:
+        mcp_app: FastMCP application instance.
+        args: Parsed CLI arguments (optional, will parse if None).
+        server_name: Server name for logging and help text.
+    """
+    if args is None:
+        parser = create_argument_parser(server_name)
+        args = parser.parse_args()
+
+    # Configure logging
+    if args.debug:
+        logging.getLogger().setLevel(logging.DEBUG)
+        logger.debug(f"Debug logging enabled for {server_name}")
+
+    config = resolve_config(args)
+    transport = config["transport"]
+    agentic = args.agentic or os.getenv("MCP_AGENTIC", "").lower() in ("true", "1", "yes")
+
+    logger.info(f"Starting {server_name} v{getattr(mcp_app, 'version', '?.?.?')}")
+    logger.info(f"Transport: {transport.upper()}")
+    if agentic:
+        try:
+            from fastmcp.experimental.transforms.code_mode import CodeMode
+
+            CodeMode().attach(mcp_app)
+            logger.info("CodeMode agentic discovery enabled")
+        except ImportError as e:
+            logger.warning("CodeMode not available in this FastMCP version: %s", e)
+
+    try:
+        if transport == "stdio":
+            logger.info("Running in STDIO mode - Ready for Claude Desktop!")
+            await mcp_app.run_stdio_async()
+
+        elif transport == "http":
+            host = config["host"]
+            port = config["port"]
+            path = config["path"]
+            endpoint = f"http://{host}:{port}{path}"
+            logger.info(f"Running in HTTP Streamable mode: {endpoint}")
+            await mcp_app.run_http_async(host=host, port=port, path=path)
+
+        elif transport == "sse":
+            host = config["host"]
+            port = config["port"]
+            logger.warning("SSE mode is deprecated. Migrate to HTTP Streamable (--http).")
+            logger.info(f"Running in SSE mode: http://{host}:{port}")
+            await mcp_app.run_async(transport='sse', host=host, port=port)
+
+    except asyncio.CancelledError:
+        logger.info(f"{server_name} task cancelled")
+    except Exception as e:
+        logger.error(f"{server_name} failed: {e}", exc_info=True)
+        raise
+
+
+# Export public API
+__all__ = [
+    "TransportType",
+    "ENV_TRANSPORT",
+    "ENV_HOST",
+    "ENV_PORT",
+    "ENV_PATH",
+    "get_transport_config",
+    "create_argument_parser",
+    "resolve_transport",
+    "resolve_config",
+    "run_server",
+    "run_server_async",
+]
+```
+
+### src/fastsearch_mcp/prompts.py
+```
+"""
+FastMCP 3.2 prompt templates for FastSearch MCP.
+
+Registered via @mcp.prompt() decorator at import time.
+"""
+
+from fastsearch_mcp.mcp_instance import mcp
+
+
+@mcp.prompt()
+def search_files_guide() -> str:
+    """Guide: How to search files with FastSearch MCP."""
+    return """# FastSearch MCP - File Search Guide
+
+## Basic Usage
+Use `fastsearch_search` with a glob pattern and path:
+- `fastsearch_search(pattern="*.txt", path="C:\\")`
+- `fastsearch_search(pattern="README.md", path="D:\\Projects")`
+
+## Search All Drives
+Set `search_all=True` to search every NTFS drive:
+- `fastsearch_search(pattern="*.log", search_all=True, max_results=50)`
+
+## Advanced Filtering
+Use `fastsearch_search_advanced` for size, date, and attribute filters:
+- Size: `min_size=1048576` (1MB+), `max_size=1073741824` (1GB-)
+- Date: `modified_after="7d"`, `created_before="2024-01-01"`
+- Attributes: `include_hidden=True`, `include_system=False`
+
+## Content Search
+Use `file_content_search` to find text inside files:
+- `file_content_search(search_pattern="TODO", search_dir="C:\\Projects", file_pattern="*.py")`
+
+## Service Management
+- Check status: `service_status`
+- Start/stop: `service_start_fastsearch`, `service_stop_fastsearch`
+- The FastSearch Windows service must be running for all search operations
+"""
+
+
+@mcp.prompt()
+def disk_analysis_guide() -> str:
+    """Guide: How to analyze disk usage and find duplicates."""
+    return """# FastSearch MCP - Disk Analysis Guide
+
+## Drive Inventory
+List all drives: `drive_inventory`
+
+## Disk Usage Analysis
+Analyze space usage: `analyze_disk_usage(path="C:\\", max_depth=3)`
+- Shows top-level folder sizes
+- Use `max_depth` to control drill-down depth
+- Use `min_size_mb` to filter out small folders
+
+## Find Duplicate Files
+Detect duplicates by content hash: `find_duplicate_files(directories=["C:\\Users"], pattern="*.jpg", min_size=102400)`
+- Filters by pattern and minimum size
+- Returns groups of identical files with paths and sizes
+
+## File Integrity
+Generate file hashes: `generate_file_hashes(paths=["C:\\important"], algorithm="sha256")`
+- Supports sha256, sha512, md5, blake2b
+- Verify integrity by re-running and comparing hashes
+
+## System Resources
+- Current resource usage: `monitor_system_resources(duration_seconds=5)`
+- Process information: `get_process_info()`
+"""
+
+
+@mcp.prompt()
+def service_troubleshooting() -> str:
+    """Guide: Troubleshoot FastSearch service issues."""
+    return """# FastSearch MCP - Service Troubleshooting
+
+## Service Not Running
+If searches return "service not available":
+1. Check status: `service_status`
+2. Start the service: `service_start_fastsearch` (requires admin)
+3. The service must be installed first via the MSI installer
+
+## Named Pipe Connection Issues
+Error: "All pipe instances are busy" or "File not found"
+- The service binary path: `D:\\Dev\\repos\\fastsearch-mcp\\service\\build\\bin\\Release\\FastSearchServiceNew.exe`
+- Verify the service is running in Windows Services (services.msc)
+- Restart: `service_restart_fastsearch`
+- Check Windows Event Log for FastSearch errors
+
+## Zero Search Results
+If `fastsearch_search` returns 0 results:
+- The C++ service's MFT record parsing may have a struct alignment issue
+- Rebuild the service from source and restart
+- Verify the named pipe connection with `service_status`
+"""
+```
+
+### src/fastsearch_mcp/skills.py
+```
+"""
+FastMCP 3.2 skill definitions for FastSearch MCP.
+
+Skills are composable workflow units registered at import time.
+"""
+
+from fastsearch_mcp.mcp_instance import mcp
+
+
+@mcp.skill()
+async def find_recently_modified_files() -> str:
+    """Skill: Find files modified in the last 7 days across all drives."""
+    return """
+Use fastsearch_search_advanced with modified_after="7d" and search_all=True
+to locate recently changed files across all NTFS drives. Combine with
+file_pattern="*" to find all types, or narrow with "*.py", "*.docx", etc.
+"""
+
+
+@mcp.skill()
+async def cleanup_disk_space() -> str:
+    """Skill: Identify large, old, or duplicate files for disk cleanup."""
+    return """
+1. Run analyze_disk_usage to find large folders
+2. Run find_duplicate_files to locate redundant data
+3. Run fastsearch_search_advanced with size filters (e.g., min_size=1073741824 for 1GB+)
+4. Combine with accessed_before="365d" to find old large files
+"""
+
+
+@mcp.skill()
+async def forensic_file_audit() -> str:
+    """Skill: Audit files for forensic or compliance review."""
+    return """
+1. Search for sensitive file types: fastsearch_search(pattern="*.xlsx", search_all=True)
+2. Find hidden files: fastsearch_search_advanced(pattern="*", include_hidden=True, search_all=True)
+3. Check for recent modifications in sensitive directories
+4. Verify file integrity with generate_file_hashes
+"""
+```
+
+### src/fastsearch_mcp/pipe_client.py
+```
+"""
+Named pipe communication client for FastSearch C++ service.
+
+This module provides real named pipe communication with the FastSearch C++ service
+for high-performance NTFS MFT access.
+"""
+
+import asyncio
+import json
+import logging
+import os
+import struct
+import sys
+from typing import Any, Dict, List, Optional, Tuple
+
+# Windows-specific imports
+if sys.platform == "win32":
+    try:
+        import pywintypes
+        import win32file
+        import win32pipe
+
+        WINDOWS_AVAILABLE = True
+    except ImportError:
+        WINDOWS_AVAILABLE = False
+        logging.warning("Windows API modules not available. Named pipe communication disabled.")
+else:
+    WINDOWS_AVAILABLE = False
+
+from .logging_config import get_logger
+
+logger = get_logger(__name__)
+
+# Service configuration: pipe name must match service\src\fastsearch_service.h kPipeName
+# (L"\\\\.\\pipe\\FastSearchMCP"). Override with FASTSEARCH_PIPE_NAME if using a different build.
+DEFAULT_PIPE_NAME = r"\\.\pipe\FastSearchMCP"
+PIPE_TIMEOUT = 5000  # 5 seconds in milliseconds
+MAX_PIPE_BUFFER = 65536  # 64KB buffer
+
+
+def get_pipe_name() -> str:
+    """Return the named pipe path. Use env FASTSEARCH_PIPE_NAME if set (e.g. if service uses a different name)."""
+    return os.environ.get("FASTSEARCH_PIPE_NAME", DEFAULT_PIPE_NAME).strip() or DEFAULT_PIPE_NAME
+
+
+# Backward compatibility
+SERVICE_PIPE_NAME = DEFAULT_PIPE_NAME
+
+
+class NamedPipeClient:
+    """Client for communicating with FastSearch C++ service via named pipes."""
+
+    def __init__(self, pipe_name: Optional[str] = None):
+        self.pipe_name = pipe_name if pipe_name is not None else get_pipe_name()
+        self.handle = None
+        self.connected = False
+        self.last_connect_error: Optional[Tuple[int, str]] = None  # (winerror, message) when connect fails
+
+    async def connect(self, timeout: float = 5.0) -> bool:
+        """Connect to the named pipe.
+
+        Args:
+            timeout: Connection timeout in seconds
+
+        Returns:
+            bool: True if connected successfully, False otherwise
+        """
+        if not WINDOWS_AVAILABLE:
+            logger.warning("Windows API not available, cannot connect to named pipe")
+            return False
+
+        self.last_connect_error = None
+        try:
+            # Try to open the named pipe (blocking Win32 call, run in executor)
+            loop = asyncio.get_event_loop()
+            self.handle = await asyncio.wait_for(
+                loop.run_in_executor(
+                    None,
+                    lambda: win32file.CreateFile(
+                        self.pipe_name,
+                        win32file.GENERIC_READ | win32file.GENERIC_WRITE,
+                        0,
+                        None,
+                        win32file.OPEN_EXISTING,
+                        0,
+                        None,
+                    ),
+                ),
+                timeout=timeout,
+            )
+
+            # Set pipe to message mode (blocking Win32 call, run in executor)
+            await loop.run_in_executor(
+                None,
+                lambda: win32pipe.SetNamedPipeHandleState(
+                    self.handle, win32pipe.PIPE_READMODE_MESSAGE, None, None
+                ),
+            )
+
+            self.connected = True
+            self.last_connect_error = None
+            logger.info(f"Connected to named pipe: {self.pipe_name}")
+            return True
+
+        except asyncio.TimeoutError:
+            self.last_connect_error = (0, f"Connection timed out after {timeout}s")
+            logger.error(f"Connection to named pipe timed out after {timeout}s: {self.pipe_name}")
+            self.connected = False
+            return False
+        except pywintypes.error as e:
+            self.last_connect_error = (e.winerror, str(e))
+            if e.winerror == 2:  # ERROR_FILE_NOT_FOUND
+                logger.debug(f"Named pipe not found: {self.pipe_name} (error 2). Set FASTSEARCH_PIPE_NAME if service uses another name.")
+            else:
+                logger.error(f"Failed to connect to named pipe: {e}")
+            self.connected = False
+            return False
+        except Exception as e:
+            self.last_connect_error = (0, str(e))
+            logger.error(f"Unexpected error connecting to named pipe: {e}")
+            self.connected = False
+            return False
+
+    async def disconnect(self):
+        """Disconnect from the named pipe."""
+        if self.handle and self.connected:
+            try:
+                win32file.CloseHandle(self.handle)
+                logger.info("Disconnected from named pipe")
+            except Exception as e:
+                logger.error(f"Error closing named pipe handle: {e}")
+            finally:
+                self.handle = None
+                self.connected = False
+
+    async def send_request(
+        self, request: Dict[str, Any], timeout: float = 10.0
+    ) -> Optional[Dict[str, Any]]:
+        """Send a request to the service and get the response.
+
+        Args:
+            request: Request dictionary to send
+            timeout: Request timeout in seconds
+
+        Returns:
+            Response dictionary or None if failed
+        """
+        if not self.connected or not self.handle:
+            logger.error("Not connected to named pipe")
+            return None
+
+        def _send_request_sync():
+            """Synchronous I/O operations that need to run in executor."""
+            try:
+                # Check handle validity before use
+                if not self.handle:
+                    logger.error("Pipe handle is invalid")
+                    return None
+
+                # Serialize request (ensure_ascii=True to escape Unicode characters)
+                request_data = json.dumps(request, ensure_ascii=True).encode("utf-8")
+                request_length = len(request_data)
+
+                # Send length prefix (4 bytes, little-endian)
+                length_bytes = struct.pack("<I", request_length)
+                win32file.WriteFile(self.handle, length_bytes)
+
+                # Send request data
+                win32file.WriteFile(self.handle, request_data)
+
+                # Flush the pipe
+                win32file.FlushFileBuffers(self.handle)
+
+                logger.debug(f"Sent request: {request}")
+
+                # Read response length
+                try:
+                    response_length_bytes = win32file.ReadFile(self.handle, 4)[1]
+                except pywintypes.error as e:
+                    if e.winerror == 6:  # ERROR_INVALID_HANDLE
+                        logger.error(
+                            "Pipe handle became invalid during read "
+                            "(service may have closed connection)"
+                        )
+                        self.connected = False
+                    raise
+
+                response_length = struct.unpack("<I", response_length_bytes)[0]
+
+                if response_length > MAX_PIPE_BUFFER:
+                    logger.error(f"Response too large: {response_length} bytes")
+                    return None
+
+                # Read response data
+                try:
+                    response_data = win32file.ReadFile(self.handle, response_length)[1]
+                except pywintypes.error as e:
+                    if e.winerror == 6:  # ERROR_INVALID_HANDLE
+                        logger.error(
+                            "Pipe handle became invalid during read "
+                            "(service may have closed connection)"
+                        )
+                        self.connected = False
+                    raise
+
+                response = json.loads(response_data.decode("utf-8"))
+
+                logger.debug(f"Received response: {response}")
+                return response
+
+            except pywintypes.error as e:
+                error_code = e.winerror if hasattr(e, 'winerror') else 0
+                if error_code == 6:  # ERROR_INVALID_HANDLE
+                    logger.error(f"Pipe handle is invalid: {e}")
+                else:
+                    logger.error(f"Named pipe communication error: {e}")
+                if self.handle:
+                    try:
+                        win32file.CloseHandle(self.handle)
+                    except Exception:
+                        pass
+                    self.handle = None
+                self.connected = False
+                return None
+            except json.JSONDecodeError as e:
+                logger.error(f"Failed to decode response JSON: {e}")
+                return None
+            except Exception as e:
+                logger.error(f"Unexpected error in named pipe communication: {e}")
+                return None
+
+        try:
+            # Run blocking I/O in executor with timeout
+            loop = asyncio.get_event_loop()
+            response = await asyncio.wait_for(
+                loop.run_in_executor(None, _send_request_sync),
+                timeout=timeout
+            )
+            return response
+        except asyncio.TimeoutError:
+            logger.error(f"Request timed out after {timeout} seconds: {request}")
+            # Mark connection as potentially invalid after timeout
+            # The service may still be processing, but we can't wait
+            # Close the handle to allow reconnection
+            if self.handle and self.connected:
+                try:
+                    win32file.CloseHandle(self.handle)
+                except Exception:
+                    pass
+                self.handle = None
+                self.connected = False
+            return None
+        except Exception as e:
+            logger.error(f"Unexpected error in async request handling: {e}")
+            return None
+
+    async def __aenter__(self):
+        """Async context manager entry."""
+        await self.connect()
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """Async context manager exit."""
+        await self.disconnect()
+
+
+async def search_files_via_pipe(
+    pattern: str,
+    directory: str = ".",
+    max_results: int = 100,
+    timeout: float = 120.0,
+    pagination_mode: Optional[str] = None,
+    page: int = 1,
+    page_size: int = 1000,
+) -> Dict[str, Any]:
+    """Search for files using the C++ service via named pipe.
+
+    Args:
+        pattern: Search pattern (glob or regex)
+        directory: Directory to search in
+        max_results: Maximum number of results (0 = unlimited, capped at 10M)
+        timeout: Request timeout in seconds (default: 120.0)
+        pagination_mode: Pagination mode - "offset" for page-based, None for all results
+        page: Page number (1-indexed) for offset pagination
+        page_size: Results per page for offset pagination
+
+    Returns:
+        Dictionary containing:
+            - results: List of file information dictionaries
+            - count: Number of results in this response
+            - pagination: Pagination metadata (if pagination_mode is "offset") or None
+    """
+    if not WINDOWS_AVAILABLE:
+        logger.warning("Windows API not available, cannot use named pipe communication")
+        return {"results": [], "count": 0, "pagination": None, "error": "Windows API not available"}
+
+    async with NamedPipeClient() as client:
+        if not client.connected:
+            logger.warning("Could not connect to FastSearch service via named pipe")
+            return {"results": [], "count": 0, "pagination": None, "error": "Could not connect to FastSearch service via named pipe"}
+
+        request = {
+            "command": "search_files",
+            "pattern": pattern,
+            "directory": directory,
+            "max_results": max_results,
+        }
+        
+        # Add pagination parameters if requested
+        if pagination_mode == "offset":
+            request["pagination_mode"] = "offset"
+            request["page"] = page
+            request["page_size"] = page_size
+
+        response = await client.send_request(request, timeout=timeout)
+        if response and response.get("success"):
+            return {
+                "results": response.get("results", []),
+                "count": response.get("count", 0),
+                "pagination": response.get("pagination"),
+            }
+        else:
+            error_msg = response.get("error", "Unknown error") if response else "No response"
+            logger.error(f"File search failed: {error_msg}")
+            return {"results": [], "count": 0, "pagination": None, "error": error_msg}
+
+
+async def get_service_info_via_pipe() -> Optional[Dict[str, Any]]:
+    """Get service information via named pipe.
+
+    Returns:
+        Service information dictionary or None if failed
+    """
+    if not WINDOWS_AVAILABLE:
+        logger.warning("Windows API not available, cannot use named pipe communication")
+        return None
+
+    async with NamedPipeClient() as client:
+        if not client.connected:
+            logger.warning("Could not connect to FastSearch service via named pipe")
+            return None
+
+        request = {"command": "get_service_info"}
+
+        response = await client.send_request(request)
+        if response and response.get("success"):
+            return response.get("info", {})
+        else:
+            error_msg = response.get("error", "Unknown error") if response else "No response"
+            logger.error(f"Get service info failed: {error_msg}")
+            return None
+
+
+async def test_pipe_connection() -> bool:
+    """Test if the named pipe connection works.
+
+    Returns:
+        bool: True if connection successful, False otherwise
+    """
+    diag = await test_pipe_connection_with_diagnostics()
+    return bool(diag.get("connected") and diag.get("ping_ok"))
+
+
+async def test_pipe_connection_with_diagnostics() -> Dict[str, Any]:
+    """Test pipe connection and return diagnostics for UI (error code, message, pipe name).
+
+    Returns:
+        dict: connected (bool), ping_ok (bool), pipe_name (str),
+              error_code (int | None), error_message (str | None)
+    """
+    pipe_name = get_pipe_name()
+    out: Dict[str, Any] = {
+        "connected": False,
+        "ping_ok": False,
+        "pipe_name": pipe_name,
+        "error_code": None,
+        "error_message": None,
+    }
+    if not WINDOWS_AVAILABLE:
+        out["error_message"] = "Windows API not available"
+        return out
+
+    try:
+        async with NamedPipeClient() as client:
+            if not client.connected:
+                if client.last_connect_error:
+                    out["error_code"] = client.last_connect_error[0]
+                    out["error_message"] = client.last_connect_error[1]
+                else:
+                    out["error_message"] = "Connect failed (no error details)"
+                return out
+            out["connected"] = True
+
+            request = {"command": "ping"}
+            response = await client.send_request(request, timeout=2.0)
+            out["ping_ok"] = response is not None and response.get("success", False)
+            if not out["ping_ok"] and response:
+                out["error_message"] = response.get("error", "Ping did not return success")
+            return out
+    except Exception as e:
+        out["error_message"] = str(e)
+        return out
+```
+
+### pyproject.toml
+```
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fastsearch-mcp"
+version = "0.5.0"
+description = "FastSearch MCP Server - FastMCP 3.2 NTFS search service with sampling, prompts, and CodeMode"
+authors = [
+    {name = "sandraschi", email = "team@sandraschi.dev"}
+]
+readme = "README.md"
+requires-python = ">=3.12"
+license = {text = "MIT"}
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: System :: Filesystems",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+dependencies = [
+    "fastmcp>=3.2.0,<4",
+    "fastapi>=0.115.0",
+    "pydantic>=2.0.0",
+    "python-dotenv>=1.0.0",
+    "psutil>=5.9.0",
+    "watchdog>=3.0.0",
+    "pywin32>=306; sys_platform == 'win32'",
+    "httpx>=0.27.0",
+    "ruff>=0.15.2",
+    "prefab-ui>=0.14.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "pytest-asyncio>=0.21.0",
+    "black>=23.0.0",
+    "isort>=5.12.0",
+    "mypy>=1.0.0",
+    "ruff>=0.1.0",
+]
+
+[project.scripts]
+fastsearch-mcp = "fastsearch_mcp.__main__:cli_main"
+fastsearch-gateway = "fastsearch_mcp.gateway:main"
+
+[project.urls]
+Homepage = "https://github.com/fastsearch/fastsearch-mcp"
+Documentation = "https://github.com/fastsearch/fastsearch-mcp/blob/main/README.md"
+Repository = "https://github.com/fastsearch/fastsearch-mcp"
+Issues = "https://github.com/fastsearch/fastsearch-mcp/issues"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-dir]
+"" = "src"
+
+# Black and isort replaced by ruff (see [tool.ruff] section below)
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+strict_equality = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "--strict-markers",
+    "--strict-config",
+    "--cov=fastsearch_mcp",
+    "--cov-report=term-missing",
+    "--cov-report=html",
+    "--cov-report=xml",
+]
+  markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+    "unit: marks tests as unit tests",
+    "service: marks tests that require the FastSearch service",
+    "admin: marks tests that require administrator privileges",
+  ]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "S", "UP", "RUF"]
+ignore = ["S101", "B008"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+```
