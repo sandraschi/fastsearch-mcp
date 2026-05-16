@@ -1,12 +1,8 @@
 # FastSearch MCP
 
-[![FastMCP Version](https://img.shields.io/badge/FastMCP-3.2-blue?style=flat-square&logo=python&logoColor=white)](https://github.com/sandraschi/fastmcp) [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff) [![Linted with Biome](https://img.shields.io/badge/Linted_with-Biome-60a5fa?style=flat-square&logo=biome&logoColor=white)](https://biomejs.dev/) [![Built with Just](https://img.shields.io/badge/Built_with-Just-000000?style=flat-square&logo=gnu-bash&logoColor=white)](https://github.com/casey/just)
+[![GitHub Release](https://img.shields.io/github/v/release/sandraschi/fastsearch-mcp?style=flat-square&logo=github&logoColor=white)](https://github.com/sandraschi/fastsearch-mcp/releases) [![FastMCP](https://img.shields.io/badge/FastMCP-3.2-blue?style=flat-square&logo=python&logoColor=white)](https://fastmcp.ai) [![Windows](https://img.shields.io/badge/Windows-10%2B-0078D6?style=flat-square&logo=windows&logoColor=white)](https://www.microsoft.com/windows) [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff) [![Biome](https://img.shields.io/badge/Linted_with-Biome-60a5fa?style=flat-square&logo=biome&logoColor=white)](https://biomejs.dev/) [![Just](https://img.shields.io/badge/Built_with-Just-000000?style=flat-square&logo=gnu-bash&logoColor=white)](https://github.com/casey/just) [![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue?style=flat-square&logo=python&logoColor=white)](https://www.python.org/) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT) [![Last Commit](https://img.shields.io/github/last-commit/sandraschi/fastsearch-mcp?style=flat-square&logo=github&logoColor=white)](https://github.com/sandraschi/fastsearch-mcp/commits/main) [![Repo Size](https://img.shields.io/github/repo-size/sandraschi/fastsearch-mcp?style=flat-square&logo=github&logoColor=white)](https://github.com/sandraschi/fastsearch-mcp) [![CI](https://img.shields.io/github/actions/workflow/status/sandraschi/fastsearch-mcp/.github/workflows/ci.yml?style=flat-square&logo=githubactions&logoColor=white&label=CI)](https://github.com/sandraschi/fastsearch-mcp/actions)
 
- Lightning-fast file search for Claude Desktop via direct NTFS Master File Table access  no indexing, no caching, no compromises.
-
-[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![FastMCP](https://img.shields.io/badge/FastMCP-3.2-brightgreen)](https://fastmcp.ai)
+  Lightning-fast file search via direct NTFS Master File Table access — zero indexing, zero caching. FastMCP 3.2 with CodeMode, prompts, and skills.
 
 > **Core Principle:** FastSearch MCP follows the WizFile philosophy. Every request reads straight from the NTFS MFT. We never build background indexes, caches, or persistent file databases.
 
@@ -14,7 +10,7 @@
 
 - **Direct NTFS MFT reads** for sub-second search across millions of files.
 - **Zero indexing & zero persistence** keeps startup instant and memory under 50 MB.
-- **Claude-first integration** through the MCP protocol and schema-driven tools.
+- **FastMCP 3.2**: sampling, CodeMode (`--agentic`), `@mcp.prompt()`, `@mcp.skill()`
 - **Privilege separation**: elevated C++ service handles filesystem duties, Python bridge stays in user space.
 - **Fast service checks** - <1ms overhead per search (optimized from 5 seconds).
 - **Clear error messages** - Actionable guidance when service is unavailable.

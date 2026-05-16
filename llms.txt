@@ -1,27 +1,41 @@
-# fastsearch-mcp
-> This directory contains documentation related to achieving GLAMA AI Gold standard status for the Advanced Memory MCP project. GLAMA AI is a quality assurance platform that evaluates MCP servers agains...
+# FastSearch MCP v0.5.0
+Lightning-fast Windows file search via direct NTFS Master File Table access. FastMCP 3.2 server with sampling, CodeMode, prompts, and skills.
 
-This project includes automated llms.txt generation for AI accessibility.
+## Quick Start
+```bash
+uvx fastsearch-mcp
+# Or with agentic discovery:
+uvx fastsearch-mcp --agentic
+```
+
+## Core Tools
+- `fastsearch_search(pattern, path, search_all, max_results)` — Name pattern search via MFT
+- `fastsearch_search_advanced(...)` — MFT search with size/date/attribute filters
+- `file_content_search(search_pattern, search_dir, ...)` — Regex content search in files
+- `service_status` — Check FastSearch Windows service
+- `drive_inventory` — List all drives
+- `analyze_disk_usage(path, max_depth)` — Disk space analysis
+- `find_duplicate_files(directories, pattern, min_size)` — Duplicates by hash
+
+## Architecture
+Python FastMCP 3.2 bridge ↔ Named pipe `\\.\pipe\FastSearchMCP` ↔ C++ Windows service (LocalSystem) ↔ NTFS MFT
 
 ## Docs
-- [Readme](docs\glama\README.md): This directory contains documentation related to achieving GLAMA AI Gold standard status for the Adv...
-- [Readme](README.md): ⚡ Lightning-fast file search for Claude Desktop via direct NTFS Master File Table access — no indexi...
-- [Readme](docs\mcpb-packaging\README.md): **Complete guide to packaging and distributing MCP servers with MCPB**
-- [Readme](docs\github\README.md): > **Purpose**: Comprehensive GitHub configuration guide to avoid hours of trial-and-error setup.
-- [Installation Methods](docs\INSTALLATION_METHODS.md): FastSearch MCP supports **three installation methods** depending on your use case:
-- [Release Installation](docs\RELEASE_INSTALLATION.md): FastSearch MCP supports **three installation methods**:
-- [Complete Setup Guide](docs\github\COMPLETE_SETUP_GUIDE.md): > **6 hours of pain distilled into 30 minutes of setup**
-- [Event Source Setup](docs\EVENT_SOURCE_SETUP.md): The FastSearch service event source has been registered in the Windows Registry to enable Event Log ...
-- [Visual Studio Debugger Setup](docs\Visual_Studio_Debugger_Setup.md): - Document the approved Visual Studio workflow for debugging the C++ Windows service without violati...
-- [Cloudflare Email Setup](docs\CLOUDFLARE_EMAIL_SETUP.md): **Purpose**: Set up email forwarding so `team@sandraschi.dev` forwards to your existing email addres...
+- [README](README.md) — Full documentation
+- [CHANGELOG](CHANGELOG.md) — Release history
+- [docs/STATUS_REPORT.md](docs/STATUS_REPORT.md) — Current status
+- [docs/TECHNICAL_ARCHITECTURE.md](docs/TECHNICAL_ARCHITECTURE.md) — Architecture deep dive
+- [docs/INSTALL.md](docs/INSTALL.md) — Installation guide
 
-## Configuration
-- [Pyproject](pyproject.toml): Python project configuration and dependencies
-- [Package](package.json): Node.js project configuration and dependencies
-- [Config](.git\config): Application configuration files
+## Prompts (FastMCP 3.2)
+- `search_files_guide` — How to search files
+- `disk_analysis_guide` — Disk usage and duplicate analysis
+- `service_troubleshooting` — Service issue resolution
 
-## Optional
-- [Changelog](CHANGELOG.md): Project changelog information
-- [Contributing](docs\CONTRIBUTING.md): Project contributing information
-- [License](LICENSE): Project license information
-- [Roadmap](docs\ROADMAP.md): Project roadmap information
+## Skills (FastMCP 3.2)
+- `find_recently_modified_files` — Files changed in last 7 days
+- `cleanup_disk_space` — Identify large/old/duplicate files
+- `forensic_file_audit` — Audit for compliance review
+
+## GitHub
+https://github.com/sandraschi/fastsearch-mcp
