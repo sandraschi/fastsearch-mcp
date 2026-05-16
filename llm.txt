@@ -1,69 +1,33 @@
-# FastSearch MCP Server
+# FastSearch MCP v0.5.0
 
 ## Overview
-FastSearch MCP Server is a Python implementation of the Model-Controller-Presenter (MCP) 2.13 protocol, designed to provide a standardized interface for the FastSearch NTFS search service.
+FastSearch MCP is a FastMCP 3.2 server providing lightning-fast Windows file search via direct NTFS Master File Table (MFT) access. Zero indexing, zero caching. Features sampling, CodeMode, prompts, and skills.
 
-## Key Components
+## Architecture
+- C++ Windows service (LocalSystem) → Named pipe `\\.\pipe\FastSearchMCP` → Python FastMCP 3.2 bridge → MCP client
+- Ports: 10844 (web dashboard), 10845 (API + MCP HTTP)
 
-### 1. MCP Server (`mcp_server.py`)
-- Implements the MCP 2.13 protocol
-- Handles JSON-RPC 2.0 requests
-- Manages tool registration and execution
-- Provides built-in methods for service management
+## Key Tools
+- `fastsearch_search(pattern, path, search_all, max_results)` — Name pattern search via NTFS MFT
+- `fastsearch_search_advanced(...)` — MFT search with size/date/attribute filters
+- `file_content_search(search_pattern, search_dir, ...)` — Regex content search in files
+- `service_status` — Check FastSearch Windows service status
+- `drive_inventory` — List all NTFS drives
+- `analyze_disk_usage(path, max_depth)` — Disk space analysis
+- `find_duplicate_files(directories, pattern, min_size)` — Duplicates by content hash
+- `generate_file_hashes(paths, algorithm)` — File integrity verification
 
-### 2. Tools System
-Tools are registered with the MCP server and can be called remotely. Each tool should:
-- Be a Python function with type hints
-- Be registered using the `@tool` decorator
-- Return JSON-serializable data
-- Handle errors using `McpError`
+## FastMCP 3.2 Features
+- Sampling: Tools can use `ctx: Context = None` → `ctx.sampling()` for client-side LLM
+- CodeMode: Run with `--agentic` for discovery + execute meta-tools (`CodeMode().attach(mcp)`)
+- Prompts: 3 `@mcp.prompt()` templates (search guide, disk analysis, troubleshooting)
+- Skills: 3 `@mcp.skill()` definitions (recent files, cleanup, forensic audit)
 
-### 3. Built-in Tools
-- `mcp.get_capabilities`: List available tools and capabilities
-- `mcp.ping`: Basic health check
-- `mcp.shutdown`: Gracefully shut down the server
-- `fastsearch.search`: Execute a search query
-- `fastsearch.status`: Get service status
+## Dependencies
+- fastmcp>=3.2.0,<4
+- fastapi, pydantic, psutil, pywin32, httpx
 
-## Development
-
-### Adding a New Tool
-1. Create a new function with type hints
-2. Decorate it with `@tool("tool.name")`
-3. Register it with the MCP server
-
-Example:
-```python
-@tool("example.hello")
-async def hello_world(name: str) -> dict:
-    """Say hello to someone."""
-    return {"message": f"Hello, {name}!"}
-```
-
-### Error Handling
-Use `McpError` for expected errors:
-```python
-from fastsearch_mcp import McpError
-
-@tool("example.fail")
-async def fail_example():
-    raise McpError("Something went wrong", code=-32000)
-```
-
-## API Reference
-
-### MCP Server
-- `McpServer(service_pipe=None)`: Create a new MCP server
-- `start(stdin=None, stdout=None)`: Start the server
-- `register_method(name, handler)`: Register a method handler
-- `get_tools()`: List all registered tools
-
-### Decorators
-- `@tool(name)`: Register a function as an MCP tool
-- `@validate_schema(schema)`: Validate input against a JSON schema
-
-## Standards Compliance
-- MCP 2.13 Protocol
-- JSON-RPC 2.0
-- PEP 8 Style Guide
-- Type Annotations (PEP 484)
+## Links
+- GitHub: https://github.com/sandraschi/fastsearch-mcp
+- Docs: docs/ directory
+- Changelog: CHANGELOG.md

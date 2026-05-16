@@ -12,7 +12,7 @@ $ErrorActionPreference = "Stop"
 # Script is in mcpb/scripts, so go up two levels to get project root
 $ProjectRoot = $PSScriptRoot | Split-Path -Parent | Split-Path -Parent
 $PackageName = "fastsearch-mcp"
-$Version = "0.4.0"
+$Version = "0.5.0"
 $BuildDir = Join-Path $ProjectRoot "mcpb-build"
 $DistDir = Join-Path $ProjectRoot $OutputDir
 $SrcDir = Join-Path $BuildDir "src"
@@ -69,7 +69,7 @@ Write-Host "  ✅ Configuration files copied" -ForegroundColor Green
 # Create requirements.txt (Claude Desktop will install these at first run)
 Write-Host "`n📋 Creating requirements.txt..." -ForegroundColor Yellow
 $Requirements = @"
-fastmcp>=2.13.0
+fastmcp>=3.2.0,<4
 pydantic>=2.0.0
 psutil>=5.9.0
 pywin32>=306; sys_platform == 'win32'

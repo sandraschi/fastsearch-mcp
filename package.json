@@ -1,6 +1,6 @@
 {
   "name": "fastsearch-mcp",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Lightning-fast file search using NTFS Master File Table - MCP Server",
   "main": "bin/fastsearch-mcp.js",
   "bin": {

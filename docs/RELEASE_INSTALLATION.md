@@ -23,7 +23,7 @@ See [Installation Methods Guide](INSTALLATION_METHODS.md) for detailed instructi
    - Right-click → Run as Administrator
 
 2. **Install Extension**:
-   - Download `fastsearch-mcp-0.4.0.mcpb`
+   - Download `fastsearch-mcp-0.5.0.mcpb`
    - Drag into Claude Desktop
 
 ### For IDE Users (Cursor, Windsurf, Zed)
@@ -85,7 +85,7 @@ Start-Service FastSearchMCP
 
 #### Option A: Drag & Drop (Easiest)
 
-1. Download `fastsearch-mcp-0.4.0.mcpb` from GitHub Releases
+1. Download `fastsearch-mcp-0.5.0.mcpb` from GitHub Releases
 2. Open Claude Desktop
 3. Drag and drop the `.mcpb` file into Claude Desktop
 4. Claude Desktop will:
@@ -101,7 +101,7 @@ Start-Service FastSearchMCP
 npm install -g @anthropic-ai/mcpb
 
 # Install the package
-mcpb install fastsearch-mcp-0.4.0.mcpb
+mcpb install fastsearch-mcp-0.5.0.mcpb
 ```
 
 ## Release Package Structure
@@ -109,10 +109,10 @@ mcpb install fastsearch-mcp-0.4.0.mcpb
 GitHub Releases will contain:
 
 ```
-fastsearch-mcp-v0.4.0/
+fastsearch-mcp-v0.5.0/
 ├── fastsearch-mcp-setup.msi          # Windows Service Installer (REQUIRES UAC)
-├── fastsearch-mcp-0.4.0.mcpb         # Claude Desktop Extension (user-level)
-├── fastsearch-mcp-0.4.0.zip          # Source code archive
+├── fastsearch-mcp-0.5.0.mcpb         # Claude Desktop Extension (user-level)
+├── fastsearch-mcp-0.5.0.zip          # Source code archive
 └── README.md                          # Installation instructions
 ```
 
@@ -217,7 +217,7 @@ Before releasing:
    - Follow the wizard
 
 2. **Install Extension**:
-   - Download `fastsearch-mcp-0.4.0.mcpb`
+   - Download `fastsearch-mcp-0.5.0.mcpb`
    - Drag into Claude Desktop
    - Done!
 

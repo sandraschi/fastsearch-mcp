@@ -19,7 +19,7 @@ FastSearch MCP uses a **dual-package architecture** for release:
 
 ### Package 2: MCPB Package (Claude Desktop Extension)
 
-**File**: `fastsearch-mcp-0.4.0.mcpb`  
+**File**: `fastsearch-mcp-0.5.0.mcpb`  
 **Purpose**: Claude Desktop MCP extension  
 **Requires**: User-level permissions only  
 **Contains**:
@@ -53,16 +53,16 @@ cd installer
 
 # Output:
 # - dist/fastsearch-mcp-setup.msi
-# - dist/fastsearch-mcp-0.4.0.mcpb
+# - dist/fastsearch-mcp-0.5.0.mcpb
 ```
 
 ## Release Structure
 
 ```
-GitHub Release: v0.4.0
+GitHub Release: v0.5.0
 ├── fastsearch-mcp-setup.msi          # ⚠️ REQUIRES UAC
-├── fastsearch-mcp-0.4.0.mcpb         # ✅ User-level
-├── fastsearch-mcp-0.4.0.zip          # Source code
+├── fastsearch-mcp-0.5.0.mcpb         # ✅ User-level
+├── fastsearch-mcp-0.5.0.zip          # Source code
 └── RELEASE_NOTES.md                  # Installation guide
 ```
 
@@ -96,7 +96,7 @@ GitHub Release: v0.4.0
 ## Release Notes Template
 
 ```markdown
-# FastSearch MCP v0.4.0
+# FastSearch MCP v0.5.0
 
 ## Installation
 
@@ -111,7 +111,7 @@ FastSearch MCP requires a two-step installation:
 
 ### Step 2: Install Claude Desktop Extension
 
-1. Download `fastsearch-mcp-0.4.0.mcpb`
+1. Download `fastsearch-mcp-0.5.0.mcpb`
 2. Open Claude Desktop
 3. Drag and drop the `.mcpb` file
 4. Done!
@@ -119,8 +119,8 @@ FastSearch MCP requires a two-step installation:
 ## What's Included
 
 - **fastsearch-mcp-setup.msi**: Windows service installer (requires UAC)
-- **fastsearch-mcp-0.4.0.mcpb**: Claude Desktop extension (user-level)
-- **fastsearch-mcp-0.4.0.zip**: Source code
+- **fastsearch-mcp-0.5.0.mcpb**: Claude Desktop extension (user-level)
+- **fastsearch-mcp-0.5.0.zip**: Source code
 
 ## System Requirements
 

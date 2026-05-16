@@ -74,8 +74,8 @@ Add this to your Claude Desktop MCP configuration file:
    ```
 
 2. Install in Claude Desktop:
-   - Drag and drop `dist/fastsearch-mcp-0.4.0.mcpb` into Claude Desktop
-   - OR use: `mcpb install dist/fastsearch-mcp-0.4.0.mcpb`
+   - Drag and drop `dist/fastsearch-mcp-0.5.0.mcpb` into Claude Desktop
+   - OR use: `mcpb install dist/fastsearch-mcp-0.5.0.mcpb`
 
 3. Claude Desktop will automatically configure it
 

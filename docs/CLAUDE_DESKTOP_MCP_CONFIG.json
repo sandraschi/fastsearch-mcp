@@ -10,7 +10,7 @@
           "env": {
             "PYTHONPATH": "D:\\Dev\\repos\\fastsearch-mcp\\src",
             "PYTHONUNBUFFERED": "1",
-            "PYTHONIOENCODING": "ascii:replace",
+            "PYTHONIOENCODING": "utf-8:replace",
             "FASTMCP_NO_BANNER": "1"
           }
     }

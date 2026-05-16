@@ -188,7 +188,7 @@ cmake --build build --config Release
 
 # 2. Test MSI creation
 cd ..
-.\scripts\create_msi_package.ps1 -Version "0.4.0" -Platform "windows-x64" -OutputDir "dist"
+.\scripts\create_msi_package.ps1 -Version "0.5.0" -Platform "windows-x64" -OutputDir "dist"
 
 # 3. Test MCPB creation
 .\mcpb\scripts\build-mcpb-package.ps1
@@ -198,10 +198,10 @@ cd ..
 
 1. Create a test branch
 2. Push workflow changes
-3. Create a test tag: `git tag -a v0.4.0-test -m "Test release"`
-4. Push tag: `git push origin v0.4.0-test`
+3. Create a test tag: `git tag -a v0.5.0-test -m "Test release"`
+4. Push tag: `git push origin v0.5.0-test`
 5. Monitor GitHub Actions
-6. Delete test tag: `git tag -d v0.4.0-test && git push origin :refs/tags/v0.4.0-test`
+6. Delete test tag: `git tag -d v0.5.0-test && git push origin :refs/tags/v0.5.0-test`
 
 ---
 

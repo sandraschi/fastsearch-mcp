@@ -3,7 +3,7 @@
 FastSearch MCP Server - Main entry point.
 
 This module provides the main entry point for the FastSearch MCP server,
-following FastMCP 2.13 patterns and conventions.
+following FastMCP 3.2 patterns and conventions.
 """
 
 import asyncio

@@ -59,14 +59,14 @@ Test-Path "build\bin\Release\FastSearchServiceNew.exe"
 # 3. Create MSI installer
 cd ..
 .\scripts\create_msi_package.ps1 `
-    -Version "0.4.0" `
+    -Version "0.5.0" `
     -Platform "windows-x64" `
     -OutputDir "dist" `
     -ProjectDir "." `
     -WixBinDir "C:\Program Files (x86)\WiX Toolset v3.11\bin"
 
 # 4. Verify MSI
-Test-Path "dist\fastsearch-mcp-setup-0.4.0.msi"
+Test-Path "dist\fastsearch-mcp-setup-0.5.0.msi"
 ```
 
 ### Step 2: Build MCPB Package
@@ -79,20 +79,20 @@ npm install -g @anthropic-ai/mcpb
 .\mcpb\scripts\build-mcpb-package.ps1
 
 # 3. Verify MCPB
-Test-Path "dist\fastsearch-mcp-0.4.0.mcpb"
+Test-Path "dist\fastsearch-mcp-0.5.0.mcpb"
 ```
 
 ### Step 3: Create GitHub Release
 
 ```powershell
 # 1. Tag the release
-git tag -a v0.4.0 -m "Release v0.4.0: First release with MCPB packaging"
-git push origin v0.4.0
+git tag -a v0.5.0 -m "Release v0.5.0: First release with MCPB packaging"
+git push origin v0.5.0
 
 # 2. Create release on GitHub (manual via web UI or CLI)
 # Upload both files:
-#   - dist\fastsearch-mcp-setup-0.4.0.msi
-#   - dist\fastsearch-mcp-0.4.0.mcpb
+#   - dist\fastsearch-mcp-setup-0.5.0.msi
+#   - dist\fastsearch-mcp-0.5.0.mcpb
 ```
 
 ## Fixing CI/CD for Future Releases
@@ -154,8 +154,8 @@ Before creating the first release:
 ## Version Numbering
 
 Use [Semantic Versioning](https://semver.org/):
-- **MAJOR.MINOR.PATCH** (e.g., `0.4.0`)
-- First release: `0.4.0` (or `1.0.0` if you consider it stable)
+- **MAJOR.MINOR.PATCH** (e.g., `0.5.0`)
+- First release: `0.5.0` (or `1.0.0` if you consider it stable)
 
 ## Next Steps After First Release
 

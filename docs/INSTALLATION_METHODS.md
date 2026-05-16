@@ -181,7 +181,7 @@ Start-Service FastSearchMCP
 
 > ⚠️ **Note**: The "drag-and-drop into Claude Desktop settings UI" UX is unconventional and not intuitive. Consider using NPX installation (Method 2) instead, which works with Claude Desktop too and uses standard MCP configuration.
 
-1. Download `fastsearch-mcp-0.4.0.mcpb` from GitHub Releases
+1. Download `fastsearch-mcp-0.5.0.mcpb` from GitHub Releases
 2. Open Claude Desktop
 3. Navigate to Settings → Extensions
 4. Drag and drop the `.mcpb` file into the extensions panel
@@ -199,7 +199,7 @@ Start-Service FastSearchMCP
 npm install -g @anthropic-ai/mcpb
 
 # Install the package
-mcpb install fastsearch-mcp-0.4.0.mcpb
+mcpb install fastsearch-mcp-0.5.0.mcpb
 ```
 
 ### Configuration

@@ -1,7 +1,7 @@
 {
   "manifest_version": "0.2",
   "name": "fastsearch-mcp",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Lightning-fast file search for Claude Desktop using direct NTFS Master File Table access",
   "author": {
     "name": "sandraschi",
@@ -23,7 +23,7 @@
       "env": {
         "PYTHONPATH": "${__dirname}/src",
         "PYTHONUNBUFFERED": "1",
-        "PYTHONIOENCODING": "ascii:replace",
+        "PYTHONIOENCODING": "utf-8:replace",
         "FASTMCP_NO_BANNER": "1"
       }
     }

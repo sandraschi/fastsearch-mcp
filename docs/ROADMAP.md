@@ -2,7 +2,7 @@
 
 This document outlines the future direction and planned features for the FastSearch MCP project.
 
-## Current Status (v0.1.0)
+## Current Status (v0.5.0)
 
 - ✅ Basic file search functionality
 - ✅ Direct NTFS MFT access
@@ -30,7 +30,7 @@ This document outlines the future direction and planned features for the FastSea
 
 ## Medium-term Goals (6-12 months)
 
-### v0.4.0 - Advanced Features
+### v0.5.0 - Advanced Features
 
 - [ ] Search within archives (ZIP, RAR, etc.)
 - [ ] Document content extraction (PDF, DOCX, etc.)
