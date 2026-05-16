@@ -426,17 +426,19 @@ async def search_result_export(
         if format_lower == "csv":
             import io
 
+            meta = "\n".join(content_lines) + "\n" if content_lines else ""
             output = io.StringIO()
             writer = csv.DictWriter(output, fieldnames=export_columns, extrasaction="ignore")
             writer.writeheader()
             for row in rows:
                 writer.writerow(row)
-            content = output.getvalue()
+            content = meta + output.getvalue()
             output.close()
 
         elif format_lower == "tsv":
             import io
 
+            meta = "\n".join(content_lines) + "\n" if content_lines else ""
             output = io.StringIO()
             writer = csv.DictWriter(
                 output, fieldnames=export_columns, delimiter="\t", extrasaction="ignore"
@@ -444,7 +446,7 @@ async def search_result_export(
             writer.writeheader()
             for row in rows:
                 writer.writerow(row)
-            content = output.getvalue()
+            content = meta + output.getvalue()
             output.close()
 
         elif format_lower == "json":

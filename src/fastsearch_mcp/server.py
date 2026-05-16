@@ -15,10 +15,14 @@ from fastsearch_mcp.mcp_instance import mcp
 
 logger = logging.getLogger(__name__)
 
-# CRITICAL: Import tools to register them with the MCP instance
+# CRITICAL: Import tools, prompts, and skills to register them with the MCP instance
 # This must happen after mcp instance is created but before running server
 # Tools are registered via @mcp.tool decorator when imported
+# Prompts are registered via @mcp.prompt() decorator when imported
+# Skills are registered via @mcp.skill() decorator when imported
 import fastsearch_mcp.tools  # noqa: F401
+import fastsearch_mcp.prompts  # noqa: F401
+import fastsearch_mcp.skills  # noqa: F401
 
 from fastsearch_mcp.api_bridge import router as api_router
 

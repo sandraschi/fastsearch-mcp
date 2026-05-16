@@ -8,54 +8,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- **Live integration tests** - Real pipe connection and real search tests
-  - `fastsearch_mcp.live_tests.run_live_tests()`: service_process, pipe_connect, get_service_info, search_via_pipe
-  - `tests/test_live_pipe.py`: pytest integration tests (marked `@pytest.mark.service`, Windows-only)
-  - POST `/api/tests/run` with optional body `{ pattern, directory, max_results }` for webapp
-- **Tests page in webapp** - Live testing from the dashboard at `/tests`
-  - Configurable pattern, directory, max_results; run button; pass/fail list with duration and details
-  - Sidebar link "Tests" (FlaskConical icon)
-- **Path normalization for search** - User paths like `C:` are normalized to `C:\\` before sending to the C++ service to avoid empty results from format mismatch
+- **MFT_RECORD_HEADER USA fixup** - Apply Update Sequence Array fixup to each MFT record before parsing attributes. Without this, the last 2 bytes of each 512-byte sector contained fixup values instead of real data, corrupting attribute traversal when attributes crossed sector boundaries.
 
 ### Fixed
-- **Server import crash** — Removed an invalid line in `service_client.py` (`get_pipe_name() = ...`) that caused `SyntaxError` on import and blocked uvicorn / `python -m fastsearch_mcp`. The pipe path is defined only in `pipe_client.py` (`DEFAULT_PIPE_NAME`, `get_pipe_name()`); `service_client` imports that.
-- **Pipe connection failures no longer reported as success** - When the named pipe fails to connect or Windows API is unavailable, the pipe client now returns an `error` key so the service client raises and the UI shows a clear error instead of "success, 0 results"
+- **C++ MFT_RECORD_HEADER struct misalignment** - The `WORD Flags` field was missing between `AttributeOffset` (0x14) and `BaseRecordReference` (0x18), placing it at offset 0x26 instead of 0x16. This caused the record-in-use check (`header->Flags & 0x0001`) to read the high word of the MFT record number instead of the actual flags, silently skipping ~50% of records. (mft_search.cpp)
+- **Session management completely broken** - `mcp_server.py` popped `session_id` from params twice, discarding the first session and creating a brand-new UUID session on every request. Session state, history, and search history were all lost. (mcp_server.py:233-243)
+- **Windows named pipe handle leak** - On pipe I/O errors, `self.connected` was set to `False` but `self.handle` was never closed via `CloseHandle`, leaking the kernel handle. (pipe_client.py:196-203)
+- **Blocking CreateFile in async connect** - `win32file.CreateFile` for named pipes can block for seconds waiting for an available instance, freezing the asyncio event loop. Wrapped in `run_in_executor` with `asyncio.wait_for`. (pipe_client.py:75-88)
+- **Service arguments passed as joined string** - `win32serviceutil.StartService` received `" ".join(args)` which caused pywin32 to iterate over individual characters, turning `["--verbose", "--port=8080"]` into 20 single-character arguments. (service_manager.py:324)
+- **Blocking subprocess.run in async functions** - `subprocess.run` calls in `get_service_status`, `start_service`, and `stop_service` blocked the event loop for up to 30 seconds. Wrapped in `asyncio.to_thread`. (service_client.py)
+- **Date filters silently dropped on parse failure** - Invalid date strings (typos, wrong formats) returned `None` from the parser, which was silently ignored. Users got unfiltered results instead of an error. All six date parameters now validated at tool entry with immediate error return. (advanced_search.py, file_search.py)
+- **Multi-drive search double truncation** - `file_name_search.py` unnecessarily truncated combined results to `max_results` after per-drive limits were already applied, discarding results from later drives. (file_name_search.py:269-270)
+- **New files reported as "updated"** - `integrity_checker.py` called `add_file` (which inserted into `self.records`) before checking `file_path_str in self.records`, making the check always True and the "added" code path dead when `update_existing=True`. (integrity_checker.py:381-388)
+- **CSV/TSV include_metadata silently discarded** - Metadata lines appended to `content_lines` were never joined into the final CSV/TSV output (only used for markdown/Pandoc). Prepend metadata to CSV/TSV string output. (search_result_export.py:418-434)
+- **PYTHONIOENCODING=ascii:replace corrupts stderr** - Set `PYTHONIOENCODING=ascii:replace` in `__main__.py`, silently replacing all non-ASCII characters with `?` in log/error output. Changed to `utf-8:replace`. (__main__.py:26)
+- **_sanitize_for_json corrupts bytes** - Decoded arbitrary bytes as ASCII with replacement, silently corrupting binary data. Now uses `base64.b64encode`. (base.py:90-91)
+- **UTF-8 truncation reclassifies text as binary** - File truncation at `MAX_TEXT_BYTES` could land mid-multi-byte character, causing `UnicodeDecodeError`. The file was reclassified as binary (base64 blob). Now trims to a clean character boundary. (api_bridge.py:143-149)
+- **mcp.disable() failures hidden silently** - Bare `except Exception: pass` swallowed all failures from `mcp.disable()`, leaving unwanted tools registered. Now logs a warning and catches only `LookupError`. (tools/__init__.py:154-158)
 
 ### Changed
-- **Search error handling** - Pipe disconnect and non-Windows cases now propagate as errors (RuntimeError) with explicit messages
-- **SOTA PowerShell error handling** - Comprehensive error handling standards for all scripts
-  - Individual error handling per operation (graceful degradation)
-  - Retry logic with exponential backoff for transient failures
-  - Disk space and path validation before operations
-  - Progress reporting for long-running operations
-  - Detailed error logging with timestamps and context
-  - Integrity verification after critical operations
-  - Graceful cleanup on failures
-- **Enhanced backup script** - `scripts/backup-repo.ps1` now implements all SOTA patterns
-  - Continues with remaining destinations if one fails
-  - Configurable retry attempts and delays
-  - ZIP integrity verification after creation
-  - Error logs saved to temp directory on failures
-- **PowerShell standards in .cursorrules** - Mandatory error handling patterns for all new scripts
-- **Fast service availability checks** - Optimized from 5 seconds to <1ms per check
-  - Fast pipe connection check (fails immediately if service is down)
-  - 2-second caching to avoid repeated checks on rapid searches
-  - Fallback to process check only if pipe check is ambiguous
-- **Improved error messages** - Clear, user-friendly error messages with step-by-step recovery instructions
-  - Service-required flags in search responses
-  - Tool suggestions for troubleshooting (`service_status`, `start_service`, etc.)
-- **Service checks performance** - Reduced from 5 seconds to <1ms overhead per search
-- **Error handling** - More explicit and actionable error messages
-- **Search response format** - Added `service_required` flag and `suggestion` field
-- **GitHub Actions workflows** - Restricted CI to only run on code changes (prevents spam)
-
-### Removed
-- **Fallback code** - Removed all treewalking fallbacks that violated architecture
-  - Removed `_fallback_search()` dead code from `service_client.py`
-  - Removed `basic_file_search()` treewalker from `mcp_server.py`
-  - Removed `fastsearch.search_basic` tool registration
-- **Python fallback references** - Updated all documentation to reflect direct MFT access only
-- **Outdated test files** - Removed broken tests referencing deprecated `ipc` module
+- **Version bump** - 0.4.0 → 0.5.0
+- **FastMCP upgrade 3.1 → 3.2** - Dependency updated to `fastmcp>=3.2.0,<4`
+  - **Sampling**: Tools now use `ctx: Context = None` pattern for client-side LLM sampling via `ctx.sampling()`
+  - **CodeMode**: New `--agentic` CLI flag (and `MCP_AGENTIC=true` env) enables agentic discovery via `CodeMode().attach(mcp)`, collapsing tools into search + execute meta-tools
+  - **Prompts**: 3 `@mcp.prompt()` templates registered: file search guide, disk analysis guide, service troubleshooting
+  - **Skills**: 3 `@mcp.skill()` definitions: find recently modified files, cleanup disk space, forensic file audit
+  - **Transport**: Updated to support FastMCP 3.2 async APIs (`run_stdio_async`, `run_http_async`)
+- **mcpb.json** - Updated fastmcp constraint to `>=3.2.0,<4`, version bumped to 1.1.0
+- **ntfs.py** - Changed `bytes(n)` to `bytearray(n)` for mutable DeviceIoControl output buffer (was passing immutable bytes object).
+- **Documentation updated** - Stale FastMCP 2.13 references replaced with 3.2 throughout
 
 ## [0.4.0] - 2025-11-15
 

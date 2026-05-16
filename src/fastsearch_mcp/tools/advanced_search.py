@@ -407,6 +407,16 @@ async def fastsearch_search_advanced(
             "count": 0,
         }
 
+    # Validate date filters before searching (fail fast on bad input)
+    date_fields = {
+        "created_after": created_after, "created_before": created_before,
+        "modified_after": modified_after, "modified_before": modified_before,
+        "accessed_after": accessed_after, "accessed_before": accessed_before,
+    }
+    date_errors = [f"Invalid date format for {name}: '{val}'" for name, val in date_fields.items() if val is not None and _parse_date_filter(val) is None]
+    if date_errors:
+        return {"success": False, "error": "; ".join(date_errors), "results": [], "count": 0}
+
     try:
         # Determine if we should search all drives
         if search_all or path in ("*", "all", "ALL"):

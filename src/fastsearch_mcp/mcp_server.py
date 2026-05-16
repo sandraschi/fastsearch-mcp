@@ -232,13 +232,6 @@ class McpServer:
             # Handle session
             session_id = params.pop("session_id", None)
             session_id, session = self.session_manager.get_or_create_session(session_id)
-            params["_session"] = session["data"]  # Make session data available to handlers
-
-            # Handle session management
-            session_id = params.pop("session_id", None)
-            session_id, session = self._get_or_create_session(session_id)
-
-            # Add session to params
             params["_session"] = session["data"]
             params["_session_id"] = session_id
 

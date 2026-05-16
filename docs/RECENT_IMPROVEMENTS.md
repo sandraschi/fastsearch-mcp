@@ -1,4 +1,43 @@
-# Recent Improvements - November 2025
+# Recent Improvements - May 2026
+
+**Date:** 2026-05-16  
+**Status:** ✅ All improvements implemented and tested
+
+## 🔧 Critical Bugfixes (May 2026)
+
+### C++ MFT Parsing Fixes
+- **Fixed MFT_RECORD_HEADER struct alignment** - The `WORD Flags` field was at offset 0x26 instead of 0x16. Caused the "record in use" bit check (`header->Flags & 0x0001`) to read the high word of the MFT record number. All records 0-65535 were silently treated as "not in use" and skipped, including on first MFT fragment on fragmented volumes where the estimate only covers the first fragment. Combined effect: **zero search results.**
+- **Added USA fixup** - Without applying the Update Sequence Array to each MFT record, the last 2 bytes of every 512-byte sector contained fixup values. These corrupted `$ATTRIBUTE_HEADER.Length` fields when attributes crossed sector boundaries, causing silent parse failures.
+
+### Python Bridge Fixes (14 bugs fixed)
+| # | Component | Bug | Impact |
+|---|-----------|-----|--------|
+| 1 | `mcp_server.py` | Session ID double-popped | All session state lost every request |
+| 2 | `pipe_client.py` | Handle leak on pipe error | Kernel handle leak on every I/O error |
+| 3 | `pipe_client.py` | Blocking CreateFile in async | Event loop frozen during pipe connect |
+| 4 | `service_manager.py` | Args passed character-by-character | Service received garbage arguments |
+| 5 | `service_client.py` | Blocking subprocess.run (3 places) | Event loop frozen for up to 30s |
+| 6 | `advanced_search.py` | Date parse failures silently dropped | Wrong (unfiltered) results returned |
+| 7 | `file_search.py` | Date parse failures silently dropped | Wrong (unfiltered) results returned |
+| 8 | `file_name_search.py` | Multi-drive double truncation | Results from later drives discarded |
+| 9 | `integrity_checker.py` | New files always "updated" | Wrong status reporting |
+| 10 | `search_result_export.py` | CSV/TSV metadata silently dropped | `include_metadata` had no effect |
+| 11 | `__main__.py` | ascii:replace encoding | All non-ASCII log output corrupted |
+| 12 | `base.py` | bytes decoded as ASCII | Binary data silently corrupted |
+| 13 | `api_bridge.py` | UTF-8 truncation → binary | Text files returned as base64 blobs |
+| 14 | `tools/__init__.py` | mcp.disable failures hidden | Unwanted tools remained registered |
+
+### 🚀 FastMCP 3.2 Upgrade
+- **FastMCP 3.1 → 3.2** - Dependency updated to `fastmcp>=3.2.0,<4`
+- **Sampling**: Tools use `ctx: Context = None` injection for client-side LLM sampling via `ctx.sampling()`
+- **CodeMode**: `--agentic` flag enables `CodeMode().attach(mcp)` for discovery + execute meta-tools
+- **Prompts**: 3 `@mcp.prompt()` templates (search guide, disk analysis, troubleshooting) auto-registered
+- **Skills**: 3 `@mcp.skill()` definitions (recent files, cleanup, forensic audit) auto-registered
+
+### ⚡ Performance
+- **Async safety** - All blocking Win32 and subprocess calls now properly wrapped in executors/threads, preventing event loop starvation during pipe connection, service queries, and searches.
+
+## Previous: November 2025 Improvements
 
 **Date:** 2025-11-27  
 **Status:** ✅ All improvements implemented and tested

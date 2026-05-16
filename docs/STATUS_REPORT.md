@@ -1,6 +1,27 @@
 # FastSearch MCP - Status Report
-**Date:** 2025-03-04  
+**Date:** 2026-05-16  
 **Version:** 0.5.0
+
+## Critical Bugfixes (May 2026)
+
+### C++ Service Fixes
+- **MFT_RECORD_HEADER struct misalignment** - The `WORD Flags` field was missing from its correct offset between `AttributeOffset` and `BaseRecordReference`. The record-in-use check was reading the high word of the MFT record number instead of actual flags, silently skipping ~50% of MFT records (all records 0-65535). This caused the search probe to return 0 results for `*.txt` on `C:\`.
+- **USA fixup** - Added Update Sequence Array fixup to correct the last 2 bytes of each 512-byte sector in MFT records during parsing. Without this, fixup values (not real data) occupied those bytes, corrupting attribute traversal when attributes crossed sector boundaries.
+
+### Python Bridge Fixes
+- **Session management** - Fixed double-pop of `session_id` that created a brand-new session on every request (all session state was lost).
+- **Pipe handle leak** - Fixed Windows kernel handle leak on every pipe I/O error.
+- **Async blocking** - Wrapped blocking `CreateFile` and `subprocess.run` calls in executor/thread to prevent event loop freezes.
+- **Service args** - Fixed `" ".join(args)` that was passing service arguments character-by-character to `StartService`.
+- **14 total bugs fixed across C++ and Python layers** - See CHANGELOG.md for full list.
+
+### 🚀 FastMCP 3.2 Upgrade
+- **FastMCP 3.1 → 3.2** - Dependency updated to `fastmcp>=3.2.0,<4`
+- **Sampling** - Tools use `ctx: Context = None` pattern for client-side LLM access via `ctx.sampling()`
+- **CodeMode** - New `--agentic` CLI flag (and `MCP_AGENTIC=true` env) enables agentic discovery via `CodeMode().attach(mcp)`
+- **Prompts** - 3 `@mcp.prompt()` templates registered: file search guide, disk analysis guide, service troubleshooting
+- **Skills** - 3 `@mcp.skill()` definitions: find recently modified files, cleanup disk space, forensic file audit
+- **mcpb.json** - FastMCP constraint updated to `>=3.2.0,<4`, version bumped to 1.1.0
 
 ## Recent Improvements (March 2025)
 

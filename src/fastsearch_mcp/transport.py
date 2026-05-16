@@ -1,19 +1,22 @@
 """
-FastMCP 3.x Dual Transport Configuration
+FastMCP 3.2 Dual Transport Configuration
 
 Unified transport configuration for STDIO, HTTP Streamable, and legacy SSE modes.
-Compatible with FastMCP 3.0/3.1 (sampling, agentic workflows when client supports them).
+Supports FastMCP 3.2 sampling (ctx.sampling()), CodeMode agentic discovery,
+@mcp.prompt() templates, and @mcp.skill() composable workflows.
 
 Environment Variables:
     MCP_TRANSPORT: Transport mode (stdio, http, sse). Default: stdio
     MCP_HOST: Bind address for HTTP/SSE. Default: 127.0.0.1
     MCP_PORT: Port for HTTP/SSE. Default: 10845 (fleet 10700+; set MCP_PORT to override)
     MCP_PATH: HTTP endpoint path. Default: /mcp
+    MCP_AGENTIC: Enable CodeMode agentic discovery when set to "true"
 
 CLI Arguments:
     --stdio: Run in STDIO mode (default, for Claude Desktop)
     --http: Run in HTTP Streamable mode
     --sse: Run in SSE mode (deprecated)
+    --agentic: Enable CodeMode agentic discovery (collapses tools into search + execute)
     --host: Bind address
     --port: Port number
     --path: HTTP endpoint path
@@ -112,6 +115,7 @@ Examples:
     parser.add_argument(
         "--path", default=None, help=f"HTTP endpoint path (default: ${ENV_PATH} or /mcp)"
     )
+    parser.add_argument("--agentic", action="store_true", help="Enable CodeMode agentic discovery (collapses tools into search + execute)")
     parser.add_argument("--debug", action="store_true", help="Enable debug logging")
 
     return parser
@@ -220,9 +224,18 @@ async def run_server_async(
 
     config = resolve_config(args)
     transport = config["transport"]
+    agentic = args.agentic or os.getenv("MCP_AGENTIC", "").lower() in ("true", "1", "yes")
 
     logger.info(f"Starting {server_name} v{getattr(mcp_app, 'version', '?.?.?')}")
     logger.info(f"Transport: {transport.upper()}")
+    if agentic:
+        try:
+            from fastmcp.experimental.transforms.code_mode import CodeMode
+
+            CodeMode().attach(mcp_app)
+            logger.info("CodeMode agentic discovery enabled")
+        except ImportError as e:
+            logger.warning("CodeMode not available in this FastMCP version: %s", e)
 
     try:
         if transport == "stdio":
@@ -242,7 +255,7 @@ async def run_server_async(
             port = config["port"]
             logger.warning("SSE mode is deprecated. Migrate to HTTP Streamable (--http).")
             logger.info(f"Running in SSE mode: http://{host}:{port}")
-            await mcp_app.run_sse_async(host=host, port=port)
+            await mcp_app.run_async(transport='sse', host=host, port=port)
 
     except asyncio.CancelledError:
         logger.info(f"{server_name} task cancelled")

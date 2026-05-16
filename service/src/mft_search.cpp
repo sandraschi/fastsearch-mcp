@@ -30,11 +30,11 @@ struct MFT_RECORD_HEADER {
     WORD SequenceNumber;
     WORD LinkCount;
     WORD AttributeOffset;
+    WORD Flags;
     ULONGLONG BaseRecordReference;
     WORD NextAttributeId;
     WORD Padding;
     DWORD RecordNumber;
-    WORD Flags;
     DWORD RealSize;
     DWORD AllocatedSize;
 };
@@ -559,6 +559,26 @@ std::string EscapeJsonString(const std::string& str) {
     return escaped;
 }
 
+// Apply Update Sequence Array (USA) fixup to an MFT record.
+// Without this, the last 2 bytes of each 512-byte sector contain fixup values
+// instead of real data, corrupting attribute parsing.
+void ApplyUsaFixup(std::vector<BYTE>& record, DWORD recordSize) {
+    if (record.size() < 4) return;
+    const auto* header = reinterpret_cast<const MFT_RECORD_HEADER*>(record.data());
+    WORD usaOffset = header->UpdateSequenceOffset;
+    WORD usaCount = header->UpdateSequenceSize;
+    if (usaOffset == 0 || usaCount < 2) return;
+    if (static_cast<DWORD>(usaOffset) + static_cast<DWORD>(usaCount) * sizeof(WORD) > recordSize) return;
+    WORD* usa = reinterpret_cast<WORD*>(record.data() + usaOffset);
+    // For each sector (512 bytes), replace the last WORD with the fixup value
+    for (WORD i = 1; i < usaCount; i++) {
+        DWORD sectorEndOffset = static_cast<DWORD>(i - 1) * 512 + 510;
+        if (sectorEndOffset + sizeof(WORD) > recordSize) break;
+        WORD* sectorEnd = reinterpret_cast<WORD*>(record.data() + sectorEndOffset);
+        *sectorEnd = usa[i];
+    }
+}
+
 }  // namespace
 
 // Main search function - DIRECT MFT ACCESS - NO TREE WALKING!
@@ -736,6 +756,7 @@ std::string HandleSearchRequestImpl(const std::string& requestJson) {
         // Quick scan to estimate MFT size
         for (ULONGLONG i = 0; i < 10000 && consecutiveFailures < 100; i++) {
             if (ReadMftRecordFromVolume(hVolume, mftStartLcn, bytesPerCluster, testRecord, recordSize, testBuffer)) {
+                ApplyUsaFixup(testBuffer, recordSize);
                 consecutiveFailures = 0;
                 estimatedMftSize = testRecord + 10000;  // Update estimate
             } else {
@@ -796,8 +817,12 @@ std::string HandleSearchRequestImpl(const std::string& requestJson) {
                 localRecordsRead++;
                 (*params.recordsRead)++;
                 
+                // Apply USA fixup before parsing (corrects last 2 bytes of each 512-byte sector)
+                ApplyUsaFixup(recordBuffer, params.recordSize);
+                
                 // Parse record
                 FileMetadata metadata = {};
+
                 metadata.hasStandardInfo = false;
                 ParseStandardInformation(recordBuffer.data(), params.recordSize, metadata);
                 

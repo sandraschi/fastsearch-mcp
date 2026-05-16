@@ -23,7 +23,7 @@ def _setup_path() -> None:
 def _setup_encoding() -> None:
     """Setup encoding for Windows console compatibility."""
     if sys.platform == "win32":
-        os.environ["PYTHONIOENCODING"] = "ascii:replace"
+        os.environ["PYTHONIOENCODING"] = "utf-8:replace"
 
 
 # Setup before imports

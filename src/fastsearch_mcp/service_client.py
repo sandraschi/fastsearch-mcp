@@ -5,6 +5,7 @@ This module provides functions to communicate with the FastSearch C++ service
 via named pipes for NTFS MFT access.
 """
 
+import asyncio
 import subprocess
 import time
 from pathlib import Path
@@ -133,8 +134,8 @@ async def get_service_status() -> Dict[str, Any]:
 
         # Try to get service info from Windows Service Manager
         try:
-            result = subprocess.run(
-                ["sc", "query", SERVICE_NAME], capture_output=True, text=True, timeout=10
+            result = await asyncio.to_thread(
+                subprocess.run, ["sc", "query", SERVICE_NAME], capture_output=True, text=True, timeout=10
             )
 
             if result.returncode == 0:
@@ -303,8 +304,8 @@ async def start_service() -> bool:
             return False
 
         # Try to start the service using sc.exe
-        result = subprocess.run(
-            ["sc", "start", SERVICE_NAME], capture_output=True, text=True, timeout=30
+        result = await asyncio.to_thread(
+            subprocess.run, ["sc", "start", SERVICE_NAME], capture_output=True, text=True, timeout=30
         )
 
         if result.returncode == 0:
@@ -327,8 +328,8 @@ async def stop_service() -> bool:
     """
     try:
         # Try to stop the service using sc.exe
-        result = subprocess.run(
-            ["sc", "stop", SERVICE_NAME], capture_output=True, text=True, timeout=30
+        result = await asyncio.to_thread(
+            subprocess.run, ["sc", "stop", SERVICE_NAME], capture_output=True, text=True, timeout=30
         )
 
         if result.returncode == 0:

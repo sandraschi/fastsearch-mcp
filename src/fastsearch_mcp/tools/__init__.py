@@ -1,13 +1,14 @@
 """
-FastSearch MCP Tools - FastMCP 2.13 compliant tool implementations.
+FastSearch MCP Tools - FastMCP 3.2 compliant tool implementations.
 
 This module provides all the tools available in the FastSearch MCP server,
-organized according to FastMCP 2.13 patterns and conventions.
+organized according to FastMCP 3.2 patterns and conventions.
 
-FastMCP 2.13: Tools are registered via @mcp.tool decorator when imported.
-Import all tools here to register them with the MCP instance.
+FastMCP 3.2: Tools registered via @mcp.tool decorator at import time.
+Sampling: Use ctx: Context = None in tool functions for client-side LLM access.
+CodeMode: Enable via --agentic flag for discovery + execute meta-tools.
 
-PRODUCTION TOOL SET: 18 tools (15 original + 3 new search result enhancement tools)
+PRODUCTION TOOL SET: 18 tools
 See docs/TOOL_REDUCTION_PLAN.md and docs/TOOL_ENHANCEMENT_PROPOSALS.md for details.
 """
 
@@ -151,8 +152,8 @@ _TOOLS_TO_REMOVE = {
 }
 
 # FastMCP 3.x: use disable() instead of remove_tool(); targets by name
+_logger = logging.getLogger(__name__)
 try:
     mcp.disable(names=_TOOLS_TO_REMOVE, components={"tool"})
-except Exception:
-    # Names may not all exist; ignore
-    pass
+except LookupError as e:
+    _logger.warning("Tool disable failed (some names may not exist): %s", e)

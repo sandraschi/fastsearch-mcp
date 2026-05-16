@@ -142,13 +142,23 @@ async def get_file(path: str = Query(..., description="Absolute path to file")) 
         max_bytes = min(max_bytes, MAX_TEXT_BYTES)
     if size > max_bytes:
         raw = raw[:max_bytes]
+        # Trim incomplete trailing multi-byte UTF-8 character
+        while raw and (raw[-1] & 0xC0) == 0x80:
+            raw = raw[:-1]
+        if raw and raw[-1] & 0x80:
+            # Check if last byte is a multi-byte start without all continuation bytes
+            b = raw[-1]
+            if (b & 0xE0) == 0xC0 and len(raw) < max_bytes:
+                raw = raw[:-1]  # 2-byte char start, cut
+            elif (b & 0xF0) == 0xE0 and len(raw) < max_bytes - 1:
+                raw = raw[:-1]  # 3-byte char start, cut
+            elif (b & 0xF8) == 0xF0 and len(raw) < max_bytes - 2:
+                raw = raw[:-1]  # 4-byte char start, cut
     if kind == "text":
         try:
             content = raw.decode("utf-8")
         except UnicodeDecodeError:
-            kind = "binary"
-            mime = "application/octet-stream"
-            content = base64.b64encode(raw).decode("ascii")
+            content = raw.decode("utf-8", errors="replace")
     else:
         content = base64.b64encode(raw).decode("ascii")
     return {"path": str(p), "type": kind, "mime": mime, "content": content, "size": size, "truncated": size > max_bytes}

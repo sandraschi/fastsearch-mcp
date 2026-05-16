@@ -71,20 +71,30 @@ class NamedPipeClient:
 
         self.last_connect_error = None
         try:
-            # Try to open the named pipe
-            self.handle = win32file.CreateFile(
-                self.pipe_name,
-                win32file.GENERIC_READ | win32file.GENERIC_WRITE,
-                0,
-                None,
-                win32file.OPEN_EXISTING,
-                0,
-                None,
+            # Try to open the named pipe (blocking Win32 call, run in executor)
+            loop = asyncio.get_event_loop()
+            self.handle = await asyncio.wait_for(
+                loop.run_in_executor(
+                    None,
+                    lambda: win32file.CreateFile(
+                        self.pipe_name,
+                        win32file.GENERIC_READ | win32file.GENERIC_WRITE,
+                        0,
+                        None,
+                        win32file.OPEN_EXISTING,
+                        0,
+                        None,
+                    ),
+                ),
+                timeout=timeout,
             )
 
-            # Set pipe to message mode
-            win32pipe.SetNamedPipeHandleState(
-                self.handle, win32pipe.PIPE_READMODE_MESSAGE, None, None
+            # Set pipe to message mode (blocking Win32 call, run in executor)
+            await loop.run_in_executor(
+                None,
+                lambda: win32pipe.SetNamedPipeHandleState(
+                    self.handle, win32pipe.PIPE_READMODE_MESSAGE, None, None
+                ),
             )
 
             self.connected = True
@@ -92,6 +102,11 @@ class NamedPipeClient:
             logger.info(f"Connected to named pipe: {self.pipe_name}")
             return True
 
+        except asyncio.TimeoutError:
+            self.last_connect_error = (0, f"Connection timed out after {timeout}s")
+            logger.error(f"Connection to named pipe timed out after {timeout}s: {self.pipe_name}")
+            self.connected = False
+            return False
         except pywintypes.error as e:
             self.last_connect_error = (e.winerror, str(e))
             if e.winerror == 2:  # ERROR_FILE_NOT_FOUND
@@ -197,9 +212,15 @@ class NamedPipeClient:
                 error_code = e.winerror if hasattr(e, 'winerror') else 0
                 if error_code == 6:  # ERROR_INVALID_HANDLE
                     logger.error(f"Pipe handle is invalid: {e}")
-                    self.connected = False
                 else:
                     logger.error(f"Named pipe communication error: {e}")
+                if self.handle:
+                    try:
+                        win32file.CloseHandle(self.handle)
+                    except Exception:
+                        pass
+                    self.handle = None
+                self.connected = False
                 return None
             except json.JSONDecodeError as e:
                 logger.error(f"Failed to decode response JSON: {e}")

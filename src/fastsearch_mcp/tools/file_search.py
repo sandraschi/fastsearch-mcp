@@ -299,6 +299,16 @@ async def file_content_search(
     if file_attributes is None:
         file_attributes = []
 
+    # Validate date filters before searching (fail fast on bad input)
+    date_fields = {
+        "modified_after": modified_after, "modified_before": modified_before,
+        "created_after": created_after, "created_before": created_before,
+        "accessed_after": accessed_after, "accessed_before": accessed_before,
+    }
+    for name, val in date_fields.items():
+        if val is not None and parse_date_filter(val) is None:
+            return {"status": "error", "error": f"Invalid date format for {name}: '{val}'. Use YYYY-MM-DD or relative (7d, 1h, 30m).", "matches": []}
+
     return await asyncio.to_thread(
         _search_sync,
         search_pattern,

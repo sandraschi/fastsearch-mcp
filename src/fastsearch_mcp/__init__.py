@@ -25,7 +25,7 @@ import sys
 from pathlib import Path
 
 # Package version
-__version__ = "0.4.0"
+__version__ = "0.5.0"
 
 # Ensure src is in Python path for development
 if __name__ == "__main__":

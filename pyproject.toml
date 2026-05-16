@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "fastsearch-mcp"
-version = "0.4.0"
-description = "FastSearch MCP Server - FastMCP 3.1.0 compliant NTFS search service"
+version = "0.5.0"
+description = "FastSearch MCP Server - FastMCP 3.2 NTFS search service with sampling, prompts, and CodeMode"
 authors = [
     {name = "sandraschi", email = "team@sandraschi.dev"}
 ]
@@ -28,7 +28,7 @@ classifiers = [
 ]
 
 dependencies = [
-    "fastmcp>=3.1.0,<4",
+    "fastmcp>=3.2.0,<4",
     "fastapi>=0.115.0",
     "pydantic>=2.0.0",
     "python-dotenv>=1.0.0",

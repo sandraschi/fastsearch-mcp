@@ -266,9 +266,6 @@ async def fastsearch_search(
                     drive_results[drive] = data.get("count", 0)
                     all_results.extend(data.get("results", []))
 
-            if len(all_results) > max_results:
-                all_results = all_results[:max_results]
-
             return {
                 "success": True,
                 "pattern": pattern,

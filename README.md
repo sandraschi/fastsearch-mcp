@@ -1,12 +1,12 @@
 # FastSearch MCP
 
-[![FastMCP Version](https://img.shields.io/badge/FastMCP-3.1.0-blue?style=flat-square&logo=python&logoColor=white)](https://github.com/sandraschi/fastmcp) [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff) [![Linted with Biome](https://img.shields.io/badge/Linted_with-Biome-60a5fa?style=flat-square&logo=biome&logoColor=white)](https://biomejs.dev/) [![Built with Just](https://img.shields.io/badge/Built_with-Just-000000?style=flat-square&logo=gnu-bash&logoColor=white)](https://github.com/casey/just)
+[![FastMCP Version](https://img.shields.io/badge/FastMCP-3.2-blue?style=flat-square&logo=python&logoColor=white)](https://github.com/sandraschi/fastmcp) [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff) [![Linted with Biome](https://img.shields.io/badge/Linted_with-Biome-60a5fa?style=flat-square&logo=biome&logoColor=white)](https://biomejs.dev/) [![Built with Just](https://img.shields.io/badge/Built_with-Just-000000?style=flat-square&logo=gnu-bash&logoColor=white)](https://github.com/casey/just)
 
  Lightning-fast file search for Claude Desktop via direct NTFS Master File Table access  no indexing, no caching, no compromises.
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![FastMCP](https://img.shields.io/badge/FastMCP-3.1-brightgreen)](https://goFastMCP 3.1.0com/)
+[![FastMCP](https://img.shields.io/badge/FastMCP-3.2-brightgreen)](https://fastmcp.ai)
 
 > **Core Principle:** FastSearch MCP follows the WizFile philosophy. Every request reads straight from the NTFS MFT. We never build background indexes, caches, or persistent file databases.
 
@@ -38,8 +38,8 @@ NTFS Master File Table (live)
   - No background threads, no file caches, no startup scans.
 
 - **Python MCP Bridge (`src/fastsearch_mcp/`)**
-  - FastMCP 3.1.0x: compatible with **sampling** (client-side LLM), **agentic workflows**, and **unified gateway**.
-  - Implements FastMCP 3.1.0x tools (`fastsearch_search`, `disk_analyzer`, `service_status`, etc.).
+  - FastMCP 3.2: **sampling** via `ctx.sampling()`, **CodeMode** agentic discovery (`--agentic`), **prompts** (`@mcp.prompt()`), and **skills** (`@mcp.skill()`).
+  - Implements 18 FastMCP 3.2 tools (`fastsearch_search`, `disk_analyzer`, `service_status`, etc.).
   - Marshals requests to the service via named pipes and reformats results for Claude.
   - Fast service availability checks (<1ms) before each search.
   - Clear error messages when service is unavailable (no silent fallbacks).
@@ -53,10 +53,12 @@ NTFS Master File Table (live)
 
 See `docs/WIZFILE_COMPARISON.md` for the rationale.
 
-## FastMCP 3.1.0: Sampling, Agentic Workflow, Unified Gateway
+## FastMCP 3.2: Sampling, CodeMode, Prompts, Skills, Gateway
 
-- **Sampling**: When clients connect with a `sampling_handler` (e.g. OpenAI/Anthropic/Gemini handlers), this server can request LLM completions from the client during tool execution. Install client extras as needed: `pip install "fastmcp[openai]"` etc.
-- **Agentic workflows**: Use with clients that support tool-use and multi-step reasoning; the server is compatible with staged discovery and Code Mode when the client supports it.
+- **Sampling**: Tools can request LLM completions from the client via `ctx.sampling()` (FastMCP 3.2 `Context` injection). No server-side configuration needed — the client provides the sampling handler.
+- **CodeMode agentic discovery**: Run with `--agentic` flag or `MCP_AGENTIC=true` to collapse all tools into discovery + execute meta-tools, using FastMCP 3.2's `CodeMode().attach(mcp)` transform.
+- **Prompts**: 3 built-in `@mcp.prompt()` templates: file search guide, disk analysis guide, service troubleshooting. Auto-registered at import time.
+- **Skills**: 3 composable `@mcp.skill()` workflows: find recently modified files, cleanup disk space, forensic file audit.
 - **Unified gateway**: Run as a proxy that aggregates or bridges other MCP servers (transport bridging, session isolation, forwards sampling/elicitation/logging/progress):
   ```bash
   # Single backend

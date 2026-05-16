@@ -378,9 +378,10 @@ class FileIntegrityChecker:
                     continue
 
                 # Add or update the file
+                was_present = file_path_str in self.records
                 record = self.add_file(file_path, algorithm)
                 if record:
-                    if file_path_str in self.records and update_existing:
+                    if was_present and update_existing:
                         results["updated"] += 1
                         status = "updated"
                     else:

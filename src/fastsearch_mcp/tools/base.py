@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import abc
+import base64
 from dataclasses import asdict, dataclass, field
 from enum import Enum
 from types import NoneType
@@ -88,7 +89,7 @@ def _sanitize_for_json(obj: Any) -> Any:
     elif isinstance(obj, (list, tuple)):
         return type(obj)(_sanitize_for_json(item) for item in obj)
     elif isinstance(obj, bytes):
-        return obj.decode("ascii", errors="replace")
+        return base64.b64encode(obj).decode("ascii")
     else:
         return obj
 

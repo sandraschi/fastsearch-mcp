@@ -321,7 +321,7 @@ class ServiceManager:
 
             # Start the service
             start_time = time.time()
-            win32serviceutil.StartService(service_name, " ".join(args or []))
+            win32serviceutil.StartService(service_name, args or [])
 
             # Wait for the service to start
             while time.time() - start_time < timeout:

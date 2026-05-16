@@ -99,7 +99,7 @@ def _get_volume_info(volume_path: str) -> dict:
     handle = _get_volume_handle(volume_path)
     try:
         # Get volume data
-        out_buf = bytes(ctypes.sizeof(NTFS_VOLUME_DATA_BUFFER))
+        out_buf = bytearray(ctypes.sizeof(NTFS_VOLUME_DATA_BUFFER))
         bytes_returned = win32file.DeviceIoControl(
             handle, FSCTL_GET_NTFS_VOLUME_DATA, None, out_buf, None
         )
