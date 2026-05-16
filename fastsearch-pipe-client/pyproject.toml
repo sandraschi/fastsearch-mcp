@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=75.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fastsearch-pipe-client"
+version = "0.1.0"
+description = "Client for the FastSearch Windows NTFS MFT service via named pipe"
+authors = [{name = "sandraschi", email = "team@sandraschi.dev"}]
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Python :: 3",
+    "Topic :: System :: Filesystems",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+keywords = ["fastsearch", "ntfs", "mft", "named-pipe", "windows", "file-search"]
+dependencies = [
+    "pywin32>=306; sys_platform == 'win32'",
+]
+
+[project.urls]
+Homepage = "https://github.com/sandraschi/fastsearch-mcp"
+Repository = "https://github.com/sandraschi/fastsearch-mcp"
+Issues = "https://github.com/sandraschi/fastsearch-mcp/issues"
+
+[tool.setuptools.packages.find]
+where = ["src"]
