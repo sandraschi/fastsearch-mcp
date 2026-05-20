@@ -7,7 +7,10 @@
   <a href="https://github.com/PrefectHQ/fastmcp"><img src="https://img.shields.io/badge/FastMCP-3.2-7c5cfc?style=flat-square" alt="FastMCP"></a>
 </p>
 
-  Lightning-fast file search via direct NTFS Master File Table access — zero indexing, zero caching. FastMCP 3.2 with CodeMode, prompts, and skills.
+  
+> 📖 **[Installation Guide](INSTALL.md)** — quick start, manual setup, and troubleshooting
+
+Lightning-fast file search via direct NTFS Master File Table access — zero indexing, zero caching. FastMCP 3.2 with CodeMode, prompts, and skills.
 
 > **Core Principle:** FastSearch MCP follows the WizFile philosophy. Every request reads straight from the NTFS MFT. We never build background indexes, caches, or persistent file databases.
 
