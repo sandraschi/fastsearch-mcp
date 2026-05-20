@@ -131,3 +131,4 @@ target/
 
 # Backup files
 *.bak
+_dashboard/

@@ -1,10 +1,29 @@
 # FastSearch MCP
 
-[![GitHub Release](https://img.shields.io/github/v/release/sandraschi/fastsearch-mcp?style=flat-square&logo=github&logoColor=white)](https://github.com/sandraschi/fastsearch-mcp/releases) [![FastMCP](https://img.shields.io/badge/FastMCP-3.2-blue?style=flat-square&logo=python&logoColor=white)](https://fastmcp.ai) [![Windows](https://img.shields.io/badge/Windows-10%2B-0078D6?style=flat-square&logo=windows&logoColor=white)](https://www.microsoft.com/windows) [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff) [![Biome](https://img.shields.io/badge/Linted_with-Biome-60a5fa?style=flat-square&logo=biome&logoColor=white)](https://biomejs.dev/) [![Just](https://img.shields.io/badge/Built_with-Just-000000?style=flat-square&logo=gnu-bash&logoColor=white)](https://github.com/casey/just) [![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue?style=flat-square&logo=python&logoColor=white)](https://www.python.org/) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT) [![Last Commit](https://img.shields.io/github/last-commit/sandraschi/fastsearch-mcp?style=flat-square&logo=github&logoColor=white)](https://github.com/sandraschi/fastsearch-mcp/commits/main) [![Repo Size](https://img.shields.io/github/repo-size/sandraschi/fastsearch-mcp?style=flat-square&logo=github&logoColor=white)](https://github.com/sandraschi/fastsearch-mcp) [![CI](https://img.shields.io/github/actions/workflow/status/sandraschi/fastsearch-mcp/.github/workflows/ci.yml?style=flat-square&logo=githubactions&logoColor=white&label=CI)](https://github.com/sandraschi/fastsearch-mcp/actions)
+<p align="center">
+  <a href="https://github.com/casey/just"><img src="https://img.shields.io/badge/just-ready_to_go-7c5cfc?style=flat-square&logo=just&logoColor=white" alt="Just"></a>
+  <a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json" alt="Ruff"></a>
+  <a href="https://python.org"><img src="https://img.shields.io/badge/Python-3.13+-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python"></a>
+  <a href="https://github.com/PrefectHQ/fastmcp"><img src="https://img.shields.io/badge/FastMCP-3.2-7c5cfc?style=flat-square" alt="FastMCP"></a>
+</p>
 
   Lightning-fast file search via direct NTFS Master File Table access — zero indexing, zero caching. FastMCP 3.2 with CodeMode, prompts, and skills.
 
 > **Core Principle:** FastSearch MCP follows the WizFile philosophy. Every request reads straight from the NTFS MFT. We never build background indexes, caches, or persistent file databases.
+
+## Quick Start
+
+```powershell
+git clone https://github.com/sandraschi/fastsearch-mcp
+cd fastsearch-mcp
+just
+```
+
+This opens an interactive dashboard showing all available commands. Run `just bootstrap` to install dependencies, then `just serve` or `just dev` to start.
+
+### Manual Setup
+
+If you don't have `just` installed:
 
 ##  Why FastSearch MCP
 
