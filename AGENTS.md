@@ -32,3 +32,5 @@ FastSearch MCP provides lightning-fast file search on Windows via direct NTFS Ma
 - C++ service: `cmake --build service/build --config Release`
 - Run with agentic mode: `python -m fastsearch_mcp --agentic`
 - Justfile: `just` (dashboard), `just lint`, `just fix`, `just check-sec`
+
+Install docs: follow mcp-central-docs/standards/AGENT_INSTALL_REFERENCE.md
