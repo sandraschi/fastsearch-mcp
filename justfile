@@ -1,10 +1,10 @@
-set windows-shell := ["pwsh.exe", "-NoLogo", "-Command"]
+﻿set windows-shell := ["pwsh.exe", "-NoLogo", "-Command"]
 
 # ── Dashboard ─────────────────────────────────────────────────────────────────
 
 # Open the interactive recipe dashboard in the browser
 default:
-    @pwsh.exe -NoProfile -ExecutionPolicy Bypass -File ../mcp-central-docs/scripts/just-dashboard.ps1 -Path .
+    @just --list
 
 # ── Quality ───────────────────────────────────────────────────────────────────
 
@@ -32,11 +32,7 @@ build-service:
 
 # Install/start the C++ service (requires admin)
 install-service:
-    sc start FastSearchMCP 2>$null
-    if ($LASTEXITCODE -ne 0) {
-        & '{{justfile_directory()}}\service\build\bin\Release\FastSearchServiceNew.exe' install
-        Start-Service FastSearchMCP
-    }
+    sc start FastSearchMCP 2>$null; if ($LASTEXITCODE -ne 0) { & '{{justfile_directory()}}\service\build\bin\Release\FastSearchServiceNew.exe' install; Start-Service FastSearchMCP }
 
 # Stop the C++ service (requires admin)
 stop-service:
@@ -100,3 +96,4 @@ release VERSION:
     Set-Location '{{justfile_directory()}}'
     git tag v{{VERSION}}
     git push origin v{{VERSION}}
+
