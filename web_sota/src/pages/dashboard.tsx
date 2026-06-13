@@ -1,5 +1,5 @@
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Search, HardDrive, Zap, Clock, Activity, FileText } from "lucide-react";
+import { Search, HardDrive, Zap, Clock, Activity } from "lucide-react";
 
 export function Dashboard() {
     const stats = [

@@ -3,7 +3,6 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/com
 import { Button } from "@/components/ui/button";
 import {
     Search,
-    FileSearch,
     Database,
     Activity,
     HardDrive,
@@ -100,7 +99,7 @@ export function Tools() {
     const [error, setError] = useState<string | null>(null);
     const [status, setStatus] = useState<string | null>(null);
     const [serviceRunning, setServiceRunning] = useState<boolean | null>(null);
-    const [lastResult, setLastResult] = useState<unknown>(null);
+    const [lastResult, setLastResult] = useState<any>(null);
     const [filenamePattern, setFilenamePattern] = useState("*.txt");
     const [filenamePath, setFilenamePath] = useState("C:\\");
     const [contentSearch, setContentSearch] = useState("TODO");

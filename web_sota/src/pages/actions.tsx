@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Search, FolderSearch, Loader2, CheckCircle2, AlertCircle, RefreshCw, Layers } from "lucide-react";
+import { Search, FolderSearch, Loader2, CheckCircle2, AlertCircle, Layers } from "lucide-react";
 import { mcpClient } from "@/common/mcp-client";
 
 interface SearchResult {
