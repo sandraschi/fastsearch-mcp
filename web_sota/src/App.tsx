@@ -5,7 +5,7 @@ import { Tools } from '@/pages/tools';
 import { Service } from '@/pages/service';
 import { Tests } from '@/pages/tests';
 import { Actions } from '@/pages/actions';
-import { Logs } from '@/pages/logs';
+import Logs from '@/pages/logs';
 import { Chat } from '@/pages/chat';
 import { Settings } from '@/pages/settings';
 

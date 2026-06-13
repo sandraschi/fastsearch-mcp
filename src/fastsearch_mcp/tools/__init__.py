@@ -129,6 +129,7 @@ _ = search_result_filter
 # Unregister tools that were imported but shouldn't be in production
 # (Importing modules registers ALL tools in those modules, so we need to unregister unwanted ones)
 from ..mcp_instance import mcp
+import logging
 
 # Tools to remove from production
 _TOOLS_TO_REMOVE = {
