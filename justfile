@@ -1,12 +1,13 @@
-﻿set windows-shell := ["pwsh.exe", "-NoLogo", "-Command"]
+set windows-shell := ["pwsh.exe", "-NoLogo", "-Command"]
+import 'scripts/just/fleet.just'
 
-# ── Dashboard ─────────────────────────────────────────────────────────────────
+# ---- Dashboard -----------------------------------------------------------
 
 # Open the interactive recipe dashboard in the browser
 default:
     @just --list
 
-# ── Quality ───────────────────────────────────────────────────────────────────
+# ---- Quality -------------------------------------------------------------
 
 # Execute Ruff SOTA linting
 lint:
@@ -23,7 +24,7 @@ fix:
     Set-Location '{{justfile_directory()}}\web_sota'
     npx @biomejs/biome check --write .
 
-# ── Build ─────────────────────────────────────────────────────────────────────
+# ----------------------------------------
 
 # Build the C++ Windows service
 build-service:
@@ -38,7 +39,7 @@ install-service:
 stop-service:
     Stop-Service FastSearchMCP -Force
 
-# ── Run ───────────────────────────────────────────────────────────────────────
+# ----------------------------------------
 
 # Run MCP server in STDIO mode (default)
 run:
@@ -65,7 +66,7 @@ run-api:
     Set-Location '{{justfile_directory()}}'
     uv run uvicorn fastsearch_mcp.server:app --host 127.0.0.1 --port 10845
 
-# ── Test ──────────────────────────────────────────────────────────────────────
+# ----------------------------------------
 
 # Run Python test suite
 test:
@@ -77,7 +78,7 @@ test-live:
     Set-Location '{{justfile_directory()}}'
     uv run pytest tests/test_live_pipe.py -v
 
-# ── Hardening ─────────────────────────────────────────────────────────────────
+# ----------------------------------------
 
 # Execute Bandit security audit
 check-sec:
@@ -89,11 +90,10 @@ audit-deps:
     Set-Location '{{justfile_directory()}}'
     uv run safety scan
 
-# ── Release ───────────────────────────────────────────────────────────────────
+# ----------------------------------------
 
 # Tag and push a new release
 release VERSION:
     Set-Location '{{justfile_directory()}}'
     git tag v{{VERSION}}
     git push origin v{{VERSION}}
-

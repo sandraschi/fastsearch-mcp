@@ -1,7 +1,7 @@
 const STORAGE_KEY = "fastsearch_llm_config";
 
 export interface LlmConfig {
-    provider: "ollama" | "lm_studio";
+    provider: string;
     model: string;
     baseUrl: string;
     systemPrompt: string;
@@ -15,7 +15,7 @@ export function getLlmConfig(): LlmConfig {
         if (raw) {
             const parsed = JSON.parse(raw) as Partial<LlmConfig>;
             return {
-                provider: parsed.provider === "lm_studio" ? "lm_studio" : "ollama",
+                provider: typeof parsed.provider === "string" ? parsed.provider : "ollama",
                 model: typeof parsed.model === "string" ? parsed.model : "",
                 baseUrl: typeof parsed.baseUrl === "string" ? parsed.baseUrl : "",
                 systemPrompt: typeof parsed.systemPrompt === "string" ? parsed.systemPrompt : DEFAULT_SYSTEM_PROMPT,

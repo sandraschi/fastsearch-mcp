@@ -1,0 +1,14 @@
+{
+    "product_name": "FastSearch MCP",
+    "install_dir": "%LOCALAPPDATA%\\FastSearch MCP",
+    "operator_exe": "fastsearch-mcp-native.exe",
+    "backend_process_names": ["fastsearch-mcp-native", "fastsearch-mcp-backend"],
+    "backend_port": 10845,
+    "health_path": "/api/v1/health",
+    "diagnostics_path": "/api/v1/diagnostics",
+    "feature_smoke_path": "/api/v1/system/info",
+    "window_title_re": "FastSearch MCP",
+    "nsis_glob": "native/target/release/bundle/nsis/FastSearch MCP_*_x64-setup.exe",
+    "bridge_ok_text": "REST bridge reachable",
+    "uninstall_registry_filter": "*FastSearch MCP*"
+}

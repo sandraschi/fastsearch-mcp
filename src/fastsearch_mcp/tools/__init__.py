@@ -35,6 +35,7 @@ from .service import (
 from .help import help
 from .drive_inventory import drive_inventory
 from .disk_analyzer import analyze_disk_usage
+from .disk_treemap import generate_disk_treemap
 
 # ============================================================================
 # ADDITIONAL USEFUL TOOLS (5) - KEEP

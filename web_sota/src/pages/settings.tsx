@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { API_BASE } from "../lib/api";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,17 +10,58 @@ import { Database, BrainCircuit, RefreshCw, Loader2, Save } from "lucide-react";
 import { mcpClient } from "@/common/mcp-client";
 import { getLlmConfig, setLlmConfig, type LlmConfig } from "@/common/llm-config";
 
+interface Provider {
+    id: string;
+    label: string;
+    base_url: string;
+    models: string[];
+    needs_key: boolean;
+}
+
 export function Settings() {
     const [config, setConfig] = useState<LlmConfig>(getLlmConfig);
     const [models, setModels] = useState<string[]>([]);
     const [modelsError, setModelsError] = useState<string | null>(null);
     const [loadingModels, setLoadingModels] = useState(false);
     const [saved, setSaved] = useState(false);
+    const [providers, setProviders] = useState<Provider[]>([]);
+    const [providerMap, setProviderMap] = useState<Record<string, Provider>>({});
 
+    // Fetch providers from backend
+    useEffect(() => {
+        fetch(API_BASE + "/api/llm/providers")
+            .then((r) => r.json())
+            .then((d) => {
+                const list: Provider[] = d.providers || [];
+                setProviders(list);
+                const map: Record<string, Provider> = {};
+                list.forEach((p) => { map[p.id] = p; });
+                setProviderMap(map);
+                // Auto-populate models for current provider
+                const cur = getLlmConfig().provider;
+                if (map[cur]?.models?.length) {
+                    setModels(map[cur].models);
+                    if (!getLlmConfig().model) {
+                        setConfig((c) => ({ ...c, model: map[cur].models[0] }));
+                    }
+                }
+            })
+            .catch(() => {});
+    }, []);
+
+    // Refresh models from provider list or backend
     const loadModels = async () => {
         setLoadingModels(true);
         setModelsError(null);
         try {
+            // Prefer cached models from provider map
+            const cached = providerMap[config.provider]?.models;
+            if (cached && cached.length > 0) {
+                setModels(cached);
+                if (!config.model) setConfig((c) => ({ ...c, model: cached[0] }));
+                setLoadingModels(false);
+                return;
+            }
             const res = await mcpClient.getLlmModels(config.provider, config.baseUrl || undefined);
             setModels(res.models || []);
             if (res.error) setModelsError(res.error);
@@ -66,14 +108,29 @@ export function Settings() {
                                 <Label className="text-slate-300 font-semibold text-xs uppercase tracking-wider">Provider</Label>
                                 <Select
                                     value={config.provider}
-                                    onValueChange={(v: "ollama" | "lm_studio") => setConfig((c) => ({ ...c, provider: v }))}
+                                    onValueChange={(v: string) => {
+                                        setConfig((c) => ({ ...c, provider: v }));
+                                        const p = providerMap[v];
+                                        if (p) {
+                                            setConfig((c) => ({ ...c, baseUrl: p.base_url }));
+                                            if (p.models.length) {
+                                                setModels(p.models);
+                                                setConfig((c) => ({ ...c, model: p.models[0] }));
+                                            }
+                                        }
+                                    }}
                                 >
                                     <SelectTrigger className="bg-slate-900 border-slate-800 text-slate-100">
-                                        <SelectValue />
+                                        <SelectValue placeholder="Select provider" />
                                     </SelectTrigger>
                                     <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
-                                        <SelectItem value="ollama">Ollama (default :11434)</SelectItem>
-                                        <SelectItem value="lm_studio">LM Studio (default :1234)</SelectItem>
+                                        {providers.length
+                                            ? providers.map((p) => (
+                                                <SelectItem key={p.id} value={p.id}>{p.label}</SelectItem>
+                                            ))
+                                            : <SelectItem value="ollama">Ollama</SelectItem>
+                                        }
+                                        {!providers.length && <SelectItem value="lmstudio">LM Studio</SelectItem>}
                                     </SelectContent>
                                 </Select>
                             </div>
