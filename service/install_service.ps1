@@ -74,10 +74,13 @@ function Install-Service {
                    -StartupType Automatic `
                    -ErrorAction Stop
 
-        # Set service to auto-restart on failure
-        $service = Get-WmiObject -Class Win32_Service -Filter "Name='$serviceName'"
-        $service.Change($null, $null, $null, $null, $null, $null, $null, $null, $null, $null, $null) | Out-Null
-        
+        # Auto-restart on failure (3 restarts, 60s apart, counter resets daily)
+        & sc.exe failure $serviceName reset= 86400 actions= restart/60000/restart/60000/restart/60000
+        if ($LASTEXITCODE -ne 0) {
+            Write-Warning "Could not configure service failure recovery (exit $LASTEXITCODE)"
+        }
+        & sc.exe failureflag $serviceName 1 | Out-Null
+
         Write-Host "Service installed successfully." -ForegroundColor Green
     }
     catch {
