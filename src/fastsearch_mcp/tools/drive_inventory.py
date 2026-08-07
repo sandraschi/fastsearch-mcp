@@ -1,7 +1,7 @@
 """Drive inventory tool for MCP."""
 
 import logging
-from typing import Any, Dict
+from typing import Any
 
 try:
     import psutil
@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 async def drive_inventory(
     filesystem_type: str = "",
     include_unmounted: bool = False,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """List all connected drives and partitions with their basic information.
 
     Provides filesystem type, size, usage, and other details for all

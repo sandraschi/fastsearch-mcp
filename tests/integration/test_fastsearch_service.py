@@ -48,10 +48,10 @@ except ImportError:
 @pytest.fixture(scope="module")
 def service_available():
     """Check if the service is available for testing.
-    
+
     In CI/GitHub Actions, this will return False and tests will be skipped.
     Tests should use mocks instead of requiring actual service.
-    
+
     Note: This fixture respects mocking - if Windows APIs are mocked (as in CI),
     it will return False to indicate real service is not available, allowing
     tests to use mocked implementations instead.
@@ -60,7 +60,7 @@ def service_available():
         # Try to import - if mocked, this will work but QueryServiceStatus might fail
         # If not mocked and not available, ImportError will be raised
         import win32serviceutil
-        
+
         # Try to query service - this will fail if service not installed or APIs not available
         # In CI with mocks, this will use the mocked version which should succeed
         # In real environment, this checks if service actually exists
@@ -78,11 +78,12 @@ def service_available():
 @pytest.fixture(scope="module")
 def admin_privileges():
     """Check if running with admin privileges.
-    
+
     In CI/GitHub Actions, this will return False and admin-required tests will be skipped.
     """
     try:
         import ctypes
+
         return ctypes.windll.shell32.IsUserAnAdmin() != 0
     except (AttributeError, ImportError, Exception):
         # Not Windows or APIs not available
@@ -121,9 +122,7 @@ class TestServiceStatus:
         # Check both escaped and raw string formats
         pipe_prefix1 = "\\\\.\\pipe\\"
         pipe_prefix2 = r"\\.\pipe\\"
-        assert SERVICE_PIPE_NAME.startswith(pipe_prefix1) or SERVICE_PIPE_NAME.startswith(
-            pipe_prefix2
-        )
+        assert SERVICE_PIPE_NAME.startswith(pipe_prefix1) or SERVICE_PIPE_NAME.startswith(pipe_prefix2)
         assert "FastSearch" in SERVICE_PIPE_NAME
 
     @pytest.mark.asyncio

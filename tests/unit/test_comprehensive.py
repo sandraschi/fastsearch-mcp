@@ -17,10 +17,8 @@ from fastsearch_mcp.service_client import get_service_client, is_service_running
 
 def setup_logging():
     """Setup logging for tests."""
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    )
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+
 
 def test_service_client():
     """Test the service client functionality."""
@@ -61,6 +59,7 @@ def test_service_client():
 
     return service_running
 
+
 def test_fastmcp_server():
     """Test the FastMCP server."""
     print("\n" + "=" * 60)
@@ -84,6 +83,7 @@ def test_fastmcp_server():
     except Exception as e:
         print(f"   ❌ Server creation failed: {e}")
         return False
+
 
 def test_frontend():
     """Test the frontend availability."""
@@ -111,6 +111,7 @@ def test_frontend():
 
     return True
 
+
 def test_service_executable():
     """Test the service executable."""
     print("\n" + "=" * 60)
@@ -131,8 +132,8 @@ def test_service_executable():
     print("\n2️⃣ Testing service help command...")
     try:
         import subprocess
-        result = subprocess.run([str(exe_path), "--help"],
-                              capture_output=True, text=True, timeout=10)
+
+        result = subprocess.run([str(exe_path), "--help"], capture_output=True, text=True, timeout=10)
         if result.returncode == 0:
             print("   ✅ Service help command works")
             print(f"   📝 Help output:\n{result.stdout}")
@@ -142,6 +143,7 @@ def test_service_executable():
         print(f"   ❌ Service help test failed: {e}")
 
     return True
+
 
 def run_integration_test():
     """Run a complete integration test."""
@@ -161,6 +163,7 @@ def run_integration_test():
     print("2. Run: PowerShell -ExecutionPolicy Bypass -File install-service.ps1 start")
     print("3. Run: python test_comprehensive.py")
     print("4. Open: frontend/index.html in browser")
+
 
 def main():
     """Main test function."""
@@ -198,6 +201,7 @@ def main():
 
     # Integration test instructions
     run_integration_test()
+
 
 if __name__ == "__main__":
     main()

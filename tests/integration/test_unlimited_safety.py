@@ -23,61 +23,62 @@ async def test_unlimited_safety():
     print("⚠️  WARNING: This test uses dangerous patterns that match ALL files")
     print("   The service should apply safety limits to prevent memory exhaustion")
     print()
-    
+
     # Dangerous patterns that match everything
     dangerous_patterns = [
         ("*.*", "Matches all files with extensions"),
         ("*", "Matches all files"),
         (".*", "Matches all files starting with dot"),
     ]
-    
+
     # Test on C: drive (smaller test first)
     test_drive = "C:\\"
-    
+
     print(f"Testing on: {test_drive}")
-    print(f"Expected behavior:")
-    print(f"  - Service should cap results at 10 million files")
-    print(f"  - Service should log warnings about dangerous patterns")
-    print(f"  - Service should stop at safety limit")
+    print("Expected behavior:")
+    print("  - Service should cap results at 10 million files")
+    print("  - Service should log warnings about dangerous patterns")
+    print("  - Service should stop at safety limit")
     print()
-    
+
     for pattern, description in dangerous_patterns:
         print(f"\n🔍 Testing: {pattern} ({description})")
-        print(f"   Max results: Unlimited (0)")
+        print("   Max results: Unlimited (0)")
         sys.stdout.flush()
-        
+
         start = time.time()
         try:
             results = await search_files_via_pipe(
                 pattern=pattern,
                 directory=test_drive,
                 max_results=0,  # Unlimited results
-                timeout=300  # 5 minute timeout
+                timeout=300,  # 5 minute timeout
             )
-            
+
             duration = time.time() - start
             count = len(results) if results else 0
-            
+
             # Format large numbers
             count_str = f"{count:,}" if count >= 1000 else str(count)
-            duration_str = f"{duration:.2f}s" if duration >= 1 else f"{duration*1000:.0f}ms"
-            
+            duration_str = f"{duration:.2f}s" if duration >= 1 else f"{duration * 1000:.0f}ms"
+
             print(f"   ✅ Found: {count_str} files in {duration_str}")
-            
+
             # Check if safety limit was applied
             if count >= 10000000:
-                print(f"   ⚠️  SAFETY LIMIT HIT: Results capped at 10 million")
+                print("   ⚠️  SAFETY LIMIT HIT: Results capped at 10 million")
             elif count >= 1000000:
                 print(f"   ⚠️  WARNING: Large result set ({count:,} files)")
             else:
-                print(f"   ℹ️  Result count is reasonable")
-                
+                print("   ℹ️  Result count is reasonable")
+
         except Exception as e:
             duration = time.time() - start
-            print(f"   ❌ EXCEPTION: {str(e)}")
+            print(f"   ❌ EXCEPTION: {e!s}")
             import traceback
+
             traceback.print_exc()
-    
+
     print("\n" + "=" * 70)
     print("TEST COMPLETE")
     print("=" * 70)
@@ -90,4 +91,3 @@ async def test_unlimited_safety():
 
 if __name__ == "__main__":
     asyncio.run(test_unlimited_safety())
-

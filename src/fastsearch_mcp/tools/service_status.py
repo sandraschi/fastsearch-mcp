@@ -5,7 +5,7 @@ including whether it's running, installed, and can be connected to.
 Supports basic, intermediate, and advanced detail levels.
 """
 
-from typing import Any, Dict
+from typing import Any
 
 from fastsearch_mcp.logging_config import get_logger
 from fastsearch_mcp.mcp_instance import mcp
@@ -21,7 +21,7 @@ logger = get_logger(__name__)
 
 
 @mcp.tool
-async def service_status(level: str = "basic") -> Dict[str, Any]:
+async def service_status(level: str = "basic") -> dict[str, Any]:
     """Get the current status of the FastSearch C++ service with multilevel detail support.
 
     Provides basic, intermediate, or advanced status information about the service,
@@ -98,9 +98,7 @@ async def service_status(level: str = "basic") -> Dict[str, Any]:
 
         if level == "advanced":
             error_result["diagnostics"] = {
-                "executable_accessible": SERVICE_EXECUTABLE.exists()
-                if SERVICE_EXECUTABLE
-                else False,
+                "executable_accessible": SERVICE_EXECUTABLE.exists() if SERVICE_EXECUTABLE else False,
                 "error_type": type(e).__name__,
             }
 

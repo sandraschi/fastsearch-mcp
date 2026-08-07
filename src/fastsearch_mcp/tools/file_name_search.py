@@ -2,7 +2,7 @@
 
 import asyncio
 import logging
-from typing import Any, Dict, List
+from typing import Any
 
 try:
     import psutil
@@ -15,7 +15,7 @@ from fastsearch_mcp.service_client import search_files
 logger = logging.getLogger(__name__)
 
 
-def _get_ntfs_drives() -> List[str]:
+def _get_ntfs_drives() -> list[str]:
     """Get all NTFS drive letters on the system."""
     drives = []
     if psutil:
@@ -78,7 +78,7 @@ async def fastsearch_search(
     pagination_mode: str = "none",
     page: int = 1,
     page_size: int = 1000,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Search for files by name pattern using direct NTFS MFT access.
 
     Simple and fast file name search using direct NTFS Master File Table access.
@@ -105,14 +105,14 @@ async def fastsearch_search(
         max_results: Maximum number of results to return (default: 100). When
             search_all=True, this limit applies per drive. Use 0 for unlimited
             (capped at 10M for safety). Stops searching after finding this many results.
-        
+
         pagination_mode: Pagination mode (default: "none"). Options:
             - "none": Return all results in single response (default)
             - "offset": Page-based pagination (use with page and page_size)
-        
+
         page: Page number for offset pagination (default: 1, 1-indexed).
             Only used when pagination_mode="offset".
-        
+
         page_size: Results per page for offset pagination (default: 1000).
             Only used when pagination_mode="offset". Maximum 100,000 per page.
 
@@ -249,7 +249,7 @@ async def fastsearch_search(
                     if drive_result and drive_result.get("results"):
                         return drive, {"count": drive_result.get("count", 0), "results": drive_result["results"]}
                     return drive, {"count": 0, "results": []}
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     logger.warning(f"Search on drive {drive} timed out after 30 seconds")
                     return drive, {"error": "Timeout after 30 seconds"}
                 except Exception as e:
@@ -278,7 +278,9 @@ async def fastsearch_search(
         else:
             # Search single path: normalize so C++ service gets e.g. C:\ not C:
             directory = _normalize_search_path(path)
-            logger.info(f"Searching for files matching pattern: {pattern!r} in directory: {directory!r} (input path: {path!r})")
+            logger.info(
+                f"Searching for files matching pattern: {pattern!r} in directory: {directory!r} (input path: {path!r})"
+            )
 
             # Use service_client.search_files which REQUIRES MFT service (no fallback)
             try:
@@ -290,11 +292,11 @@ async def fastsearch_search(
                     page=page,
                     page_size=page_size,
                 )
-                
+
                 # Extract results and pagination from service response
                 results = result.get("results", []) if isinstance(result, dict) else result
                 pagination = result.get("pagination") if isinstance(result, dict) else None
-                
+
                 return {
                     "success": True,
                     "pattern": pattern,

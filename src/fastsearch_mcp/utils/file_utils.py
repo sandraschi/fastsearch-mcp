@@ -7,8 +7,9 @@ This module provides file system utilities following FastMCP 2.13 patterns.
 import logging
 import os
 import re
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Iterator, List, Optional, Pattern
+from re import Pattern
 
 logger = logging.getLogger(__name__)
 
@@ -16,8 +17,8 @@ logger = logging.getLogger(__name__)
 def find_files(
     root_dir: str,
     include: str = "*",
-    exclude: Optional[str] = None,
-    max_size: Optional[int] = None,
+    exclude: str | None = None,
+    max_size: int | None = None,
     skip_binary: bool = True,
     max_results: int = 100,
 ) -> Iterator[Path]:
@@ -85,7 +86,7 @@ def search_in_file(
     whole_word: bool = False,
     context_lines: int = 0,
     max_matches: int = 100,
-) -> List[dict]:
+) -> list[dict]:
     """
     Search for a pattern within a file.
 

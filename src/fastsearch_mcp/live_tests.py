@@ -4,10 +4,9 @@ Live integration tests: pipe connection and real searches via the FastSearch C++
 Used by the webapp Tests page and can be run from pytest with the service running.
 """
 
-import asyncio
 import logging
 import time
-from typing import Any, Dict, List
+from typing import Any
 
 from .pipe_client import (
     get_pipe_name,
@@ -20,8 +19,8 @@ from .service_client import is_service_running
 logger = logging.getLogger(__name__)
 
 
-def _record(name: str, passed: bool, message: str, duration_ms: float, details: Any = None) -> Dict[str, Any]:
-    out: Dict[str, Any] = {
+def _record(name: str, passed: bool, message: str, duration_ms: float, details: Any = None) -> dict[str, Any]:
+    out: dict[str, Any] = {
         "name": name,
         "passed": passed,
         "message": message,
@@ -36,7 +35,7 @@ async def run_live_tests(
     search_pattern: str = "*.txt",
     search_directory: str = "C:\\",
     search_max_results: int = 5,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """Run live tests: service check, pipe connect, get_service_info, real search.
 
     Args:
@@ -47,7 +46,7 @@ async def run_live_tests(
     Returns:
         List of test result dicts: name, passed, message, duration_ms, details (optional).
     """
-    results: List[Dict[str, Any]] = []
+    results: list[dict[str, Any]] = []
 
     # 1. Service process check (fast, cached)
     t0 = time.perf_counter()
@@ -115,9 +114,7 @@ async def run_live_tests(
             logger.exception("get_service_info test failed")
             results.append(_record("get_service_info", False, str(e), elapsed, {"error": str(e)}))
     else:
-        results.append(
-            _record("get_service_info", False, "Skipped (pipe not connected)", 0.0, {"skipped": True})
-        )
+        results.append(_record("get_service_info", False, "Skipped (pipe not connected)", 0.0, {"skipped": True}))
 
     # 4. Real search via pipe
     if results[1].get("passed"):  # pipe_connect passed

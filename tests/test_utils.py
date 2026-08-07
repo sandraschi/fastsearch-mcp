@@ -3,8 +3,9 @@ Test utilities for FastSearch MCP tests.
 """
 
 import asyncio
+from collections.abc import Callable
 from contextlib import contextmanager
-from typing import Any, Callable, Dict, Optional, TypeVar
+from typing import Any, TypeVar
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -39,9 +40,9 @@ def async_raise(exception: Exception) -> asyncio.Future:
 
 @contextmanager
 def assert_raises_mcp_error(
-    expected_code: Optional[int] = None,
-    expected_message: Optional[str] = None,
-    expected_data: Optional[Dict[str, Any]] = None,
+    expected_code: int | None = None,
+    expected_message: str | None = None,
+    expected_data: dict[str, Any] | None = None,
 ):
     """Context manager to assert that a McpError is raised with specific attributes."""
     try:
@@ -51,14 +52,12 @@ def assert_raises_mcp_error(
         if expected_code is not None:
             assert e.code == expected_code, f"Expected code {expected_code}, got {e.code}"
         if expected_message is not None:
-            assert expected_message in str(e), (
-                f"Expected message containing '{expected_message}', got '{str(e)}'"
-            )
+            assert expected_message in str(e), f"Expected message containing '{expected_message}', got '{e!s}'"
         if expected_data is not None:
             assert e.data == expected_data, f"Expected data {expected_data}, got {e.data}"
 
 
-def create_mock_coroutine(return_value: Any = None, side_effect: Exception = None) -> AsyncMock:
+def create_mock_coroutine(return_value: Any = None, side_effect: Exception | None = None) -> AsyncMock:
     """Create a mock coroutine with the specified return value or side effect."""
     if side_effect is not None:
 
@@ -72,8 +71,8 @@ def create_mock_coroutine(return_value: Any = None, side_effect: Exception = Non
     return AsyncMock(side_effect=mock_coroutine)
 
 
-def mock_async_method(
-    method: Callable[..., T], return_value: Any = None, side_effect: Exception = None
+def mock_async_method[T](
+    method: Callable[..., T], return_value: Any = None, side_effect: Exception | None = None
 ) -> AsyncMock:
     """Mock an async method with the specified return value or side effect."""
     mock = create_mock_coroutine(return_value, side_effect)

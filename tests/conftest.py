@@ -8,8 +8,9 @@ import logging
 import shutil
 import sys
 import tempfile
+from collections.abc import Generator
 from pathlib import Path
-from typing import Any, Dict, Generator, List
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -79,9 +80,10 @@ def mock_mcp_error():
 @pytest.fixture(autouse=True)
 def mock_windows_apis():
     """Auto-use fixture that mocks Windows API calls for all tests.
-    
+
     This ensures tests can run in GitHub Actions even if Windows APIs aren't available.
     """
+
     # Configure the error class for pywintypes.error (needed before patching)
     class MockWinError(Exception):
         def __init__(self, winerror=None, *args, **kwargs):
@@ -98,10 +100,10 @@ def mock_windows_apis():
     mock_win32service_module = MagicMock()
     mock_win32serviceutil_module = MagicMock()
     mock_win32security_module = MagicMock()
-    
+
     # Configure the mock pipe handle
     mock_handle = MagicMock()
-    
+
     # Configure win32file mock (used by both sys.modules and module patches)
     mock_win32file_module.CreateFile.return_value = mock_handle
     mock_win32file_module.CloseHandle.return_value = None
@@ -109,10 +111,10 @@ def mock_windows_apis():
     mock_win32file_module.GENERIC_READ = 0x80000000
     mock_win32file_module.GENERIC_WRITE = 0x40000000
     mock_win32file_module.OPEN_EXISTING = 3
-    
+
     # Configure win32pipe mock
     mock_win32pipe_module.SetNamedPipeHandleState.return_value = None
-    
+
     # Configure win32serviceutil mock
     mock_service_handle = MagicMock()
     mock_service_handle.QueryServiceConfig.return_value = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)
@@ -124,38 +126,42 @@ def mock_windows_apis():
     mock_win32serviceutil_module.StartService.return_value = None
     mock_win32serviceutil_module.ControlService.return_value = (1, 0, 0, 0, 0, 0, 0)
     mock_win32serviceutil_module.ChangeServiceConfig.return_value = None
-    
+
     # Configure win32security mock
     mock_win32security_module.GetFileSecurity.return_value = MagicMock()
-    
+
     # Mock win32file, win32pipe, pywintypes for pipe_client
     # Also patch sys.modules to catch imports inside functions
-    with patch.dict(sys.modules, {
-        "win32file": mock_win32file_module,
-        "pywintypes": mock_pywintypes_module,
-        "win32pipe": mock_win32pipe_module,
-        "win32service": mock_win32service_module,
-        "win32serviceutil": mock_win32serviceutil_module,
-        "win32security": mock_win32security_module,
-    }), \
-         patch("fastsearch_mcp.pipe_client.win32file", mock_win32file_module, create=True) as mock_win32file, \
-         patch("fastsearch_mcp.pipe_client.win32pipe", mock_win32pipe_module, create=True) as mock_win32pipe, \
-         patch("fastsearch_mcp.pipe_client.pywintypes", mock_pywintypes_module, create=True) as mock_pywintypes, \
-         patch("fastsearch_mcp.pipe_client.WINDOWS_AVAILABLE", True), \
-         patch("fastsearch_mcp.service_client.win32file", mock_win32file_module, create=True) as mock_win32file_svc, \
-         patch("fastsearch_mcp.service_client.pywintypes", mock_pywintypes_module, create=True) as mock_pywintypes_svc, \
-         patch("fastsearch_mcp.service_client.subprocess", create=True) as mock_subprocess, \
-         patch("fastsearch_mcp.tools.service.win32service", mock_win32service_module, create=True) as mock_win32service, \
-         patch("fastsearch_mcp.tools.service.win32serviceutil", mock_win32serviceutil_module, create=True) as mock_win32serviceutil, \
-         patch("fastsearch_mcp.tools.service_manager.win32service", mock_win32service_module, create=True) as mock_win32service_mgr, \
-         patch("fastsearch_mcp.tools.service_manager.win32serviceutil", mock_win32serviceutil_module, create=True) as mock_win32serviceutil_mgr, \
-         patch("fastsearch_mcp.tools.ntfs.win32file", mock_win32file_module, create=True) as mock_win32file_ntfs, \
-         patch("fastsearch_mcp.tools.ntfs.win32security", mock_win32security_module, create=True) as mock_win32security:
-        
+    with (
+        patch.dict(
+            sys.modules,
+            {
+                "win32file": mock_win32file_module,
+                "pywintypes": mock_pywintypes_module,
+                "win32pipe": mock_win32pipe_module,
+                "win32service": mock_win32service_module,
+                "win32serviceutil": mock_win32serviceutil_module,
+                "win32security": mock_win32security_module,
+            },
+        ),
+        patch("fastsearch_mcp.pipe_client.win32file", mock_win32file_module, create=True),
+        patch("fastsearch_mcp.pipe_client.win32pipe", mock_win32pipe_module, create=True),
+        patch("fastsearch_mcp.pipe_client.pywintypes", mock_pywintypes_module, create=True),
+        patch("fastsearch_mcp.pipe_client.WINDOWS_AVAILABLE", True),
+        patch("fastsearch_mcp.service_client.win32file", mock_win32file_module, create=True),
+        patch("fastsearch_mcp.service_client.pywintypes", mock_pywintypes_module, create=True),
+        patch("fastsearch_mcp.service_client.subprocess", create=True) as mock_subprocess,
+        patch("fastsearch_mcp.tools.service.win32service", mock_win32service_module, create=True),
+        patch("fastsearch_mcp.tools.service.win32serviceutil", mock_win32serviceutil_module, create=True),
+        patch("fastsearch_mcp.tools.service_manager.win32service", mock_win32service_module, create=True),
+        patch("fastsearch_mcp.tools.service_manager.win32serviceutil", mock_win32serviceutil_module, create=True),
+        patch("fastsearch_mcp.tools.ntfs.win32file", mock_win32file_module, create=True),
+        patch("fastsearch_mcp.tools.ntfs.win32security", mock_win32security_module, create=True),
+    ):
         # Configure ReadFile and WriteFile to use test data
         test_response = json.dumps({"status": "ok", "results": []}).encode("utf-8")
         response_length = len(test_response).to_bytes(4, "little")
-        
+
         mock_win32file_module.ReadFile.side_effect = [
             (0, response_length),  # Length prefix
             (0, test_response),  # Actual response data
@@ -167,7 +173,7 @@ def mock_windows_apis():
         # Configure ReadFile and WriteFile to use test data
         test_response = json.dumps({"status": "ok", "results": []}).encode("utf-8")
         response_length = len(test_response).to_bytes(4, "little")
-        
+
         # Configure ReadFile for pipe operations
         mock_win32file_module.ReadFile.side_effect = [
             (0, response_length),  # Length prefix
@@ -208,19 +214,20 @@ def mock_windows_apis():
 def mock_pipe_client():
     """Fixture that provides a mocked NamedPipeClient."""
     from fastsearch_mcp.pipe_client import NamedPipeClient
-    
-    with patch.object(NamedPipeClient, 'connect', new_callable=AsyncMock) as mock_connect, \
-         patch.object(NamedPipeClient, 'disconnect', new_callable=AsyncMock) as mock_disconnect, \
-         patch.object(NamedPipeClient, 'send_request', new_callable=AsyncMock) as mock_send:
-        
+
+    with (
+        patch.object(NamedPipeClient, "connect", new_callable=AsyncMock) as mock_connect,
+        patch.object(NamedPipeClient, "disconnect", new_callable=AsyncMock) as mock_disconnect,
+        patch.object(NamedPipeClient, "send_request", new_callable=AsyncMock) as mock_send,
+    ):
         mock_connect.return_value = True
         mock_send.return_value = {"status": "ok", "results": []}
-        
+
         client = NamedPipeClient(pipe_name=TEST_PIPE_NAME)
         client.connect = mock_connect
         client.disconnect = mock_disconnect
         client.send_request = mock_send
-        
+
         yield client
 
 
@@ -235,11 +242,12 @@ def server():
 @pytest.fixture
 def mock_service_client():
     """Fixture that mocks service_client functions."""
-    with patch("fastsearch_mcp.service_client.is_service_running", return_value=True), \
-         patch("fastsearch_mcp.service_client.get_service_status", new_callable=AsyncMock) as mock_status, \
-         patch("fastsearch_mcp.service_client.search_files", new_callable=AsyncMock) as mock_search, \
-         patch("fastsearch_mcp.service_client.test_service_connection", new_callable=AsyncMock) as mock_test:
-        
+    with (
+        patch("fastsearch_mcp.service_client.is_service_running", return_value=True),
+        patch("fastsearch_mcp.service_client.get_service_status", new_callable=AsyncMock) as mock_status,
+        patch("fastsearch_mcp.service_client.search_files", new_callable=AsyncMock) as mock_search,
+        patch("fastsearch_mcp.service_client.test_service_connection", new_callable=AsyncMock) as mock_test,
+    ):
         mock_status.return_value = {
             "running": True,
             "service_state": "running",
@@ -250,7 +258,7 @@ def mock_service_client():
             {"path": "C:\\test\\file2.txt", "size": 2048, "attributes": 32},
         ]
         mock_test.return_value = True
-        
+
         yield {
             "status": mock_status,
             "search": mock_search,
@@ -259,7 +267,7 @@ def mock_service_client():
 
 
 @pytest.fixture
-def test_files(temp_dir: Path) -> List[Path]:
+def test_files(temp_dir: Path) -> list[Path]:
     """Create test files in a temporary directory."""
     files = []
 
@@ -282,7 +290,7 @@ def test_files(temp_dir: Path) -> List[Path]:
 
 
 @pytest.fixture
-def test_search_results() -> List[Dict[str, Any]]:
+def test_search_results() -> list[dict[str, Any]]:
     """Return sample search results for testing."""
     return [
         {
@@ -319,7 +327,7 @@ def test_search_results() -> List[Dict[str, Any]]:
 
 
 @pytest.fixture
-def mock_search_results(test_search_results: List[Dict[str, Any]]):
+def mock_search_results(test_search_results: list[dict[str, Any]]):
     """Fixture that mocks search results."""
     with patch("fastsearch_mcp.service_client.search_files", new_callable=AsyncMock) as mock_search:
         mock_search.return_value = test_search_results

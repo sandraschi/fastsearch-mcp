@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Test script for FastSearch service management tools."""
+
 import asyncio
 import ctypes
 import os
@@ -35,7 +36,7 @@ def elevate_if_needed():
             sys.executable,
             f'"{script}" --elevated --result-file "{result_file}"',
             None,
-            5  # SW_SHOW - show window and activate it
+            5,  # SW_SHOW - show window and activate it
         )
         print("\nUAC elevation requested. A new window will open and stay open.")
         print(f"Results will also be written to: {result_file}")
@@ -44,6 +45,7 @@ def elevate_if_needed():
         print(f"Failed to request elevation: {e}")
         print("Please run this script as Administrator")
         return False
+
 
 # Import directly from service module to avoid importing all tools
 from fastsearch_mcp.tools.service import (
@@ -63,11 +65,11 @@ class TestResults:
 
     def add_pass(self, test_name: str, duration: float, details: str = ""):
         self.passed.append((test_name, duration, details))
-        print(f"[PASS] {test_name} ({duration*1000:.1f}ms) {details}")
+        print(f"[PASS] {test_name} ({duration * 1000:.1f}ms) {details}")
 
     def add_fail(self, test_name: str, error: str, duration: float):
         self.failed.append((test_name, error, duration))
-        print(f"[FAIL] {test_name} ({duration*1000:.1f}ms) - {error}")
+        print(f"[FAIL] {test_name} ({duration * 1000:.1f}ms) - {error}")
 
     def add_skip(self, test_name: str, reason: str):
         self.skipped.append((test_name, reason))
@@ -85,13 +87,13 @@ class TestResults:
         if self.passed:
             print("PASSED TESTS:")
             for name, duration, details in self.passed:
-                print(f"  ✓ {name} ({duration*1000:.1f}ms) {details}")
+                print(f"  ✓ {name} ({duration * 1000:.1f}ms) {details}")
             print()
 
         if self.failed:
             print("FAILED TESTS:")
             for name, error, duration in self.failed:
-                print(f"  ✗ {name} ({duration*1000:.1f}ms)")
+                print(f"  ✗ {name} ({duration * 1000:.1f}ms)")
                 print(f"    Error: {error}")
             print()
 
@@ -112,13 +114,15 @@ async def test_service_status():
     sys.stdout.flush()
     start = time.time()
     try:
-        result = await (service_status_fastsearch.fn if hasattr(service_status_fastsearch, "fn") else service_status_fastsearch)()
+        result = await (
+            service_status_fastsearch.fn if hasattr(service_status_fastsearch, "fn") else service_status_fastsearch
+        )()
         duration = time.time() - start
 
         status = result.get("status")
         if status:
             details = f"Status: {status}"
-            if "pid" in result and result["pid"]:
+            if result.get("pid"):
                 details += f", PID: {result['pid']}"
             results.add_pass(test_name, duration, details)
             return True
@@ -148,20 +152,26 @@ async def test_service_start():
     start = time.time()
     try:
         # Check current status first
-        status_result = await (service_status_fastsearch.fn if hasattr(service_status_fastsearch, "fn") else service_status_fastsearch)()
+        status_result = await (
+            service_status_fastsearch.fn if hasattr(service_status_fastsearch, "fn") else service_status_fastsearch
+        )()
         current_status = status_result.get("status")
 
         if current_status == "running":
             results.add_skip(test_name, "Service already running")
             return True
 
-        result = await (service_start_fastsearch.fn if hasattr(service_start_fastsearch, "fn") else service_start_fastsearch)()
+        result = await (
+            service_start_fastsearch.fn if hasattr(service_start_fastsearch, "fn") else service_start_fastsearch
+        )()
         duration = time.time() - start
 
         if result.get("success"):
             # Wait a moment and verify it's running
             await asyncio.sleep(1)
-            status_result = await (service_status_fastsearch.fn if hasattr(service_status_fastsearch, "fn") else service_status_fastsearch)()
+            status_result = await (
+                service_status_fastsearch.fn if hasattr(service_status_fastsearch, "fn") else service_status_fastsearch
+            )()
             if status_result.get("status") == "running":
                 results.add_pass(test_name, duration, "Service started successfully")
                 return True
@@ -202,20 +212,26 @@ async def test_service_stop():
     start = time.time()
     try:
         # Check current status first
-        status_result = await (service_status_fastsearch.fn if hasattr(service_status_fastsearch, "fn") else service_status_fastsearch)()
+        status_result = await (
+            service_status_fastsearch.fn if hasattr(service_status_fastsearch, "fn") else service_status_fastsearch
+        )()
         current_status = status_result.get("status")
 
         if current_status == "stopped" or current_status == "not_installed":
             results.add_skip(test_name, f"Service is {current_status}")
             return True
 
-        result = await (service_stop_fastsearch.fn if hasattr(service_stop_fastsearch, "fn") else service_stop_fastsearch)()
+        result = await (
+            service_stop_fastsearch.fn if hasattr(service_stop_fastsearch, "fn") else service_stop_fastsearch
+        )()
         duration = time.time() - start
 
         if result.get("success"):
             # Wait a moment and verify it's stopped
             await asyncio.sleep(1)
-            status_result = await (service_status_fastsearch.fn if hasattr(service_status_fastsearch, "fn") else service_status_fastsearch)()
+            status_result = await (
+                service_status_fastsearch.fn if hasattr(service_status_fastsearch, "fn") else service_status_fastsearch
+            )()
             if status_result.get("status") == "stopped":
                 results.add_pass(test_name, duration, "Service stopped successfully")
                 return True
@@ -256,20 +272,26 @@ async def test_service_restart():
     start = time.time()
     try:
         # Get initial status
-        initial_status = await (service_status_fastsearch.fn if hasattr(service_status_fastsearch, "fn") else service_status_fastsearch)()
+        initial_status = await (
+            service_status_fastsearch.fn if hasattr(service_status_fastsearch, "fn") else service_status_fastsearch
+        )()
         initial_state = initial_status.get("status")
 
         if initial_state == "not_installed":
             results.add_skip(test_name, "Service not installed")
             return True
 
-        result = await (service_restart_fastsearch.fn if hasattr(service_restart_fastsearch, "fn") else service_restart_fastsearch)()
+        result = await (
+            service_restart_fastsearch.fn if hasattr(service_restart_fastsearch, "fn") else service_restart_fastsearch
+        )()
         duration = time.time() - start
 
         if result.get("success"):
             # Wait a moment and verify it's running
             await asyncio.sleep(2)
-            status_result = await (service_status_fastsearch.fn if hasattr(service_status_fastsearch, "fn") else service_status_fastsearch)()
+            status_result = await (
+                service_status_fastsearch.fn if hasattr(service_status_fastsearch, "fn") else service_status_fastsearch
+            )()
             if status_result.get("status") == "running":
                 results.add_pass(test_name, duration, "Service restarted successfully")
                 return True
@@ -309,7 +331,9 @@ async def test_service_repair():
 
     start = time.time()
     try:
-        result = await (service_repair_fastsearch.fn if hasattr(service_repair_fastsearch, "fn") else service_repair_fastsearch)()
+        result = await (
+            service_repair_fastsearch.fn if hasattr(service_repair_fastsearch, "fn") else service_repair_fastsearch
+        )()
         duration = time.time() - start
 
         if result.get("success"):
@@ -378,13 +402,13 @@ async def main():
     if results.passed:
         summary_lines.append("PASSED TESTS:")
         for name, duration, details in results.passed:
-            summary_lines.append(f"  ✓ {name} ({duration*1000:.1f}ms) {details}")
+            summary_lines.append(f"  ✓ {name} ({duration * 1000:.1f}ms) {details}")
         summary_lines.append("")
 
     if results.failed:
         summary_lines.append("FAILED TESTS:")
         for name, error, duration in results.failed:
-            summary_lines.append(f"  ✗ {name} ({duration*1000:.1f}ms)")
+            summary_lines.append(f"  ✗ {name} ({duration * 1000:.1f}ms)")
             summary_lines.append(f"    Error: {error}")
         summary_lines.append("")
 
@@ -400,7 +424,7 @@ async def main():
     # Write to result file if specified
     if result_file:
         try:
-            with open(result_file, 'w', encoding='utf-8') as f:
+            with open(result_file, "w", encoding="utf-8") as f:
                 f.write(summary_text)
             print(f"\nResults written to: {result_file}")
         except Exception as e:
@@ -412,6 +436,7 @@ async def main():
         print("Tests completed. Window will close in 5 seconds...")
         print("=" * 80)
         import time
+
         time.sleep(5)
 
     # Exit with error code if any tests failed
@@ -422,4 +447,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-

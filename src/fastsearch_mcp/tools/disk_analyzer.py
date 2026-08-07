@@ -5,7 +5,6 @@ import os
 import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Union
 
 from fastsearch_mcp.logging_config import get_logger
 from fastsearch_mcp.mcp_instance import mcp
@@ -21,9 +20,9 @@ class DiskUsage:
     size: int  # in bytes
     file_count: int = 0
     dir_count: int = 0
-    children: List["DiskUsage"] = field(default_factory=list)
+    children: list["DiskUsage"] = field(default_factory=list)
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         """Convert to a dictionary for JSON serialization."""
         return {
             "path": self.path,
@@ -45,9 +44,7 @@ class DiskUsage:
         return f"{size:.{decimal_places}f} {units[-1]}"
 
 
-def get_disk_usage(
-    path: Union[str, Path], max_depth: int = 3, max_entries: int = 10000
-) -> DiskUsage:
+def get_disk_usage(path: str | Path, max_depth: int = 3, max_entries: int = 10000) -> DiskUsage:
     """Get disk usage information for a directory with limits to prevent hangs."""
     path = Path(path).resolve()
     usage = DiskUsage(path=str(path), size=0)
@@ -80,9 +77,7 @@ def get_disk_usage(
                             current_usage.dir_count += 1 + child_usage.dir_count
                             current_usage.file_count += child_usage.file_count
                             current_usage.size += child_usage.size
-                            if (
-                                len(current_usage.children) < 20
-                            ):  # Limit children to prevent huge responses
+                            if len(current_usage.children) < 20:  # Limit children to prevent huge responses
                                 current_usage.children.append(child_usage)
                         else:
                             current_usage.dir_count += 1
@@ -108,9 +103,7 @@ def get_disk_usage(
     return usage
 
 
-def get_largest_files(
-    path: Union[str, Path], limit: int = 50, max_files_to_scan: int = 10000
-) -> List[Dict]:
+def get_largest_files(path: str | Path, limit: int = 50, max_files_to_scan: int = 10000) -> list[dict]:
     """Get the largest files in a directory with early termination."""
     path = Path(path).resolve()
     largest = []
@@ -163,7 +156,7 @@ def get_largest_files(
     ]
 
 
-def get_disk_partitions() -> List[Dict]:
+def get_disk_partitions() -> list[dict]:
     """Get information about all disk partitions."""
     partitions = []
 
@@ -201,7 +194,7 @@ async def analyze_disk_usage(
     find_large_files: bool = True,
     large_file_limit: int = 50,
     min_file_size_mb: int = 10,
-) -> Dict:
+) -> dict:
     """Analyze disk usage and find large files and directories.
 
     Provides comprehensive disk usage analysis including partition information,
@@ -236,7 +229,7 @@ def _analyze_disk_usage_sync(
     find_large_files: bool = True,
     large_file_limit: int = 50,
     min_file_size_mb: int = 10,
-) -> Dict:
+) -> dict:
     """Synchronous implementation of disk analysis."""
     result = {"path": path, "status": "completed"}
 
@@ -264,9 +257,7 @@ def _analyze_disk_usage_sync(
             min_size = min_file_size_mb * 1024 * 1024
             # Limit scanning to prevent hangs
             large_files = get_largest_files(path, large_file_limit, max_files_to_scan=5000)
-            result["large_files"] = [f for f in large_files if f["size"] >= min_size][
-                :large_file_limit
-            ]
+            result["large_files"] = [f for f in large_files if f["size"] >= min_size][:large_file_limit]
         except Exception as e:
             logger.error("Error finding large files: %s", e)
             result["error"] = f"Failed to find large files: {e}"

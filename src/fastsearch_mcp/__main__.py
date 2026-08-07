@@ -34,6 +34,7 @@ _setup_path()
 from fastsearch_mcp import __version__
 from fastsearch_mcp.logging_config import setup_logging, struct_message
 from fastsearch_mcp.server import server
+
 from .transport import run_server_async
 
 # Setup logging before creating logger

@@ -8,9 +8,10 @@ These decorators serve a dual purpose:
 
 import inspect
 import json
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from functools import wraps
-from typing import Any, Callable, Dict, List, Optional, TypeVar, cast
+from typing import Any, TypeVar, cast
 
 # Type variable for generic function typing
 F = TypeVar("F", bound=Callable[..., Any])
@@ -22,9 +23,9 @@ class MCPMethodDoc:
 
     name: str
     description: str
-    params: Dict[str, Dict[str, Any]] = field(default_factory=dict)
-    returns: Dict[str, Any] = field(default_factory=dict)
-    examples: List[Dict[str, Any]] = field(default_factory=list)
+    params: dict[str, dict[str, Any]] = field(default_factory=dict)
+    returns: dict[str, Any] = field(default_factory=dict)
+    examples: list[dict[str, Any]] = field(default_factory=list)
     source_file: str = ""
     source_line: int = 0
 
@@ -44,15 +45,10 @@ class MCPMethodDoc:
                     param_type = f"{'&#124;'.join(param['enum'])}"
                 required = "**Yes**" if param.get("required", False) else "No"
                 default = f"`{param['default']}`" if "default" in param else ""
-                lines.append(
-                    f"| `{name}` | {param_type} | {required} | {default} | "
-                    f"{param.get('description', '')} |"
-                )
+                lines.append(f"| `{name}` | {param_type} | {required} | {default} | {param.get('description', '')} |")
 
         # Add return value
-        lines.extend(
-            ["", "### Returns", "", f"```json\n{json.dumps(self.returns, indent=2)}\n```", ""]
-        )
+        lines.extend(["", "### Returns", "", f"```json\n{json.dumps(self.returns, indent=2)}\n```", ""])
 
         # Add examples
         if self.examples:
@@ -85,9 +81,9 @@ class MCPMethodDoc:
 def mcp_method(
     name: str,
     description: str,
-    params: Optional[Dict[str, Dict[str, Any]]] = None,
-    returns: Optional[Dict[str, Any]] = None,
-    examples: Optional[List[Dict[str, Any]]] = None,
+    params: dict[str, dict[str, Any]] | None = None,
+    returns: dict[str, Any] | None = None,
+    examples: list[dict[str, Any]] | None = None,
 ):
     """
     Decorator for documenting MCP methods.

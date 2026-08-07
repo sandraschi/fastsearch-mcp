@@ -13,7 +13,7 @@ import os
 import sys
 
 # Add the package root to the Python path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), 'fastsearch_mcp_bridge', 'src')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "fastsearch_mcp_bridge", "src")))
 
 from fastsearch_mcp.ipc import FastSearchClient
 
@@ -22,13 +22,11 @@ from fastsearch_mcp import McpServer, __version__
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler('test_server.log')
-    ]
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[logging.StreamHandler(), logging.FileHandler("test_server.log")],
 )
-logger = logging.getLogger('test_server')
+logger = logging.getLogger("test_server")
+
 
 class TestServer:
     """Test harness for the FastSearch MCP server."""
@@ -67,11 +65,7 @@ class TestServer:
         # Create a client
         async with FastSearchClient(pipe_name="\\\\.\\pipe\\fastsearch-test") as client:
             # Test a simple search
-            results = await client.search(
-                pattern="test",
-                search_type="fuzzy",
-                max_results=10
-            )
+            results = await client.search(pattern="test", search_type="fuzzy", max_results=10)
 
             logger.info(f"Search results: {json.dumps(results, indent=2, default=str)}")
             return True
@@ -111,6 +105,7 @@ class TestServer:
             # Ensure the server is stopped
             await self.stop_server()
 
+
 def main():
     """Main entry point for the test script."""
     # Set up signal handlers
@@ -122,6 +117,7 @@ def main():
 
     # Return appropriate exit code
     sys.exit(0 if success else 1)
+
 
 if __name__ == "__main__":
     main()

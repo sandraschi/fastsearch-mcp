@@ -1,4 +1,5 @@
 """Quick test to search for .py files on C: drive."""
+
 import asyncio
 import sys
 from pathlib import Path
@@ -37,7 +38,7 @@ async def main():
             pattern="*.md",
             directory="D:\\",
             max_results=20,
-            timeout=120.0  # 2 minutes
+            timeout=120.0,  # 2 minutes
         )
 
         # Convert to expected format
@@ -62,7 +63,7 @@ async def main():
         for i, r in enumerate(results[:10], 1):
             # Results can have 'path' or 'file_path' key
             if isinstance(r, dict):
-                path = r.get('path') or r.get('file_path') or r.get('name') or str(r)
+                path = r.get("path") or r.get("file_path") or r.get("name") or str(r)
             else:
                 path = str(r)
             print(f"  {i}. {path}")
@@ -73,9 +74,9 @@ async def main():
     except Exception as e:
         print(f"ERROR: {e}")
         import traceback
+
         traceback.print_exc()
 
 
 if __name__ == "__main__":
     asyncio.run(main())
-

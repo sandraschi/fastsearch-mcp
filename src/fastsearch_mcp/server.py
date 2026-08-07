@@ -20,10 +20,9 @@ logger = logging.getLogger(__name__)
 # Tools are registered via @mcp.tool decorator when imported
 # Prompts are registered via @mcp.prompt() decorator when imported
 # Skills are registered via @mcp.skill() decorator when imported
+import fastsearch_mcp.prompts
+import fastsearch_mcp.skills
 import fastsearch_mcp.tools  # noqa: F401
-import fastsearch_mcp.prompts  # noqa: F401
-import fastsearch_mcp.skills  # noqa: F401
-
 from fastsearch_mcp.api_bridge import router as api_router
 
 # REST app for web_sota: GET /health, GET /tools, POST /tools/:name
@@ -42,6 +41,7 @@ app.include_router(api_router, prefix="/api")
 async def root_health() -> dict:
     """Fleet manifest healthPath: /health (no /api prefix)."""
     return {"status": "ok", "service": "fastsearch-mcp"}
+
 
 # MCP server reference for CLI / stdio
 server = mcp

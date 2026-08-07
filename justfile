@@ -1,4 +1,4 @@
-set windows-shell := ["pwsh.exe", "-NoLogo", "-Command"]
+set windows-shell := ["powershell.exe", "-NoProfile", "-Command"]
 import 'scripts/just/fleet.just'
 
 # ---- Dashboard -----------------------------------------------------------
@@ -38,6 +38,11 @@ install-service:
 # Stop the C++ service (requires admin)
 stop-service:
     Stop-Service FastSearchMCP -Force
+
+# Ensure Windows service + pipe are up; configure recovery/watchdog (admin for -ConfigureRecovery/-InstallWatchdog)
+ensure-service:
+    Set-Location '{{justfile_directory()}}'
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\ensure-fastsearch-service.ps1 -RestartIfHung
 
 # ----------------------------------------
 
@@ -97,3 +102,9 @@ release VERSION:
     Set-Location '{{justfile_directory()}}'
     git tag v{{VERSION}}
     git push origin v{{VERSION}}
+
+# Bootstrap: install dev deps + pre-commit hook
+bootstrap:
+    uv sync --group dev
+    uv run pre-commit install
+    Write-Host "Pre-commit hooks installed." -ForegroundColor Green

@@ -37,19 +37,17 @@ if __name__ == "__main__":
 try:
     from fastmcp import FastMCP
 except ImportError as e:
-    raise ImportError(
-        "FastMCP 3.x is required. Install with: pip install 'fastmcp>=3.0.0,<4'"
-    ) from e
+    raise ImportError("FastMCP 3.x is required. Install with: pip install 'fastmcp>=3.0.0,<4'") from e
 
 # Local imports - import server to register tools
 from .server import server
 
 # Public API
 __all__ = [
-    # Server instance
-    "server",
     # FastMCP class
     "FastMCP",
     # Version
     "__version__",
+    # Server instance
+    "server",
 ]

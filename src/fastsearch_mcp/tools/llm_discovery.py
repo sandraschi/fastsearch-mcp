@@ -1,15 +1,17 @@
 """Tool for discovering local LLM models from Ollama and LM Studio."""
 
 import logging
-from typing import Any, Dict
+from typing import Any
+
 import httpx
+
 from fastsearch_mcp.mcp_instance import mcp
 
 logger = logging.getLogger(__name__)
 
 
 @mcp.tool
-async def list_local_models() -> Dict[str, Any]:
+async def list_local_models() -> dict[str, Any]:
     """
     Discover available LLM models from local providers like Ollama and LM Studio.
 
@@ -27,7 +29,7 @@ async def list_local_models() -> Dict[str, Any]:
                 results["ollama"] = [m["name"] for m in data.get("models", [])]
     except Exception as e:
         logger.debug(f"Ollama discovery failed: {e}")
-        results["errors"].append(f"Ollama: {str(e)}")
+        results["errors"].append(f"Ollama: {e!s}")
 
     # 2. Discover LM Studio models
     try:
@@ -38,6 +40,6 @@ async def list_local_models() -> Dict[str, Any]:
                 results["lm_studio"] = [m["id"] for m in data.get("data", [])]
     except Exception as e:
         logger.debug(f"LM Studio discovery failed: {e}")
-        results["errors"].append(f"LM Studio: {str(e)}")
+        results["errors"].append(f"LM Studio: {e!s}")
 
     return results

@@ -5,7 +5,6 @@ import os
 import platform
 import time
 from datetime import datetime
-from typing import Dict, List, Optional, Union
 
 import psutil
 
@@ -24,7 +23,7 @@ class SystemMetricsCollector:
         self._last_cpu_times = psutil.cpu_times()
         self._last_time = time.time()
 
-    def collect_cpu_usage(self) -> Dict[str, float]:
+    def collect_cpu_usage(self) -> dict[str, float]:
         """Collect CPU usage statistics."""
         try:
             # Get per-core usage
@@ -42,9 +41,7 @@ class SystemMetricsCollector:
                 if delta_total > 0:  # Avoid division by zero
                     cpu_percent = {
                         "user": (cpu_times.user - self._last_cpu_times.user) / delta_total * 100,
-                        "system": (cpu_times.system - self._last_cpu_times.system)
-                        / delta_total
-                        * 100,
+                        "system": (cpu_times.system - self._last_cpu_times.system) / delta_total * 100,
                         "idle": (cpu_times.idle - self._last_cpu_times.idle) / delta_total * 100,
                     }
                 else:
@@ -60,16 +57,12 @@ class SystemMetricsCollector:
                 "times": cpu_percent,  # User/System/Idle breakdown
                 "count": psutil.cpu_count(),  # Number of CPU cores
                 "freq": {
-                    "current": psutil.cpu_freq().current
-                    if hasattr(psutil, "cpu_freq") and psutil.cpu_freq()
-                    else None,
-                    "max": psutil.cpu_freq().max
-                    if hasattr(psutil, "cpu_freq") and psutil.cpu_freq()
-                    else None,
+                    "current": psutil.cpu_freq().current if hasattr(psutil, "cpu_freq") and psutil.cpu_freq() else None,
+                    "max": psutil.cpu_freq().max if hasattr(psutil, "cpu_freq") and psutil.cpu_freq() else None,
                 }
                 if hasattr(psutil, "cpu_freq")
                 else None,
-                "load_avg": dict(zip(["1min", "5min", "15min"], os.getloadavg()))
+                "load_avg": dict(zip(["1min", "5min", "15min"], os.getloadavg(), strict=False))
                 if hasattr(os, "getloadavg")
                 else None,
             }
@@ -78,7 +71,7 @@ class SystemMetricsCollector:
             logger.error("Error collecting CPU metrics: %s", e, exc_info=True)
             return {}
 
-    def collect_memory_usage(self) -> Dict[str, Union[float, Dict]]:
+    def collect_memory_usage(self) -> dict[str, float | dict]:
         """Collect memory usage statistics."""
         try:
             virtual_mem = psutil.virtual_memory()
@@ -107,7 +100,7 @@ class SystemMetricsCollector:
             logger.error("Error collecting memory metrics: %s", e, exc_info=True)
             return {}
 
-    def collect_disk_usage(self) -> Dict[str, Dict]:
+    def collect_disk_usage(self) -> dict[str, dict]:
         """Collect disk usage and I/O statistics."""
         try:
             # Get disk partitions
@@ -144,18 +137,10 @@ class SystemMetricsCollector:
                         "write_bytes": disk_io.write_bytes,
                         "read_time": disk_io.read_time,
                         "write_time": disk_io.write_time,
-                        "read_bytes_per_sec": (disk_io.read_bytes - self._last_disk_io.read_bytes)
-                        / time_delta,
-                        "write_bytes_per_sec": (
-                            disk_io.write_bytes - self._last_disk_io.write_bytes
-                        )
-                        / time_delta,
-                        "read_count_per_sec": (disk_io.read_count - self._last_disk_io.read_count)
-                        / time_delta,
-                        "write_count_per_sec": (
-                            disk_io.write_count - self._last_disk_io.write_count
-                        )
-                        / time_delta,
+                        "read_bytes_per_sec": (disk_io.read_bytes - self._last_disk_io.read_bytes) / time_delta,
+                        "write_bytes_per_sec": (disk_io.write_bytes - self._last_disk_io.write_bytes) / time_delta,
+                        "read_count_per_sec": (disk_io.read_count - self._last_disk_io.read_count) / time_delta,
+                        "write_count_per_sec": (disk_io.write_count - self._last_disk_io.write_count) / time_delta,
                     }
 
             self._last_disk_io = disk_io
@@ -166,7 +151,7 @@ class SystemMetricsCollector:
             logger.error("Error collecting disk metrics: %s", e, exc_info=True)
             return {}
 
-    def collect_network_usage(self) -> Dict[str, Dict]:
+    def collect_network_usage(self) -> dict[str, dict]:
         """Collect network I/O statistics."""
         try:
             net_io = psutil.net_io_counters()
@@ -184,18 +169,10 @@ class SystemMetricsCollector:
                         "errout": net_io.errout,
                         "dropin": net_io.dropin,
                         "dropout": net_io.dropout,
-                        "bytes_sent_per_sec": (net_io.bytes_sent - self._last_net_io.bytes_sent)
-                        / time_delta,
-                        "bytes_recv_per_sec": (net_io.bytes_recv - self._last_net_io.bytes_recv)
-                        / time_delta,
-                        "packets_sent_per_sec": (
-                            net_io.packets_sent - self._last_net_io.packets_sent
-                        )
-                        / time_delta,
-                        "packets_recv_per_sec": (
-                            net_io.packets_recv - self._last_net_io.packets_recv
-                        )
-                        / time_delta,
+                        "bytes_sent_per_sec": (net_io.bytes_sent - self._last_net_io.bytes_sent) / time_delta,
+                        "bytes_recv_per_sec": (net_io.bytes_recv - self._last_net_io.bytes_recv) / time_delta,
+                        "packets_sent_per_sec": (net_io.packets_sent - self._last_net_io.packets_sent) / time_delta,
+                        "packets_recv_per_sec": (net_io.packets_recv - self._last_net_io.packets_recv) / time_delta,
                     }
 
             self._last_net_io = net_io
@@ -207,12 +184,8 @@ class SystemMetricsCollector:
                     connections.append(
                         {
                             "fd": conn.fd,
-                            "family": conn.family.name
-                            if hasattr(conn.family, "name")
-                            else str(conn.family),
-                            "type": conn.type.name
-                            if hasattr(conn.type, "name")
-                            else str(conn.type),
+                            "family": conn.family.name if hasattr(conn.family, "name") else str(conn.family),
+                            "type": conn.type.name if hasattr(conn.type, "name") else str(conn.type),
                             "laddr": f"{conn.laddr.ip}:{conn.laddr.port}" if conn.laddr else None,
                             "raddr": f"{conn.raddr.ip}:{conn.raddr.port}" if conn.raddr else None,
                             "status": conn.status,
@@ -229,7 +202,7 @@ class SystemMetricsCollector:
             logger.error("Error collecting network metrics: %s", e, exc_info=True)
             return {}
 
-    def collect_processes(self, limit: int = 10, sort_by: str = "cpu_percent") -> Dict:
+    def collect_processes(self, limit: int = 10, sort_by: str = "cpu_percent") -> dict:
         """Collect information about running processes."""
         try:
             processes = []
@@ -261,7 +234,7 @@ class SystemMetricsCollector:
             logger.error("Error collecting process info: %s", e, exc_info=True)
             return []
 
-    def collect_system_info(self) -> Dict:
+    def collect_system_info(self) -> dict:
         """Collect general system information."""
         try:
             boot_time = datetime.fromtimestamp(psutil.boot_time()).strftime("%Y-%m-%d %H:%M:%S")
@@ -291,7 +264,7 @@ class SystemMetricsCollector:
             logger.error("Error collecting system info: %s", e, exc_info=True)
             return {}
 
-    def collect_all_metrics(self, include_processes: bool = True, process_limit: int = 10) -> Dict:
+    def collect_all_metrics(self, include_processes: bool = True, process_limit: int = 10) -> dict:
         """Collect all system metrics."""
         current_time = time.time()
 
@@ -330,8 +303,8 @@ async def monitor_system_resources(
     include_disk: bool = True,
     include_network: bool = True,
     include_system: bool = True,
-    callback_url: Optional[str] = None,
-) -> Dict:
+    callback_url: str | None = None,
+) -> dict:
     """MONITOR_SYSTEM_RESOURCES — CPU, memory, disk, network, and optional top processes.
 
     **Duration semantics:** ``duration <= 0`` (default ``0``) returns **one synchronous
@@ -397,12 +370,10 @@ async def _get_snapshot(
     include_disk: bool = True,
     include_network: bool = True,
     include_system: bool = True,
-) -> Dict:
+) -> dict:
     """Get a single snapshot of system metrics."""
     # Get a single snapshot
-    metrics = _collector.collect_all_metrics(
-        include_processes=include_processes, process_limit=process_limit
-    )
+    metrics = _collector.collect_all_metrics(include_processes=include_processes, process_limit=process_limit)
 
     # Filter metrics based on include_* parameters
     filtered_metrics = {
@@ -436,8 +407,8 @@ async def _monitor_continuous(
     include_disk: bool,
     include_network: bool,
     include_system: bool,
-    callback_url: Optional[str],
-) -> Dict:
+    callback_url: str | None,
+) -> dict:
     """Monitor system resources continuously for the specified duration."""
     global _monitoring
     interval = max(0.1, float(interval))
@@ -486,7 +457,7 @@ async def _monitor_continuous(
 
 
 async def _monitor_loop(
-    result: Dict,
+    result: dict,
     interval: float,
     duration: float,
     include_processes: bool,
@@ -496,7 +467,7 @@ async def _monitor_loop(
     include_disk: bool,
     include_network: bool,
     include_system: bool,
-    callback_url: Optional[str],
+    callback_url: str | None,
 ) -> None:
     """Background monitoring loop."""
     global _monitoring
@@ -550,13 +521,13 @@ async def _monitor_loop(
 
 @mcp.tool
 async def get_process_info(
-    pids: Optional[List[int]] = None,
-    name: Optional[str] = None,
-    user: Optional[str] = None,
+    pids: list[int] | None = None,
+    name: str | None = None,
+    user: str | None = None,
     limit: int = 100,
     sort_by: str = "cpu_percent",
     sort_desc: bool = True,
-) -> List[Dict]:
+) -> list[dict]:
     """GET_PROCESS_INFO — Detailed rows for selected or filtered processes (psutil).
 
     **Pagination:** There is **no cursor**. At most ``limit`` rows are returned after
@@ -638,21 +609,11 @@ async def get_process_info(
                     "memory_info": {
                         "rss": proc.memory_info().rss,
                         "vms": proc.memory_info().vms,
-                        "shared": proc.memory_info().shared
-                        if hasattr(proc.memory_info(), "shared")
-                        else None,
-                        "text": proc.memory_info().text
-                        if hasattr(proc.memory_info(), "text")
-                        else None,
-                        "lib": proc.memory_info().lib
-                        if hasattr(proc.memory_info(), "lib")
-                        else None,
-                        "data": proc.memory_info().data
-                        if hasattr(proc.memory_info(), "data")
-                        else None,
-                        "dirty": proc.memory_info().dirty
-                        if hasattr(proc.memory_info(), "dirty")
-                        else None,
+                        "shared": proc.memory_info().shared if hasattr(proc.memory_info(), "shared") else None,
+                        "text": proc.memory_info().text if hasattr(proc.memory_info(), "text") else None,
+                        "lib": proc.memory_info().lib if hasattr(proc.memory_info(), "lib") else None,
+                        "data": proc.memory_info().data if hasattr(proc.memory_info(), "data") else None,
+                        "dirty": proc.memory_info().dirty if hasattr(proc.memory_info(), "dirty") else None,
                     },
                     "io_counters": {
                         "read_count": proc.io_counters().read_count,
@@ -664,31 +625,20 @@ async def get_process_info(
                     else None,
                     "num_threads": proc.num_threads(),
                     "num_fds": proc.num_fds() if hasattr(proc, "num_fds") else None,
-                    "cpu_affinity": proc.cpu_affinity()
-                    if hasattr(proc, "cpu_affinity")
-                    else None,
+                    "cpu_affinity": proc.cpu_affinity() if hasattr(proc, "cpu_affinity") else None,
                     "cpu_num": proc.cpu_num() if hasattr(proc, "cpu_num") else None,
                     "ppid": proc.ppid(),
                     "parent": proc.parent().name() if proc.parent() else None,
                     "children": [
-                        {"pid": child.pid, "name": child.name(), "status": child.status()}
-                        for child in proc.children()
+                        {"pid": child.pid, "name": child.name(), "status": child.status()} for child in proc.children()
                     ],
                     "connections": [
                         {
                             "fd": conn.fd,
-                            "family": conn.family.name
-                            if hasattr(conn.family, "name")
-                            else str(conn.family),
-                            "type": conn.type.name
-                            if hasattr(conn.type, "name")
-                            else str(conn.type),
-                            "laddr": f"{conn.laddr.ip}:{conn.laddr.port}"
-                            if conn.laddr
-                            else None,
-                            "raddr": f"{conn.raddr.ip}:{conn.raddr.port}"
-                            if conn.raddr
-                            else None,
+                            "family": conn.family.name if hasattr(conn.family, "name") else str(conn.family),
+                            "type": conn.type.name if hasattr(conn.type, "name") else str(conn.type),
+                            "laddr": f"{conn.laddr.ip}:{conn.laddr.port}" if conn.laddr else None,
+                            "raddr": f"{conn.raddr.ip}:{conn.raddr.port}" if conn.raddr else None,
                             "status": conn.status,
                         }
                         for conn in proc.connections()

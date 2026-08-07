@@ -6,7 +6,6 @@ This module provides logging utilities following FastMCP 2.13 patterns.
 
 import logging
 import sys
-from typing import Optional
 
 
 def get_logger(name: str) -> logging.Logger:
@@ -14,7 +13,7 @@ def get_logger(name: str) -> logging.Logger:
     return logging.getLogger(name)
 
 
-def setup_logging(log_level: str = "INFO", format_string: Optional[str] = None) -> None:
+def setup_logging(log_level: str = "INFO", format_string: str | None = None) -> None:
     """Set up logging configuration.
 
     Logs to stderr for Claude Desktop visibility.

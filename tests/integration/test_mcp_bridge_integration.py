@@ -15,7 +15,7 @@ import sys
 from pathlib import Path
 
 # Add src to path
-sys.path.insert(0, str(Path(__file__).parent / 'src'))
+sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from fastsearch_mcp import FastSearchServer, __version__
 from fastsearch_mcp.tools import AVAILABLE_TOOLS
@@ -64,7 +64,7 @@ def test_tool_registration(server: FastSearchServer):
 
     try:
         # Get registered tools from FastMCP
-        app = server.get_app()
+        server.get_app()
 
         # Check if tools are registered
         # FastMCP stores tools internally, we'll check via AVAILABLE_TOOLS
@@ -96,28 +96,12 @@ async def test_jsonrpc_communication(server: FastSearchServer):
             "params": {
                 "protocolVersion": "2024-11-05",
                 "capabilities": {},
-                "clientInfo": {
-                    "name": "test-client",
-                    "version": "1.0.0"
-                }
+                "clientInfo": {"name": "test-client", "version": "1.0.0"},
             },
-            "id": 1
+            "id": 1,
         },
-        {
-            "jsonrpc": "2.0",
-            "method": "tools/list",
-            "params": {},
-            "id": 2
-        },
-        {
-            "jsonrpc": "2.0",
-            "method": "tools/call",
-            "params": {
-                "name": "service_status",
-                "arguments": {}
-            },
-            "id": 3
-        }
+        {"jsonrpc": "2.0", "method": "tools/list", "params": {}, "id": 2},
+        {"jsonrpc": "2.0", "method": "tools/call", "params": {"name": "service_status", "arguments": {}}, "id": 3},
     ]
 
     for request in test_requests:
@@ -185,14 +169,9 @@ def test_claude_desktop_config():
         "mcpServers": {
             "fastsearch": {
                 "command": python_exe,
-                "args": [
-                    "-m",
-                    "fastsearch_mcp"
-                ],
+                "args": ["-m", "fastsearch_mcp"],
                 "cwd": str(project_root),
-                "env": {
-                    "PYTHONUNBUFFERED": "1"
-                }
+                "env": {"PYTHONUNBUFFERED": "1"},
             }
         }
     }
@@ -214,6 +193,7 @@ def test_claude_desktop_config():
     # Check if module can be imported
     try:
         import fastsearch_mcp
+
         print_success("Module can be imported: fastsearch_mcp")
     except ImportError as e:
         print_error(f"Module import failed: {e}")
@@ -235,7 +215,7 @@ def generate_claude_config_file(config: dict):
     existing_config = {}
     if claude_config_path.exists():
         try:
-            with open(claude_config_path, encoding='utf-8') as f:
+            with open(claude_config_path, encoding="utf-8") as f:
                 existing_config = json.load(f)
             print_info("Found existing Claude Desktop config")
         except Exception as e:
@@ -250,7 +230,7 @@ def generate_claude_config_file(config: dict):
     # Write config
     try:
         claude_config_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(claude_config_path, 'w', encoding='utf-8') as f:
+        with open(claude_config_path, "w", encoding="utf-8") as f:
             json.dump(existing_config, f, indent=2)
         print_success(f"Config written to: {claude_config_path}")
         print_info("[WARNING] You may need to restart Claude Desktop for changes to take effect")
@@ -295,23 +275,23 @@ async def main():
     try:
         # Test 1: Server initialization
         server = await test_server_initialization()
-        results['initialization'] = True
+        results["initialization"] = True
 
         # Test 2: Tool registration
-        results['tool_registration'] = test_tool_registration(server)
+        results["tool_registration"] = test_tool_registration(server)
 
         # Test 3: JSON-RPC communication
-        results['jsonrpc'] = await test_jsonrpc_communication(server)
+        results["jsonrpc"] = await test_jsonrpc_communication(server)
 
         # Test 4: Tool execution
-        results['tool_execution'] = await test_tool_execution(server)
+        results["tool_execution"] = await test_tool_execution(server)
 
         # Test 5: Claude Desktop config
         config = test_claude_desktop_config()
-        results['config'] = True
+        results["config"] = True
 
         # Test 6: Service connection
-        results['service'] = await test_service_connection(server)
+        results["service"] = await test_service_connection(server)
 
         # Generate config file
         if config:
@@ -320,6 +300,7 @@ async def main():
     except Exception as e:
         print_error(f"Test suite failed: {e}")
         import traceback
+
         traceback.print_exc()
         return 1
 
@@ -343,4 +324,3 @@ async def main():
 if __name__ == "__main__":
     exit_code = asyncio.run(main())
     sys.exit(exit_code)
-

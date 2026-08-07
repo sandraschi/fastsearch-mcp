@@ -14,7 +14,7 @@ import subprocess
 import tempfile
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from fastsearch_mcp.mcp_instance import mcp
 
@@ -72,15 +72,11 @@ def _check_pandoc_available() -> bool:
         return False
 
 
-async def _convert_with_pandoc(
-    markdown_content: str, output_format: str, output_path: str
-) -> Dict[str, Any]:
+async def _convert_with_pandoc(markdown_content: str, output_format: str, output_path: str) -> dict[str, Any]:
     """Convert markdown content to another format using Pandoc."""
     try:
         # Create temporary markdown file
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".md", delete=False, encoding="utf-8"
-        ) as temp_md:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False, encoding="utf-8") as temp_md:
             temp_md.write(markdown_content)
             temp_md_path = temp_md.name
 
@@ -107,7 +103,7 @@ async def _convert_with_pandoc(
                 stderr=asyncio.subprocess.PIPE,
             )
 
-            stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=60)
+            _stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=60)
 
             if process.returncode != 0:
                 error_msg = stderr.decode("utf-8", errors="ignore")
@@ -125,7 +121,7 @@ async def _convert_with_pandoc(
             except Exception:
                 pass
 
-    except asyncio.TimeoutError:
+    except TimeoutError:
         return {
             "success": False,
             "error": "Pandoc conversion timed out (60 seconds)",
@@ -133,20 +129,20 @@ async def _convert_with_pandoc(
     except Exception as e:
         return {
             "success": False,
-            "error": f"Pandoc conversion error: {str(e)}",
+            "error": f"Pandoc conversion error: {e!s}",
         }
 
 
 @mcp.tool
 async def search_result_export(
-    results: List[Dict[str, Any]],
+    results: list[dict[str, Any]],
     export_format: str = "csv",
-    output_path: Optional[str] = None,
-    include_columns: Optional[List[str]] = None,
-    exclude_columns: Optional[List[str]] = None,
+    output_path: str | None = None,
+    include_columns: list[str] | None = None,
+    exclude_columns: list[str] | None = None,
     include_metadata: bool = True,
-    search_query: Optional[str] = None,
-) -> Dict[str, Any]:
+    search_query: str | None = None,
+) -> dict[str, Any]:
     """Export search results to various formats for external analysis.
 
     Exports search results to CSV, JSON, Markdown, or TSV formats. Useful for
@@ -407,7 +403,7 @@ async def search_result_export(
 
         # Add metadata header if requested
         if include_metadata:
-            if format_lower in ["markdown"] + PANDOC_FORMATS:
+            if format_lower in ["markdown", *PANDOC_FORMATS]:
                 content_lines.append("# Search Results Export")
                 content_lines.append("")
                 if search_query:
@@ -440,9 +436,7 @@ async def search_result_export(
 
             meta = "\n".join(content_lines) + "\n" if content_lines else ""
             output = io.StringIO()
-            writer = csv.DictWriter(
-                output, fieldnames=export_columns, delimiter="\t", extrasaction="ignore"
-            )
+            writer = csv.DictWriter(output, fieldnames=export_columns, delimiter="\t", extrasaction="ignore")
             writer.writeheader()
             for row in rows:
                 writer.writerow(row)
@@ -480,8 +474,7 @@ async def search_result_export(
                 return {
                     "success": False,
                     "error": (
-                        f"Format '{format_lower}' requires output_path. "
-                        "Pandoc formats must be written to a file."
+                        f"Format '{format_lower}' requires output_path. Pandoc formats must be written to a file."
                     ),
                 }
 
@@ -519,7 +512,7 @@ async def search_result_export(
                 logger.error(f"Error converting with Pandoc: {e}", exc_info=True)
                 return {
                     "success": False,
-                    "error": f"Failed to convert with Pandoc: {str(e)}",
+                    "error": f"Failed to convert with Pandoc: {e!s}",
                     "format": format_lower,
                     "row_count": len(results),
                 }
@@ -543,7 +536,7 @@ async def search_result_export(
                 logger.error(f"Error writing export file: {e}", exc_info=True)
                 return {
                     "success": False,
-                    "error": f"Failed to write export file: {str(e)}",
+                    "error": f"Failed to write export file: {e!s}",
                     "format": format_lower,
                     "row_count": len(results),
                 }
@@ -561,7 +554,7 @@ async def search_result_export(
         logger.error(f"Error exporting search results: {e}", exc_info=True)
         return {
             "success": False,
-            "error": f"Failed to export search results: {str(e)}",
+            "error": f"Failed to export search results: {e!s}",
             "format": export_format,
             "row_count": 0,
         }

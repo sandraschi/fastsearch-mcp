@@ -12,7 +12,7 @@ import sys
 from pathlib import Path
 
 # Add the package root to the Python path
-sys.path.insert(0, str(Path(__file__).parent / 'fastsearch_mcp_bridge' / 'src'))
+sys.path.insert(0, str(Path(__file__).parent / "fastsearch_mcp_bridge" / "src"))
 
 from fastsearch_mcp.ipc import FastSearchClient, IpcError
 
@@ -21,13 +21,11 @@ from fastsearch_mcp import McpServer, __version__
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler('test_fastsearch.log')
-    ]
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[logging.StreamHandler(), logging.FileHandler("test_fastsearch.log")],
 )
-logger = logging.getLogger('test_fastsearch')
+logger = logging.getLogger("test_fastsearch")
+
 
 class FastSearchTester:
     """Test harness for FastSearch MCP server."""
@@ -85,11 +83,7 @@ class FastSearchTester:
         try:
             async with FastSearchClient(pipe_name=self.pipe_name) as client:
                 # Test a simple search
-                results = await client.search(
-                    pattern="test",
-                    search_type="fuzzy",
-                    max_results=5
-                )
+                results = await client.search(pattern="test", search_type="fuzzy", max_results=5)
 
                 logger.info(f"Search results: {results}")
                 return True
@@ -110,10 +104,7 @@ class FastSearchTester:
             await self.start_server()
 
             # Run tests
-            tests = [
-                ("Connection Test", self.test_connection),
-                ("Search Test", self.test_search)
-            ]
+            tests = [("Connection Test", self.test_connection), ("Search Test", self.test_search)]
 
             all_passed = True
             for name, test_func in tests:
@@ -138,6 +129,7 @@ class FastSearchTester:
             await self.stop_server()
             logger.info("Test harness shutdown complete")
 
+
 def main():
     """Main entry point for the test script."""
     # Set up signal handlers
@@ -149,6 +141,7 @@ def main():
 
     # Return appropriate exit code
     sys.exit(0 if success else 1)
+
 
 if __name__ == "__main__":
     main()

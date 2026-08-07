@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Check FastSearch service status with detailed info."""
+
 import asyncio
 import sys
 from pathlib import Path
@@ -16,8 +17,9 @@ async def main():
     except Exception as e:
         print(f"Error: {e}")
         import traceback
+
         traceback.print_exc()
+
 
 if __name__ == "__main__":
     asyncio.run(main())
-

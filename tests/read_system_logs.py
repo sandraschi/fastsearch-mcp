@@ -1,10 +1,11 @@
 """
 Read System Event Logs for FastSearch service crashes.
 """
+
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent / 'src'))
+sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 import asyncio
 
@@ -29,7 +30,7 @@ async def main():
         last="7d",
         limit=50,
         event_level="all",
-        source=""  # Don't filter by source, look for FastSearch in message
+        source="",  # Don't filter by source, look for FastSearch in message
     )
 
     if result.get("success"):
@@ -63,12 +64,7 @@ async def main():
 
             # Try without source filter
             result2 = await tool.execute(
-                service_name="",
-                log_type="System",
-                last="7d",
-                limit=100,
-                event_level="all",
-                source=""
+                service_name="", log_type="System", last="7d", limit=100, event_level="all", source=""
             )
 
             if result2.get("success"):
@@ -94,4 +90,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-

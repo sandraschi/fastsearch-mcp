@@ -6,7 +6,7 @@ import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Literal, Optional, Union
+from typing import Any, Literal, Optional
 
 import psutil
 import win32service
@@ -110,18 +110,18 @@ class ServiceInfo:
     startup_type: ServiceStartupType
     binary_path: str
     description: str = ""
-    pid: Optional[int] = None
-    exit_code: Optional[int] = None
-    process_name: Optional[str] = None
-    username: Optional[str] = None
-    dependencies: List[str] = field(default_factory=list)
+    pid: int | None = None
+    exit_code: int | None = None
+    process_name: str | None = None
+    username: str | None = None
+    dependencies: list[str] = field(default_factory=list)
     delayed_start: bool = False
     error_control: str = "NORMAL"
     load_order_group: str = ""
     service_type: str = "WIN32_OWN_PROCESS"
     tag_id: int = 0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "name": self.name,
@@ -174,9 +174,7 @@ class ServiceInfo:
 
                     # Get service dependencies
                     try:
-                        deps = win32service.EnumDependentServices(
-                            service_handle, win32service.SERVICE_ACTIVE
-                        )
+                        deps = win32service.EnumDependentServices(service_handle, win32service.SERVICE_ACTIVE)
                         dependencies = [dep[0] for dep in deps]
                     except Exception:
                         dependencies = []
@@ -206,9 +204,7 @@ class ServiceInfo:
                         process_name=process_name,
                         username=username,
                         dependencies=dependencies,
-                        delayed_start=bool(
-                            config[7] & 0x00000001
-                        ),  # SERVICE_DELAYED_AUTO_START_INFO
+                        delayed_start=bool(config[7] & 0x00000001),  # SERVICE_DELAYED_AUTO_START_INFO
                         service_type=cls._get_service_type_str(config[2]),
                         error_control=cls._get_error_control_str(config[4]),
                         load_order_group=config[5] or "",
@@ -254,12 +250,10 @@ class ServiceManager:
     """Class for managing Windows services."""
 
     @staticmethod
-    def get_services() -> List[ServiceInfo]:
+    def get_services() -> list[ServiceInfo]:
         """Get all services on the system."""
         services = []
-        scm_handle = win32service.OpenSCManager(
-            None, None, win32service.SC_MANAGER_ENUMERATE_SERVICE
-        )
+        scm_handle = win32service.OpenSCManager(None, None, win32service.SC_MANAGER_ENUMERATE_SERVICE)
 
         try:
             # Get all services
@@ -281,14 +275,12 @@ class ServiceManager:
         return services
 
     @staticmethod
-    def get_service(service_name: str) -> Optional[ServiceInfo]:
+    def get_service(service_name: str) -> ServiceInfo | None:
         """Get information about a specific service."""
         return ServiceInfo.from_win32_service(service_name)
 
     @staticmethod
-    def start_service(
-        service_name: str, args: Optional[List[str]] = None, timeout: int = 30
-    ) -> Dict[str, Any]:
+    def start_service(service_name: str, args: list[str] | None = None, timeout: int = 30) -> dict[str, Any]:
         """Start a Windows service.
 
         Args:
@@ -347,10 +339,7 @@ class ServiceManager:
                 elif service.status == ServiceStatus.STOPPED:
                     return {
                         "success": False,
-                        "error": (
-                            f"Service '{service_name}' failed to start "
-                            f"(status: {service.status.value})"
-                        ),
+                        "error": (f"Service '{service_name}' failed to start (status: {service.status.value})"),
                         "service": service_name,
                         "status": service.status.value,
                         "exit_code": service.exit_code,
@@ -383,13 +372,13 @@ class ServiceManager:
         except Exception as e:
             return {
                 "success": False,
-                "error": f"Error starting service '{service_name}': {str(e)}",
+                "error": f"Error starting service '{service_name}': {e!s}",
                 "service": service_name,
                 "action": "start",
             }
 
     @staticmethod
-    def stop_service(service_name: str, timeout: int = 30) -> Dict[str, Any]:
+    def stop_service(service_name: str, timeout: int = 30) -> dict[str, Any]:
         """Stop a Windows service.
 
         Args:
@@ -469,13 +458,13 @@ class ServiceManager:
         except Exception as e:
             return {
                 "success": False,
-                "error": f"Error stopping service '{service_name}': {str(e)}",
+                "error": f"Error stopping service '{service_name}': {e!s}",
                 "service": service_name,
                 "action": "stop",
             }
 
     @staticmethod
-    def restart_service(service_name: str, timeout: int = 60) -> Dict[str, Any]:
+    def restart_service(service_name: str, timeout: int = 60) -> dict[str, Any]:
         """Restart a Windows service.
 
         Args:
@@ -511,16 +500,12 @@ class ServiceManager:
             "service": service_name,
             "status": start_result.get("status", "UNKNOWN"),
             "pid": start_result.get("pid"),
-            "elapsed_time": (
-                stop_result.get("elapsed_time", 0) + start_result.get("elapsed_time", 0)
-            ),
+            "elapsed_time": (stop_result.get("elapsed_time", 0) + start_result.get("elapsed_time", 0)),
             "action": "restart",
         }
 
     @staticmethod
-    def set_startup_type(
-        service_name: str, startup_type: Union[ServiceStartupType, str]
-    ) -> Dict[str, Any]:
+    def set_startup_type(service_name: str, startup_type: ServiceStartupType | str) -> dict[str, Any]:
         """Set the startup type for a service.
 
         Args:
@@ -551,9 +536,7 @@ class ServiceManager:
             scm_handle = win32service.OpenSCManager(None, None, win32service.SC_MANAGER_CONNECT)
 
             try:
-                service_handle = win32service.OpenService(
-                    scm_handle, service_name, win32service.SERVICE_CHANGE_CONFIG
-                )
+                service_handle = win32service.OpenService(scm_handle, service_name, win32service.SERVICE_CHANGE_CONFIG)
 
                 try:
                     # Change the service config
@@ -572,10 +555,7 @@ class ServiceManager:
 
                     return {
                         "success": True,
-                        "message": (
-                            f"Set startup type for service '{service_name}' "
-                            f"to {startup_type.value}"
-                        ),
+                        "message": (f"Set startup type for service '{service_name}' to {startup_type.value}"),
                         "service": service_name,
                         "startup_type": startup_type.value,
                         "action": "set_startup_type",
@@ -597,7 +577,7 @@ class ServiceManager:
         except Exception as e:
             return {
                 "success": False,
-                "error": f"Error setting startup type for service '{service_name}': {str(e)}",
+                "error": f"Error setting startup type for service '{service_name}': {e!s}",
                 "service": service_name,
                 "action": "set_startup_type",
             }
@@ -618,15 +598,10 @@ class ServiceManager:
                 winerror.ERROR_ACCESS_DENIED: "Access is denied",
                 winerror.ERROR_INVALID_HANDLE: "The handle is invalid",
                 winerror.ERROR_PATH_NOT_FOUND: "The system cannot find the path specified",
-                winerror.ERROR_SERVICE_DISABLED: (
-                    "The service cannot be started because it is disabled"
-                ),
-                winerror.ERROR_SERVICE_LOGON_FAILED: (
-                    "The service did not start due to a logon failure"
-                ),
+                winerror.ERROR_SERVICE_DISABLED: ("The service cannot be started because it is disabled"),
+                winerror.ERROR_SERVICE_LOGON_FAILED: ("The service did not start due to a logon failure"),
                 winerror.ERROR_SERVICE_REQUEST_TIMEOUT: (
-                    "The service did not respond to the start request "
-                    "in a timely fashion"
+                    "The service did not respond to the start request in a timely fashion"
                 ),
             }
 
@@ -641,7 +616,7 @@ async def list_services(
     startup_type: ServiceListStartup = "all",
     search: str = "",
     include_details: bool = True,
-) -> Dict:
+) -> dict:
     """LIST_SERVICES — Enumerate Windows services with optional filters.
 
     Use this read-only tool to discover service names, states, and startup types before
@@ -682,16 +657,12 @@ async def list_services(
                 continue
 
             # Startup type filter
-            if (
-                startup_type_filter != "all"
-                and service.startup_type.value.lower() != startup_type_filter
-            ):
+            if startup_type_filter != "all" and service.startup_type.value.lower() != startup_type_filter:
                 continue
 
             # Search filter
             if search_term and not (
-                search_term in service.name.lower()
-                or search_term in (service.display_name or "").lower()
+                search_term in service.name.lower() or search_term in (service.display_name or "").lower()
             ):
                 continue
 
@@ -723,14 +694,14 @@ async def list_services(
     except Exception as e:
         return {
             "success": False,
-            "error": f"Error listing services: {str(e)}",
+            "error": f"Error listing services: {e!s}",
             "count": 0,
             "services": [],
         }
 
 
 @mcp.tool
-async def get_service(service_name: str) -> Dict:
+async def get_service(service_name: str) -> dict:
     """GET_SERVICE — Read-only snapshot of one Windows service (SCM).
 
     Use before start/stop/restart to confirm the exact service ``name``, current
@@ -761,7 +732,7 @@ async def get_service(service_name: str) -> Dict:
     except Exception as e:
         return {
             "success": False,
-            "error": f"Error getting service '{service_name}': {str(e)}",
+            "error": f"Error getting service '{service_name}': {e!s}",
             "service_name": service_name,
         }
 
@@ -769,10 +740,10 @@ async def get_service(service_name: str) -> Dict:
 @mcp.tool
 async def start_service(
     service_name: str,
-    args: Optional[List[str]] = None,
+    args: list[str] | None = None,
     timeout: int = 30,
     dry_run: bool = False,
-) -> Dict:
+) -> dict:
     """START_SERVICE — Start a Windows service and wait until RUNNING or timeout.
 
     Mutates system state: can launch processes depended on by other components. Use
@@ -815,10 +786,7 @@ async def start_service(
             return {
                 "success": True,
                 "dry_run": True,
-                "message": (
-                    f"Would start '{service_name}' (current status: {svc.status.value}); "
-                    "no start issued."
-                ),
+                "message": (f"Would start '{service_name}' (current status: {svc.status.value}); no start issued."),
                 "service": service_name,
                 "status": svc.status.value,
                 "action": "start",
@@ -836,13 +804,13 @@ async def start_service(
     except Exception as e:
         return {
             "success": False,
-            "error": f"Error starting service '{service_name}': {str(e)}",
+            "error": f"Error starting service '{service_name}': {e!s}",
             "service_name": service_name,
         }
 
 
 @mcp.tool
-async def stop_service(service_name: str, timeout: int = 30, dry_run: bool = False) -> Dict:
+async def stop_service(service_name: str, timeout: int = 30, dry_run: bool = False) -> dict:
     """STOP_SERVICE — Stop a Windows service and wait until STOPPED or timeout.
 
     Destructive: can interrupt dependent apps (DB, web, print queues). Use get_service
@@ -879,10 +847,7 @@ async def stop_service(service_name: str, timeout: int = 30, dry_run: bool = Fal
             return {
                 "success": True,
                 "dry_run": True,
-                "message": (
-                    f"Would stop '{service_name}' (current status: {svc.status.value}); "
-                    "no stop issued."
-                ),
+                "message": (f"Would stop '{service_name}' (current status: {svc.status.value}); no stop issued."),
                 "service": service_name,
                 "status": svc.status.value,
                 "action": "stop",
@@ -900,13 +865,13 @@ async def stop_service(service_name: str, timeout: int = 30, dry_run: bool = Fal
     except Exception as e:
         return {
             "success": False,
-            "error": f"Error stopping service '{service_name}': {str(e)}",
+            "error": f"Error stopping service '{service_name}': {e!s}",
             "service_name": service_name,
         }
 
 
 @mcp.tool
-async def restart_service(service_name: str, timeout: int = 60, dry_run: bool = False) -> Dict:
+async def restart_service(service_name: str, timeout: int = 60, dry_run: bool = False) -> dict:
     """RESTART_SERVICE — Stop then start a Windows service (two-phase, bounded time).
 
     Highest-impact mutation: combines stop + start risks. Use for user-requested
@@ -964,15 +929,13 @@ async def restart_service(service_name: str, timeout: int = 60, dry_run: bool = 
     except Exception as e:
         return {
             "success": False,
-            "error": f"Error restarting service '{service_name}': {str(e)}",
+            "error": f"Error restarting service '{service_name}': {e!s}",
             "service_name": service_name,
         }
 
 
 @mcp.tool
-async def set_service_startup_type(
-    service_name: str, startup_type: ServiceStartupInput
-) -> Dict:
+async def set_service_startup_type(service_name: str, startup_type: ServiceStartupInput) -> dict:
     """SET_SERVICE_STARTUP_TYPE — Change SCM start mode (boot/system/auto/manual/disabled).
 
     Persists across reboots. Disabling or switching to manual can prevent a service
@@ -996,13 +959,11 @@ async def set_service_startup_type(
         return {"success": False, "error": "Startup type is required"}
 
     try:
-        return await asyncio.to_thread(
-            ServiceManager.set_startup_type, service_name, startup_type
-        )
+        return await asyncio.to_thread(ServiceManager.set_startup_type, service_name, startup_type)
     except Exception as e:
         return {
             "success": False,
-            "error": f"Error setting startup type for service '{service_name}': {str(e)}",
+            "error": f"Error setting startup type for service '{service_name}': {e!s}",
             "service_name": service_name,
             "startup_type": startup_type,
         }
@@ -1016,7 +977,7 @@ async def get_service_logs(
     last: str = "1h",
     limit: int = 50,
     event_level: str = "all",
-) -> Dict:
+) -> dict:
     """Get event logs for a Windows service.
 
     Retrieves Windows Event Log entries for a specific service with optional
@@ -1076,7 +1037,7 @@ async def get_service_logs(
             except Exception as e:
                 return {
                     "success": False,
-                    "error": f"Could not open event log: {str(e)}",
+                    "error": f"Could not open event log: {e!s}",
                     "service_name": service_name,
                     "log_type": log_type,
                 }
@@ -1123,25 +1084,13 @@ async def get_service_logs(
 
                     # Filter by level if specified
                     if event_level != "all":
-                        if (
-                            event_level == "critical"
-                            and event.EventType != win32con.EVENTLOG_ERROR_TYPE
-                        ):
+                        if event_level == "critical" and event.EventType != win32con.EVENTLOG_ERROR_TYPE:
                             continue
-                        if (
-                            event_level == "error"
-                            and event.EventType != win32con.EVENTLOG_ERROR_TYPE
-                        ):
+                        if event_level == "error" and event.EventType != win32con.EVENTLOG_ERROR_TYPE:
                             continue
-                        if (
-                            event_level == "warning"
-                            and event.EventType != win32con.EVENTLOG_WARNING_TYPE
-                        ):
+                        if event_level == "warning" and event.EventType != win32con.EVENTLOG_WARNING_TYPE:
                             continue
-                        if (
-                            event_level == "information"
-                            and event.EventType != win32con.EVENTLOG_INFORMATION_TYPE
-                        ):
+                        if event_level == "information" and event.EventType != win32con.EVENTLOG_INFORMATION_TYPE:
                             continue
                         if event_level == "verbose" and event.EventType not in [
                             win32con.EVENTLOG_AUDIT_SUCCESS,
@@ -1181,7 +1130,7 @@ async def get_service_logs(
     except Exception as e:
         return {
             "success": False,
-            "error": f"Error retrieving logs for service '{service_name}': {str(e)}",
+            "error": f"Error retrieving logs for service '{service_name}': {e!s}",
             "service_name": service_name,
         }
 

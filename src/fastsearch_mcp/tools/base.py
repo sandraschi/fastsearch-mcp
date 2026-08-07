@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import abc
 import base64
+from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
-from enum import Enum
+from enum import StrEnum
 from types import NoneType
-from typing import Any, Callable, TypeVar
+from typing import Any, TypeVar
 
 from fastsearch_mcp.logging_config import get_logger
 
@@ -16,7 +17,7 @@ logger = get_logger(__name__)
 T = TypeVar("T", bound="BaseTool")
 
 
-class ToolCategory(str, Enum):
+class ToolCategory(StrEnum):
     """Categories for organizing tools in the MCP server."""
 
     FILESYSTEM = "File System"

@@ -32,9 +32,7 @@ class TestServiceManagerIntegration:
     @patch("fastsearch_mcp.tools.service_manager.win32serviceutil.QueryServiceStatus")
     @patch("fastsearch_mcp.tools.service_manager.win32serviceutil.OpenService")
     @patch("fastsearch_mcp.tools.service_manager.win32serviceutil.EnumServicesStatus")
-    def test_get_services_mocked(
-        self, mock_enum_services, mock_open_service, mock_query_status, service_manager
-    ):
+    def test_get_services_mocked(self, mock_enum_services, mock_open_service, mock_query_status, service_manager):
         """Test getting services with mocked Windows API."""
         # Setup mocks
         mock_enum_services.return_value = [

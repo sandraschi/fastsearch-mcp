@@ -13,13 +13,11 @@ from pathlib import Path
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler('test_results.log')
-    ]
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[logging.StreamHandler(), logging.FileHandler("test_results.log")],
 )
-logger = logging.getLogger('test_runner')
+logger = logging.getLogger("test_runner")
+
 
 async def run_test_script(script_path):
     """Run a test script and return True if it passes."""
@@ -28,9 +26,7 @@ async def run_test_script(script_path):
     try:
         # Run the script in a subprocess
         proc = await asyncio.create_subprocess_exec(
-            sys.executable, str(script_path),
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
+            sys.executable, str(script_path), stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
         )
 
         # Capture output
@@ -54,12 +50,12 @@ async def run_test_script(script_path):
         logger.error(f"Error running test script {script_path}: {e}", exc_info=True)
         return False
 
+
 async def run_all_tests():
     """Run all test scripts in the tests directory."""
     test_dir = Path(__file__).parent
     test_scripts = [
-        test_file for test_file in test_dir.glob('test_*.py')
-        if test_file.is_file() and test_file.name != '__init__.py'
+        test_file for test_file in test_dir.glob("test_*.py") if test_file.is_file() and test_file.name != "__init__.py"
     ]
 
     if not test_scripts:
@@ -77,6 +73,7 @@ async def run_all_tests():
     logger.info(f"\nTest Results: {passed}/{total} tests passed")
     return passed == total
 
+
 def main():
     """Main entry point for the test runner."""
     logger.info("Starting FastSearch MCP test suite")
@@ -84,12 +81,10 @@ def main():
     try:
         # Run the main test script
         test_dir = Path(__file__).parent
-        main_test = test_dir / 'unit' / 'test_fastsearch.py'
+        main_test = test_dir / "unit" / "test_fastsearch.py"
         if not main_test.exists():
-            main_test = test_dir / 'test_fastsearch.py'
-        success = asyncio.get_event_loop().run_until_complete(
-            run_test_script(main_test)
-        )
+            main_test = test_dir / "test_fastsearch.py"
+        success = asyncio.get_event_loop().run_until_complete(run_test_script(main_test))
 
         # Run additional tests if the main test passes
         if success:
@@ -101,6 +96,7 @@ def main():
     except Exception as e:
         logger.error(f"Test runner error: {e}", exc_info=True)
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()

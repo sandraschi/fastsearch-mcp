@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Test script for FastSearch NTFS tools."""
+
 import asyncio
 import ctypes
 import os
@@ -26,20 +27,16 @@ def elevate_if_needed():
     # Re-run the program with admin rights
     script = os.path.abspath(__file__)
     result_file = os.path.join(os.path.dirname(script), "test_ntfs_results.txt")
-    params = ' '.join([f'"{arg}"' for arg in sys.argv[1:]])
+    " ".join([f'"{arg}"' for arg in sys.argv[1:]])
 
     try:
         # Request elevation - redirect output to file so we can read it back
         import subprocess
+
         subprocess.Popen(
-            [
-                sys.executable,
-                script,
-                "--elevated",
-                "--result-file", result_file
-            ],
+            [sys.executable, script, "--elevated", "--result-file", result_file],
             shell=True,
-            creationflags=0x08000000  # CREATE_NO_WINDOW - but this won't work with UAC
+            creationflags=0x08000000,  # CREATE_NO_WINDOW - but this won't work with UAC
         )
         print(f"\nUAC elevation requested. Results will be written to: {result_file}")
         print("Please approve the UAC prompt, then check the result file.")
@@ -53,7 +50,7 @@ def elevate_if_needed():
                 sys.executable,
                 f'"{script}" --elevated --result-file "{result_file}"',
                 None,
-                5  # SW_SHOW - show window and activate it
+                5,  # SW_SHOW - show window and activate it
             )
             print("\nUAC elevation requested. A new window will open and stay open.")
             print(f"Results will also be written to: {result_file}")
@@ -62,6 +59,7 @@ def elevate_if_needed():
             print(f"Failed to request elevation: {e2}")
             print("Please run this script as Administrator")
             return False
+
 
 # Import directly from ntfs module to avoid importing all tools
 from fastsearch_mcp.tools.ntfs import (
@@ -79,11 +77,11 @@ class TestResults:
 
     def add_pass(self, test_name: str, duration: float, details: str = ""):
         self.passed.append((test_name, duration, details))
-        print(f"[PASS] {test_name} ({duration*1000:.1f}ms) {details}")
+        print(f"[PASS] {test_name} ({duration * 1000:.1f}ms) {details}")
 
     def add_fail(self, test_name: str, error: str, duration: float):
         self.failed.append((test_name, error, duration))
-        print(f"[FAIL] {test_name} ({duration*1000:.1f}ms) - {error}")
+        print(f"[FAIL] {test_name} ({duration * 1000:.1f}ms) - {error}")
 
     def add_skip(self, test_name: str, reason: str):
         self.skipped.append((test_name, reason))
@@ -101,13 +99,13 @@ class TestResults:
         if self.passed:
             print("PASSED TESTS:")
             for name, duration, details in self.passed:
-                print(f"  ✓ {name} ({duration*1000:.1f}ms) {details}")
+                print(f"  ✓ {name} ({duration * 1000:.1f}ms) {details}")
             print()
 
         if self.failed:
             print("FAILED TESTS:")
             for name, error, duration in self.failed:
-                print(f"  ✗ {name} ({duration*1000:.1f}ms)")
+                print(f"  ✗ {name} ({duration * 1000:.1f}ms)")
                 print(f"    Error: {error}")
             print()
 
@@ -312,13 +310,13 @@ async def main():
     if results.passed:
         summary.append("PASSED TESTS:")
         for name, duration, details in results.passed:
-            summary.append(f"  ✓ {name} ({duration*1000:.1f}ms) {details}")
+            summary.append(f"  ✓ {name} ({duration * 1000:.1f}ms) {details}")
         summary.append("")
 
     if results.failed:
         summary.append("FAILED TESTS:")
         for name, error, duration in results.failed:
-            summary.append(f"  ✗ {name} ({duration*1000:.1f}ms)")
+            summary.append(f"  ✗ {name} ({duration * 1000:.1f}ms)")
             summary.append(f"    Error: {error}")
         summary.append("")
 
@@ -334,7 +332,7 @@ async def main():
     # Write to result file if specified
     if result_file:
         try:
-            with open(result_file, 'w', encoding='utf-8') as f:
+            with open(result_file, "w", encoding="utf-8") as f:
                 f.write(summary_text)
             print(f"\nResults written to: {result_file}")
         except Exception as e:
@@ -346,6 +344,7 @@ async def main():
         print("Tests completed. Window will close in 5 seconds...")
         print("=" * 80)
         import time
+
         time.sleep(5)
 
     # Exit with error code if any tests failed
@@ -356,4 +355,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-

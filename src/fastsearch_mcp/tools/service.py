@@ -9,7 +9,6 @@ import ctypes
 import sys
 import winreg
 from pathlib import Path
-from typing import Dict, Optional, Union
 
 import win32service
 import win32serviceutil
@@ -61,7 +60,7 @@ def _get_service_executable() -> Path:
 
 
 @mcp.tool
-async def service_status_fastsearch() -> Dict[str, Union[str, bool, int]]:
+async def service_status_fastsearch() -> dict[str, str | bool | int]:
     """Get the status of the FastSearch service.
 
     Returns:
@@ -114,16 +113,12 @@ async def service_status_fastsearch() -> Dict[str, Union[str, bool, int]]:
         }
     except Exception as e:
         if hasattr(e, "winerror") and e.winerror == winerror.ERROR_SERVICE_DOES_NOT_EXIST:
-            return {
-                "status": "not_installed",
-                "installed": False,
-                "can_install": _is_admin()
-            }
+            return {"status": "not_installed", "installed": False, "can_install": _is_admin()}
         raise ServiceError(f"Failed to get service status: {e}") from e
 
 
 @mcp.tool
-async def service_start_fastsearch(dry_run: bool = False) -> Dict[str, Union[str, bool]]:
+async def service_start_fastsearch(dry_run: bool = False) -> dict[str, str | bool]:
     """SERVICE_START_FASTSEARCH — Start the FastSearch NTFS indexing Windows service.
 
     Requires local **Administrator** (elevated). Use ``service_status`` first to see
@@ -161,7 +156,7 @@ async def service_start_fastsearch(dry_run: bool = False) -> Dict[str, Union[str
 
 
 @mcp.tool
-async def service_stop_fastsearch(dry_run: bool = False) -> Dict[str, Union[str, bool]]:
+async def service_stop_fastsearch(dry_run: bool = False) -> dict[str, str | bool]:
     """SERVICE_STOP_FASTSEARCH — Stop the FastSearch indexing service (admin).
 
     Stopping the service pauses background indexing until started again; active MCP
@@ -195,7 +190,7 @@ async def service_stop_fastsearch(dry_run: bool = False) -> Dict[str, Union[str,
 
 
 @mcp.tool
-async def service_restart_fastsearch(dry_run: bool = False) -> Dict[str, Union[str, bool]]:
+async def service_restart_fastsearch(dry_run: bool = False) -> dict[str, str | bool]:
     """SERVICE_RESTART_FASTSEARCH — Restart FastSearch (single SCM restart call; admin).
 
     Equivalent to a stop+start from the perspective of dependent apps; brief outage while
@@ -230,8 +225,8 @@ async def service_restart_fastsearch(dry_run: bool = False) -> Dict[str, Union[s
 
 @mcp.tool
 async def service_install_fastsearch(
-    executable_path: Optional[str] = None, auto_start: bool = True
-) -> Dict[str, Union[str, bool]]:
+    executable_path: str | None = None, auto_start: bool = True
+) -> dict[str, str | bool]:
     """Install the FastSearch service.
 
     Args:
@@ -255,9 +250,7 @@ async def service_install_fastsearch(
             SERVICE_DISPLAY_NAME,
             displayName=SERVICE_DISPLAY_NAME,
             description=SERVICE_DESCRIPTION,
-            startType=win32service.SERVICE_AUTO_START
-            if auto_start
-            else win32service.SERVICE_DEMAND_START,
+            startType=win32service.SERVICE_AUTO_START if auto_start else win32service.SERVICE_DEMAND_START,
             exeName=f'"{executable_path}" service',
             exeArgs="run",
         )
@@ -287,7 +280,7 @@ async def service_install_fastsearch(
 
 
 @mcp.tool
-async def service_uninstall_fastsearch() -> Dict[str, Union[str, bool]]:
+async def service_uninstall_fastsearch() -> dict[str, str | bool]:
     """Uninstall the FastSearch service.
 
     Returns:
@@ -312,7 +305,7 @@ async def service_uninstall_fastsearch() -> Dict[str, Union[str, bool]]:
 
 
 @mcp.tool
-async def service_repair_fastsearch() -> Dict[str, Union[str, bool]]:
+async def service_repair_fastsearch() -> dict[str, str | bool]:
     """Repair the FastSearch service installation.
 
     This will reinstall the service with default settings.

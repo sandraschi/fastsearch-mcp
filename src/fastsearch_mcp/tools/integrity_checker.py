@@ -7,7 +7,6 @@ import os
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional, Union
 
 from fastsearch_mcp.logging_config import get_logger
 from fastsearch_mcp.mcp_instance import mcp
@@ -29,9 +28,9 @@ class FileIntegrityRecord:
     hash_algorithm: str
     hash_value: str
     last_checked: float = field(default_factory=time.time)
-    metadata: Dict = field(default_factory=dict)
+    metadata: dict = field(default_factory=dict)
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         """Convert record to dictionary."""
         return {
             "path": self.path,
@@ -44,7 +43,7 @@ class FileIntegrityRecord:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict) -> "FileIntegrityRecord":
+    def from_dict(cls, data: dict) -> "FileIntegrityRecord":
         """Create record from dictionary."""
         return cls(
             path=data["path"],
@@ -60,14 +59,14 @@ class FileIntegrityRecord:
 class FileIntegrityChecker:
     """File integrity checker that calculates and verifies file hashes."""
 
-    def __init__(self, db_path: Optional[str] = None):
+    def __init__(self, db_path: str | None = None):
         """Initialize the integrity checker.
 
         Args:
             db_path: Path to the integrity database file. If None, an in-memory database is used.
         """
         self.db_path = db_path
-        self.records: Dict[str, FileIntegrityRecord] = {}
+        self.records: dict[str, FileIntegrityRecord] = {}
         self._load_database()
 
     def _load_database(self) -> None:
@@ -80,8 +79,7 @@ class FileIntegrityChecker:
             with open(self.db_path, encoding="utf-8") as f:
                 data = json.load(f)
                 self.records = {
-                    record["path"]: FileIntegrityRecord.from_dict(record)
-                    for record in data.get("records", [])
+                    record["path"]: FileIntegrityRecord.from_dict(record) for record in data.get("records", [])
                 }
             logger.info("Loaded %d integrity records from %s", len(self.records), self.db_path)
         except Exception as e:
@@ -115,9 +113,7 @@ class FileIntegrityChecker:
             logger.error("Error saving integrity database: %s", e, exc_info=True)
             return False
 
-    def calculate_file_hash(
-        self, file_path: Union[str, Path], algorithm: str = DEFAULT_HASH_ALGORITHM
-    ) -> Optional[str]:
+    def calculate_file_hash(self, file_path: str | Path, algorithm: str = DEFAULT_HASH_ALGORITHM) -> str | None:
         """Calculate the hash of a file.
 
         Args:
@@ -144,10 +140,10 @@ class FileIntegrityChecker:
 
     def add_file(
         self,
-        file_path: Union[str, Path],
+        file_path: str | Path,
         algorithm: str = DEFAULT_HASH_ALGORITHM,
-        metadata: Optional[Dict] = None,
-    ) -> Optional[FileIntegrityRecord]:
+        metadata: dict | None = None,
+    ) -> FileIntegrityRecord | None:
         """Add a file to the integrity database.
 
         Args:
@@ -186,7 +182,7 @@ class FileIntegrityChecker:
             logger.debug("Error adding file %s to integrity database: %s", file_path, e)
             return None
 
-    def remove_file(self, file_path: Union[str, Path]) -> bool:
+    def remove_file(self, file_path: str | Path) -> bool:
         """Remove a file from the integrity database.
 
         Args:
@@ -201,7 +197,7 @@ class FileIntegrityChecker:
             return True
         return False
 
-    def verify_file(self, file_path: Union[str, Path]) -> Dict:
+    def verify_file(self, file_path: str | Path) -> dict:
         """Verify the integrity of a file.
 
         Args:
@@ -245,9 +241,7 @@ class FileIntegrityChecker:
                 }
 
             # Check modification time (as a quick check before hashing)
-            if (
-                abs(stat.st_mtime - record.mtime) > 1.0
-            ):  # Allow 1 second for time resolution differences
+            if abs(stat.st_mtime - record.mtime) > 1.0:  # Allow 1 second for time resolution differences
                 # File was modified, but we need to verify the content
                 pass
             else:
@@ -295,20 +289,20 @@ class FileIntegrityChecker:
         except OSError as e:
             return {
                 "status": "error",
-                "message": f"Error verifying file: {str(e)}",
+                "message": f"Error verifying file: {e!s}",
                 "path": file_path,
                 "record": record.to_dict(),
             }
 
     def scan_directory(
         self,
-        directory: Union[str, Path],
-        patterns: List[str] = None,
-        exclude_dirs: Optional[List[str]] = None,
+        directory: str | Path,
+        patterns: list[str] | None = None,
+        exclude_dirs: list[str] | None = None,
         algorithm: str = DEFAULT_HASH_ALGORITHM,
         update_existing: bool = False,
-        max_file_size: Optional[int] = None,
-    ) -> Dict[str, Dict]:
+        max_file_size: int | None = None,
+    ) -> dict[str, dict]:
         """Scan a directory and add/update files in the integrity database.
 
         Args:
@@ -388,9 +382,7 @@ class FileIntegrityChecker:
                         results["added"] += 1
                         status = "added"
 
-                    results["files"].append(
-                        {"path": file_path_str, "status": status, "record": record.to_dict()}
-                    )
+                    results["files"].append({"path": file_path_str, "status": status, "record": record.to_dict()})
                 else:
                     results["failed"] += 1
                     results["files"].append(
@@ -406,15 +398,15 @@ class FileIntegrityChecker:
 
 @mcp.tool
 async def check_file_integrity(
-    paths: List[str],
+    paths: list[str],
     database: str = "~/.fastsearch/integrity_db.json",
     algorithm: str = DEFAULT_HASH_ALGORITHM,
     update: bool = False,
     recursive: bool = True,
-    patterns: Optional[List[str]] = None,
-    exclude_dirs: Optional[List[str]] = None,
+    patterns: list[str] | None = None,
+    exclude_dirs: list[str] | None = None,
     max_file_size: int = 100,
-) -> Dict:
+) -> dict:
     """CHECK_FILE_INTEGRITY — Compare files on disk to a persisted hash database.
 
     **paths:** Each entry may be a **file** or a **directory**. Files are verified
@@ -512,9 +504,7 @@ async def check_file_integrity(
                     )
                 elif file_info["status"] == "skipped":
                     # For skipped files, verify them
-                    result = await _process_file_integrity(
-                        checker, file_info["path"], update, algorithm
-                    )
+                    result = await _process_file_integrity(checker, file_info["path"], update, algorithm)
                     results["checked"] += 1
 
                     if result["status"] == "verified":
@@ -544,9 +534,7 @@ async def check_file_integrity(
     return results
 
 
-async def _process_file_integrity(
-    checker: FileIntegrityChecker, file_path: str, update: bool, algorithm: str
-) -> Dict:
+async def _process_file_integrity(checker: FileIntegrityChecker, file_path: str, update: bool, algorithm: str) -> dict:
     """Process a single file for integrity checking."""
     try:
         # Verify the file
@@ -570,18 +558,18 @@ async def _process_file_integrity(
         return {
             "path": file_path,
             "status": "error",
-            "message": f"Error processing file: {str(e)}",
+            "message": f"Error processing file: {e!s}",
         }
 
 
 @mcp.tool
 async def generate_file_hashes(
-    paths: List[str],
+    paths: list[str],
     algorithm: str = DEFAULT_HASH_ALGORITHM,
     recursive: bool = False,
-    patterns: Optional[List[str]] = None,
-    exclude_dirs: Optional[List[str]] = None,
-) -> Dict:
+    patterns: list[str] | None = None,
+    exclude_dirs: list[str] | None = None,
+) -> dict:
     """Generate hash values for files.
 
     Calculates cryptographic hash values (checksums) for files using the specified
@@ -733,9 +721,7 @@ async def generate_file_hashes(
                         continue
 
                     try:
-                        hash_value = await asyncio.to_thread(
-                            _hash_file_sync, file_path_str, algorithm
-                        )
+                        hash_value = await asyncio.to_thread(_hash_file_sync, file_path_str, algorithm)
                         results["files"][file_path_str] = hash_value
                     except Exception as e:
                         results["errors"][file_path_str] = str(e)

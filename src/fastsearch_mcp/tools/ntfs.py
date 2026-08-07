@@ -7,7 +7,6 @@ This module provides tools for checking and maintaining the health of NTFS volum
 import ctypes
 import subprocess
 from ctypes import wintypes
-from typing import List
 
 import psutil
 import pywintypes
@@ -84,10 +83,7 @@ def _get_volume_handle(volume_path: str) -> int:
         if handle == win32file.INVALID_HANDLE_VALUE:
             # Get the last error using kernel32
             error_code = ctypes.windll.kernel32.GetLastError()
-            raise NtfsError(
-                f"Failed to open volume {volume_path} "
-                f"(tried {volume_name}): Windows error {error_code}"
-            )
+            raise NtfsError(f"Failed to open volume {volume_path} (tried {volume_name}): Windows error {error_code}")
 
         return handle
     except pywintypes.error as e:
@@ -100,17 +96,13 @@ def _get_volume_info(volume_path: str) -> dict:
     try:
         # Get volume data
         out_buf = bytearray(ctypes.sizeof(NTFS_VOLUME_DATA_BUFFER))
-        bytes_returned = win32file.DeviceIoControl(
-            handle, FSCTL_GET_NTFS_VOLUME_DATA, None, out_buf, None
-        )
+        bytes_returned = win32file.DeviceIoControl(handle, FSCTL_GET_NTFS_VOLUME_DATA, None, out_buf, None)
 
         if not bytes_returned:
             raise NtfsError("Failed to get NTFS volume data")
 
         # Parse volume data
-        vol_data = NTFS_VOLUME_DATA_BUFFER.from_buffer_copy(
-            out_buf[: ctypes.sizeof(NTFS_VOLUME_DATA_BUFFER)]
-        )
+        vol_data = NTFS_VOLUME_DATA_BUFFER.from_buffer_copy(out_buf[: ctypes.sizeof(NTFS_VOLUME_DATA_BUFFER)])
 
         # Calculate usage
         total_bytes = vol_data.TotalClusters * vol_data.BytesPerCluster
@@ -210,7 +202,7 @@ def _get_ntfs_permissions(volume_path: str) -> dict:
 
         for i in range(dacl.GetAceCount()):
             ace = dacl.GetAce(i)
-            ace_type, ace_flags, ace_mask, ace_sid = ace
+            ace_type, _ace_flags, _ace_mask, ace_sid = ace
 
             # Check for Everyone or Authenticated Users with deny ACEs
             if ace_type == win32security.ACCESS_DENIED_ACE_TYPE:
@@ -291,9 +283,7 @@ async def ntfs_check_health(volume_path: str) -> dict:
         return {
             "volume_path": volume_path,
             "health_score": health_score,
-            "health_status": (
-                "healthy" if health_score >= 80 else "warning" if health_score >= 50 else "critical"
-            ),
+            "health_status": ("healthy" if health_score >= 80 else "warning" if health_score >= 50 else "critical"),
             "volume_info": volume_info,
             "disk_errors": disk_errors,
             "permissions": permissions,
@@ -308,7 +298,7 @@ async def ntfs_check_health(volume_path: str) -> dict:
 
 
 @mcp.tool
-async def ntfs_list_volumes() -> List[dict]:
+async def ntfs_list_volumes() -> list[dict]:
     """List all NTFS volumes on the system.
 
     Returns:

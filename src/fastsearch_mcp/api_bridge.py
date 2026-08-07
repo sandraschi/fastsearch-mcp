@@ -55,13 +55,41 @@ def _detect_type(path: Path, raw: bytes) -> tuple[str, str]:
     """Return (type, mime). type is text, image, video, audio, or binary."""
     ext = path.suffix.lower() if path.suffix else ""
     if ext in IMAGE_EXTENSIONS:
-        mime = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png", "gif": "image/gif", "webp": "image/webp", "bmp": "image/bmp", "svg": "image/svg+xml", "ico": "image/x-icon"}.get(ext, "application/octet-stream")
+        mime = {
+            "jpg": "image/jpeg",
+            "jpeg": "image/jpeg",
+            "png": "image/png",
+            "gif": "image/gif",
+            "webp": "image/webp",
+            "bmp": "image/bmp",
+            "svg": "image/svg+xml",
+            "ico": "image/x-icon",
+        }.get(ext, "application/octet-stream")
         return "image", mime
     if ext in VIDEO_EXTENSIONS:
-        mime = {"mp4": "video/mp4", "webm": "video/webm", "mov": "video/quicktime", "avi": "video/x-msvideo", "mkv": "video/x-matroska", "m4v": "video/mp4"}.get(ext, "video/mp4")
+        mime = {
+            "mp4": "video/mp4",
+            "webm": "video/webm",
+            "mov": "video/quicktime",
+            "avi": "video/x-msvideo",
+            "mkv": "video/x-matroska",
+            "m4v": "video/mp4",
+        }.get(ext, "video/mp4")
         return "video", mime
     if ext in AUDIO_EXTENSIONS:
-        mime = "audio/mpeg" if ext == "mp3" else "audio/wav" if ext == "wav" else "audio/ogg" if ext == "ogg" else "audio/mp4" if ext in (".m4a", ".aac") else "audio/flac" if ext == "flac" else "application/octet-stream"
+        mime = (
+            "audio/mpeg"
+            if ext == "mp3"
+            else "audio/wav"
+            if ext == "wav"
+            else "audio/ogg"
+            if ext == "ogg"
+            else "audio/mp4"
+            if ext in (".m4a", ".aac")
+            else "audio/flac"
+            if ext == "flac"
+            else "application/octet-stream"
+        )
         return "audio", mime
     if ext in TEXT_EXTENSIONS or not ext:
         try:
@@ -258,6 +286,7 @@ async def llm_analyze(body: dict) -> dict:
         "3) practical recommendations (e.g. cleanup, archiving, security). Be concise and actionable. Output plain text, no code blocks unless listing paths."
     )
     import json as _json
+
     results_str = _json.dumps(search_results, indent=2) if search_results is not None else "{}"
     messages = [
         {"role": "system", "content": system_prompt},
@@ -312,6 +341,7 @@ async def llm_analyze_forensic(body: dict) -> dict:
     base_url = body.get("base_url") or (DEFAULT_OLLAMA_BASE if provider == "ollama" else DEFAULT_LMSTUDIO_BASE)
     base = base_url.rstrip("/")
     import json as _json
+
     results_str = _json.dumps(search_results, indent=2) if search_results is not None else "{}"
     user_content = (
         "Review this list of file search results (paths, names, sizes, dates). "
@@ -356,6 +386,7 @@ async def llm_analyze_forensic(body: dict) -> dict:
 # Live tests (pipe + real search) for webapp Tests page
 # ---------------------------------------------------------------------------
 
+
 @router.post("/tests/run")
 async def run_tests(body: dict | None = None) -> dict:
     """Run live integration tests: pipe connect, service info, real search via pipe.
@@ -363,6 +394,7 @@ async def run_tests(body: dict | None = None) -> dict:
     Body (optional): { "pattern": "*.txt", "directory": "C:\\\\", "max_results": 5 }
     """
     from fastsearch_mcp.live_tests import run_live_tests
+
     args = body or {}
     pattern = args.get("pattern", "*.txt")
     directory = args.get("directory", "C:\\")

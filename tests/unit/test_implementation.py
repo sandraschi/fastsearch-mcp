@@ -30,6 +30,7 @@ def test_service_client():
     status = client.get_service_status()
     print(f"Service status: {status}")
 
+
 def test_fastmcp_server():
     """Test the FastMCP server."""
     print("\n=== Testing FastMCP Server ===")
@@ -48,6 +49,7 @@ def test_fastmcp_server():
     except Exception as e:
         print(f"Error creating server: {e}")
 
+
 def main():
     """Main test function."""
     logging.basicConfig(level=logging.INFO)
@@ -59,6 +61,7 @@ def main():
     test_fastmcp_server()
 
     print("\n=== Test Complete ===")
+
 
 if __name__ == "__main__":
     main()

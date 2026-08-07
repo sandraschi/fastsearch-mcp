@@ -8,7 +8,7 @@ from .file_utils import find_files, get_file_info, is_binary_file, search_in_fil
 
 __all__ = [
     "find_files",
-    "search_in_file",
     "get_file_info",
     "is_binary_file",
+    "search_in_file",
 ]

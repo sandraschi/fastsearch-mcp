@@ -7,7 +7,7 @@ Supports basic, intermediate, and advanced detail levels.
 
 import inspect
 import logging
-from typing import Any, Dict, Optional
+from typing import Any
 
 from fastsearch_mcp.mcp_instance import mcp
 
@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 @mcp.tool
-async def help(tool_name: Optional[str] = None, level: str = "basic") -> Dict[str, Any]:
+async def help(tool_name: str | None = None, level: str = "basic") -> dict[str, Any]:
     """Get help for available tools with multilevel detail support.
 
     Provides comprehensive help for all FastSearch MCP tools with three detail levels:
@@ -65,7 +65,7 @@ async def help(tool_name: Optional[str] = None, level: str = "basic") -> Dict[st
         return _list_all_tools(level, tools_list)
 
 
-def _list_all_tools(level: str, tools_list: list) -> Dict[str, Any]:
+def _list_all_tools(level: str, tools_list: list) -> dict[str, Any]:
     """List all available tools with appropriate detail level."""
     tools = []
 
@@ -106,12 +106,8 @@ def _list_all_tools(level: str, tools_list: list) -> Dict[str, Any]:
                     params.append(
                         {
                             "name": param_name,
-                            "type": str(param.annotation)
-                            if param.annotation != inspect.Parameter.empty
-                            else "Any",
-                            "default": str(param.default)
-                            if param.default != inspect.Parameter.empty
-                            else None,
+                            "type": str(param.annotation) if param.annotation != inspect.Parameter.empty else "Any",
+                            "default": str(param.default) if param.default != inspect.Parameter.empty else None,
                             "required": param.default == inspect.Parameter.empty,
                         }
                     )
@@ -126,9 +122,7 @@ def _list_all_tools(level: str, tools_list: list) -> Dict[str, Any]:
                     }
                 )
         except Exception as e:
-            logger.debug(
-                "Error processing tool %s: %s", getattr(tool_func, "__name__", "unknown"), e
-            )
+            logger.debug("Error processing tool %s: %s", getattr(tool_func, "__name__", "unknown"), e)
             continue
 
     result = {
@@ -141,7 +135,7 @@ def _list_all_tools(level: str, tools_list: list) -> Dict[str, Any]:
     return result
 
 
-def _get_tool_help(tool_name: str, level: str, tools_list: list) -> Dict[str, Any]:
+def _get_tool_help(tool_name: str, level: str, tools_list: list) -> dict[str, Any]:
     """Get help for a specific tool with multilevel detail."""
     # Find the tool - try exact match first, then case-insensitive
     tool_func = None
@@ -162,9 +156,7 @@ def _get_tool_help(tool_name: str, level: str, tools_list: list) -> Dict[str, An
             "level": level,
             "error": "Tool not found",
             "available_tools": available,
-            "hint": f"Try one of: {', '.join(available[:10])}"
-            if available
-            else "No tools available",
+            "hint": f"Try one of: {', '.join(available[:10])}" if available else "No tools available",
         }
 
     doc = inspect.getdoc(tool_func) or "No description"
@@ -182,9 +174,7 @@ def _get_tool_help(tool_name: str, level: str, tools_list: list) -> Dict[str, An
             params.append(
                 {
                     "name": param_name,
-                    "type": str(param.annotation)
-                    if param.annotation != inspect.Parameter.empty
-                    else "Any",
+                    "type": str(param.annotation) if param.annotation != inspect.Parameter.empty else "Any",
                     "description": "",
                     "required": param.default == inspect.Parameter.empty,
                 }
@@ -195,9 +185,7 @@ def _get_tool_help(tool_name: str, level: str, tools_list: list) -> Dict[str, An
             "description": doc,
             "parameters": params,
             "returns": {
-                "type": str(sig.return_annotation)
-                if sig.return_annotation != inspect.Signature.empty
-                else "Any",
+                "type": str(sig.return_annotation) if sig.return_annotation != inspect.Signature.empty else "Any",
                 "description": "",
             },
         }
@@ -207,12 +195,8 @@ def _get_tool_help(tool_name: str, level: str, tools_list: list) -> Dict[str, An
             params.append(
                 {
                     "name": param_name,
-                    "type": str(param.annotation)
-                    if param.annotation != inspect.Parameter.empty
-                    else "Any",
-                    "default": str(param.default)
-                    if param.default != inspect.Parameter.empty
-                    else None,
+                    "type": str(param.annotation) if param.annotation != inspect.Parameter.empty else "Any",
+                    "default": str(param.default) if param.default != inspect.Parameter.empty else None,
                     "required": param.default == inspect.Parameter.empty,
                 }
             )
@@ -222,9 +206,7 @@ def _get_tool_help(tool_name: str, level: str, tools_list: list) -> Dict[str, An
             "description": doc,
             "parameters": params,
             "returns": {
-                "type": str(sig.return_annotation)
-                if sig.return_annotation != inspect.Signature.empty
-                else "Any",
+                "type": str(sig.return_annotation) if sig.return_annotation != inspect.Signature.empty else "Any",
                 "description": "",
             },
             "examples": _get_examples(tool_name),

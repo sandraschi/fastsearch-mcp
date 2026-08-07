@@ -10,14 +10,14 @@ import logging
 import re
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from fastsearch_mcp.mcp_instance import mcp
 
 logger = logging.getLogger(__name__)
 
 
-def _parse_date(date_str: str) -> Optional[float]:
+def _parse_date(date_str: str) -> float | None:
     """Parse date string to timestamp."""
     if not date_str:
         return None
@@ -61,21 +61,21 @@ def _matches_pattern(path: str, pattern: str) -> bool:
 
 @mcp.tool
 async def search_result_filter(
-    results: List[Dict[str, Any]],
-    min_size: Optional[int] = None,
-    max_size: Optional[int] = None,
-    min_size_mb: Optional[float] = None,
-    max_size_mb: Optional[float] = None,
-    modified_after: Optional[str] = None,
-    modified_before: Optional[str] = None,
-    created_after: Optional[str] = None,
-    created_before: Optional[str] = None,
-    file_types: Optional[List[str]] = None,
-    path_pattern: Optional[str] = None,
-    exclude_path_pattern: Optional[str] = None,
-    min_depth: Optional[int] = None,
-    max_depth: Optional[int] = None,
-) -> Dict[str, Any]:
+    results: list[dict[str, Any]],
+    min_size: int | None = None,
+    max_size: int | None = None,
+    min_size_mb: float | None = None,
+    max_size_mb: float | None = None,
+    modified_after: str | None = None,
+    modified_before: str | None = None,
+    created_after: str | None = None,
+    created_before: str | None = None,
+    file_types: list[str] | None = None,
+    path_pattern: str | None = None,
+    exclude_path_pattern: str | None = None,
+    min_depth: int | None = None,
+    max_depth: int | None = None,
+) -> dict[str, Any]:
     """Filter search results by various criteria without performing a new search.
 
     Further filters already-obtained search results by size, date ranges, file
@@ -361,9 +361,7 @@ async def search_result_filter(
                     if max_depth is not None and depth > max_depth:
                         continue
                     if "depth" not in filters_applied:
-                        filters_applied.append(
-                            f"depth: {min_depth or 0}-{max_depth or 'unlimited'}"
-                        )
+                        filters_applied.append(f"depth: {min_depth or 0}-{max_depth or 'unlimited'}")
                 except Exception:
                     pass
 
@@ -387,7 +385,7 @@ async def search_result_filter(
         logger.error(f"Error filtering search results: {e}", exc_info=True)
         return {
             "success": False,
-            "error": f"Failed to filter search results: {str(e)}",
+            "error": f"Failed to filter search results: {e!s}",
             "filtered_results": [],
             "count": 0,
             "original_count": len(results) if results else 0,

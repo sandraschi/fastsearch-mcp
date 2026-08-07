@@ -9,7 +9,7 @@ import logging
 from collections import Counter, defaultdict
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 from fastsearch_mcp.mcp_instance import mcp
 
@@ -43,13 +43,13 @@ def _format_size(size_bytes: int) -> str:
 
 @mcp.tool
 async def search_result_analyze(
-    results: List[Dict[str, Any]],
+    results: list[dict[str, Any]],
     include_file_types: bool = True,
     include_size_stats: bool = True,
     include_location_patterns: bool = True,
     include_date_patterns: bool = True,
     top_n: int = 10,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Analyze patterns in search results to provide actionable insights.
 
     Transforms raw search results into structured insights including file type
@@ -195,7 +195,7 @@ async def search_result_analyze(
                         pass
 
         # Build analysis results
-        analysis: Dict[str, Any] = {
+        analysis: dict[str, Any] = {
             "success": True,
             "total_files": total_files,
             "total_size": total_size,
@@ -244,9 +244,7 @@ async def search_result_analyze(
             top_dirs = directories.most_common(top_n)
             top_dirs_by_size = []
             if directory_sizes:
-                top_dirs_by_size = sorted(
-                    directory_sizes.items(), key=lambda x: x[1], reverse=True
-                )[:top_n]
+                top_dirs_by_size = sorted(directory_sizes.items(), key=lambda x: x[1], reverse=True)[:top_n]
 
             location_patterns = {
                 "top_directories_by_count": [
@@ -266,7 +264,7 @@ async def search_result_analyze(
 
         # Date patterns
         if include_date_patterns:
-            date_patterns: Dict[str, Any] = {}
+            date_patterns: dict[str, Any] = {}
             if modified_dates:
                 modified_dates_sorted = sorted(modified_dates)
                 oldest_modified = datetime.fromtimestamp(modified_dates_sorted[0])
@@ -296,18 +294,14 @@ async def search_result_analyze(
             if most_common_ext[1] > total_files * 0.5:
                 ext_name = most_common_ext[0]
                 ext_count = most_common_ext[1]
-                insights.append(
-                    f"Most files ({ext_count}/{total_files}) are {ext_name} files"
-                )
+                insights.append(f"Most files ({ext_count}/{total_files}) are {ext_name} files")
 
         if include_size_stats and sizes:
             if total_size > 1024 * 1024 * 1024:  # > 1GB
                 insights.append(f"Total size is {_format_size(total_size)} - consider cleanup")
             largest_files = sorted(sizes, reverse=True)[:3]
             if largest_files and largest_files[0] > 100 * 1024 * 1024:  # > 100MB
-                insights.append(
-                    f"Largest files are {_format_size(largest_files[0])} - review for optimization"
-                )
+                insights.append(f"Largest files are {_format_size(largest_files[0])} - review for optimization")
 
         if include_location_patterns and directories:
             top_dir = directories.most_common(1)[0]
@@ -329,7 +323,7 @@ async def search_result_analyze(
         logger.error(f"Error analyzing search results: {e}", exc_info=True)
         return {
             "success": False,
-            "error": f"Failed to analyze search results: {str(e)}",
+            "error": f"Failed to analyze search results: {e!s}",
             "total_files": 0,
             "total_size": 0,
         }

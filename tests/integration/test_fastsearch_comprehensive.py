@@ -17,7 +17,7 @@ import sys
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
@@ -41,7 +41,7 @@ class TestResults:
         self.passed = 0
         self.failed = 0
         self.skipped = 0
-        self.errors: List[Dict[str, Any]] = []
+        self.errors: list[dict[str, Any]] = []
         self.total_tests = 0
         self.completed_tests = 0
 
@@ -269,7 +269,9 @@ async def test_extension_lengths():
         for pattern, desc in extensions:
             try:
                 if hasattr(tool, "fn"):
-                    result = await (tool.fn if hasattr(tool, "fn") else tool)(pattern=pattern, path="D:\\", max_results=5)
+                    result = await (tool.fn if hasattr(tool, "fn") else tool)(
+                        pattern=pattern, path="D:\\", max_results=5
+                    )
                 else:
                     result = await tool(pattern=pattern, path="D:\\", max_results=5)
 
@@ -283,7 +285,7 @@ async def test_extension_lengths():
                     results_summary.append(f"{pattern}: FAILED - {result.get('error', 'Unknown')}")
                     all_passed = False
             except Exception as e:
-                results_summary.append(f"{pattern}: EXCEPTION - {str(e)}")
+                results_summary.append(f"{pattern}: EXCEPTION - {e!s}")
                 all_passed = False
 
         duration = time.time() - start
@@ -524,7 +526,7 @@ async def test_speed_benchmark():
 
 async def test_unlimited_results_performance():
     """Test unlimited results performance over millions of files.
-    
+
     This test searches for common file patterns with unlimited results
     to validate performance on large-scale searches. Tests the core
     value proposition of FastSearch - handling millions of files efficiently.
@@ -533,23 +535,23 @@ async def test_unlimited_results_performance():
     print(f"\n>>> Running: {test_name}...")
     print("   This test may take several minutes on large drives...")
     sys.stdout.flush()
-    
+
     # Test patterns that typically match many files
     test_patterns = [
         ("*.dll", "DLL files (system files)"),
         ("*.exe", "Executable files"),
         ("*.txt", "Text files"),
     ]
-    
+
     # Test on C: drive (typically has most files)
     test_drive = "C:\\"
-    
+
     all_results = []
-    
+
     for pattern, description in test_patterns:
         print(f"\n   Testing: {pattern} ({description})")
         sys.stdout.flush()
-        
+
         start = time.time()
         try:
             tool = fastsearch_search
@@ -558,73 +560,66 @@ async def test_unlimited_results_performance():
                     pattern=pattern,
                     path=test_drive,
                     max_results=0,  # Unlimited results
-                    search_all=False
+                    search_all=False,
                 )
             else:
                 result = await tool(
                     pattern=pattern,
                     path=test_drive,
                     max_results=0,  # Unlimited results
-                    search_all=False
+                    search_all=False,
                 )
-            
+
             duration = time.time() - start
-            
+
             if result.get("success"):
                 count = result.get("count", 0)
                 files_per_sec = count / duration if duration > 0 else 0
-                
+
                 # Format large numbers
                 count_str = f"{count:,}" if count >= 1000 else str(count)
-                duration_str = f"{duration:.2f}s" if duration >= 1 else f"{duration*1000:.0f}ms"
-                
+                duration_str = f"{duration:.2f}s" if duration >= 1 else f"{duration * 1000:.0f}ms"
+
                 print(f"      Found: {count_str} files in {duration_str}")
                 print(f"      Speed: {files_per_sec:,.0f} files/sec")
-                
-                all_results.append({
-                    "pattern": pattern,
-                    "count": count,
-                    "duration": duration,
-                    "files_per_sec": files_per_sec,
-                    "success": True
-                })
+
+                all_results.append(
+                    {
+                        "pattern": pattern,
+                        "count": count,
+                        "duration": duration,
+                        "files_per_sec": files_per_sec,
+                        "success": True,
+                    }
+                )
             else:
                 error_msg = result.get("error", "Unknown error")
                 print(f"      FAILED: {error_msg}")
-                all_results.append({
-                    "pattern": pattern,
-                    "success": False,
-                    "error": error_msg
-                })
-                
+                all_results.append({"pattern": pattern, "success": False, "error": error_msg})
+
         except Exception as e:
             duration = time.time() - start
-            print(f"      EXCEPTION: {str(e)}")
-            all_results.append({
-                "pattern": pattern,
-                "success": False,
-                "error": str(e),
-                "duration": duration
-            })
-    
+            print(f"      EXCEPTION: {e!s}")
+            all_results.append({"pattern": pattern, "success": False, "error": str(e), "duration": duration})
+
     # Summary
     successful_tests = [r for r in all_results if r.get("success")]
     failed_tests = [r for r in all_results if not r.get("success")]
-    
+
     if successful_tests:
         total_files = sum(r["count"] for r in successful_tests)
         total_duration = sum(r["duration"] for r in successful_tests)
         avg_files_per_sec = sum(r["files_per_sec"] for r in successful_tests) / len(successful_tests)
-        
+
         details = (
             f"Total: {total_files:,} files in {total_duration:.1f}s | "
             f"Avg: {avg_files_per_sec:,.0f} files/sec | "
             f"Patterns: {len(successful_tests)}/{len(test_patterns)}"
         )
-        
+
         if failed_tests:
             details += f" | {len(failed_tests)} failed"
-        
+
         results.add_pass(test_name, total_duration, details)
         return True
     else:

@@ -5,13 +5,13 @@ import re
 import stat
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from fastsearch_mcp.mcp_instance import mcp
 from fastsearch_mcp.utils.file_utils import find_files, search_in_file
 
 
-def parse_date_filter(date_str: str) -> Optional[float]:
+def parse_date_filter(date_str: str) -> float | None:
     """Parse date string to timestamp for filtering."""
     if not date_str:
         return None
@@ -51,7 +51,7 @@ def parse_date_filter(date_str: str) -> Optional[float]:
     return None
 
 
-def check_file_attributes(file_path: Path, required_attrs: List[str]) -> bool:
+def check_file_attributes(file_path: Path, required_attrs: list[str]) -> bool:
     """Check if file has required attributes."""
     if not required_attrs:
         return True
@@ -100,7 +100,7 @@ async def file_content_search(
     search_pattern: str,
     search_dir: str,
     file_pattern: str = "*",
-    exclude_dirs: Optional[List[str]] = None,
+    exclude_dirs: list[str] | None = None,
     case_sensitive: bool = False,
     whole_word: bool = False,
     max_results: int = 100,
@@ -108,18 +108,18 @@ async def file_content_search(
     max_file_size_mb: int = 10,
     skip_binary: bool = True,
     min_file_size_mb: int = 0,
-    modified_after: Optional[str] = None,
-    modified_before: Optional[str] = None,
-    created_after: Optional[str] = None,
-    created_before: Optional[str] = None,
-    accessed_after: Optional[str] = None,
-    accessed_before: Optional[str] = None,
+    modified_after: str | None = None,
+    modified_before: str | None = None,
+    created_after: str | None = None,
+    created_before: str | None = None,
+    accessed_after: str | None = None,
+    accessed_before: str | None = None,
     include_hidden: bool = False,
     files_only: bool = True,
     directories_only: bool = False,
-    file_attributes: Optional[List[str]] = None,
-    owner: Optional[str] = None,
-) -> Dict[str, Any]:
+    file_attributes: list[str] | None = None,
+    owner: str | None = None,
+) -> dict[str, Any]:
     """Search for text patterns in files.
 
     Searches for text patterns within file contents using regex support, with
@@ -301,13 +301,20 @@ async def file_content_search(
 
     # Validate date filters before searching (fail fast on bad input)
     date_fields = {
-        "modified_after": modified_after, "modified_before": modified_before,
-        "created_after": created_after, "created_before": created_before,
-        "accessed_after": accessed_after, "accessed_before": accessed_before,
+        "modified_after": modified_after,
+        "modified_before": modified_before,
+        "created_after": created_after,
+        "created_before": created_before,
+        "accessed_after": accessed_after,
+        "accessed_before": accessed_before,
     }
     for name, val in date_fields.items():
         if val is not None and parse_date_filter(val) is None:
-            return {"status": "error", "error": f"Invalid date format for {name}: '{val}'. Use YYYY-MM-DD or relative (7d, 1h, 30m).", "matches": []}
+            return {
+                "status": "error",
+                "error": f"Invalid date format for {name}: '{val}'. Use YYYY-MM-DD or relative (7d, 1h, 30m).",
+                "matches": [],
+            }
 
     return await asyncio.to_thread(
         _search_sync,
@@ -340,7 +347,7 @@ def _search_sync(
     search_pattern: str,
     search_dir: str,
     file_pattern: str = "*",
-    exclude_dirs: Optional[List[str]] = None,
+    exclude_dirs: list[str] | None = None,
     case_sensitive: bool = False,
     whole_word: bool = False,
     max_results: int = 100,
@@ -348,18 +355,18 @@ def _search_sync(
     max_file_size_mb: int = 10,
     skip_binary: bool = True,
     min_file_size_mb: int = 0,
-    modified_after: Optional[str] = None,
-    modified_before: Optional[str] = None,
-    created_after: Optional[str] = None,
-    created_before: Optional[str] = None,
-    accessed_after: Optional[str] = None,
-    accessed_before: Optional[str] = None,
+    modified_after: str | None = None,
+    modified_before: str | None = None,
+    created_after: str | None = None,
+    created_before: str | None = None,
+    accessed_after: str | None = None,
+    accessed_before: str | None = None,
     include_hidden: bool = False,
     files_only: bool = True,
     directories_only: bool = False,
-    file_attributes: Optional[List[str]] = None,
-    owner: Optional[str] = None,
-) -> Dict[str, Any]:
+    file_attributes: list[str] | None = None,
+    owner: str | None = None,
+) -> dict[str, Any]:
     """Synchronous implementation of file search."""
     if exclude_dirs is None:
         exclude_dirs = []
@@ -384,9 +391,7 @@ def _search_sync(
     file_regex = file_pattern
 
     # Convert exclude_dirs to regex pattern
-    exclude_pattern = "|\\.".join(
-        re.escape(d).replace("*", ".*").replace("?", ".") for d in exclude_dirs
-    )
+    exclude_pattern = "|\\.".join(re.escape(d).replace("*", ".*").replace("?", ".") for d in exclude_dirs)
 
     # Find all matching files
     files = list(
@@ -502,10 +507,7 @@ def _search_sync(
 
         # Update progress periodically
         if files_searched % 100 == 0:
-            print(
-                f"Searched {files_searched}/{len(files)} files, "
-                f"found {total_matches} matches..."
-            )
+            print(f"Searched {files_searched}/{len(files)} files, found {total_matches} matches...")
 
     return {
         "status": "completed",

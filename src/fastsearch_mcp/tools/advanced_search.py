@@ -3,7 +3,7 @@
 import asyncio
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 try:
     import psutil
@@ -27,7 +27,7 @@ def _ntfs_time_to_timestamp(ntfs_time: int) -> int:
     return (ntfs_time // 10000000) - 11644473600
 
 
-def _parse_date_filter(date_str: str) -> Optional[int]:
+def _parse_date_filter(date_str: str) -> int | None:
     """Parse date string to NTFS timestamp (100-nanosecond intervals since 1601-01-01)."""
     if not date_str:
         return None
@@ -85,7 +85,7 @@ def _parse_date_filter(date_str: str) -> Optional[int]:
         return None
 
 
-def _get_ntfs_drives() -> List[str]:
+def _get_ntfs_drives() -> list[str]:
     """Get all NTFS drive letters on the system."""
     drives = []
     if psutil:
@@ -122,21 +122,21 @@ async def _search_via_pipe_advanced(
     pattern: str,
     directory: str,
     max_results: int,
-    min_size: Optional[int] = None,
-    max_size: Optional[int] = None,
-    created_after: Optional[str] = None,
-    created_before: Optional[str] = None,
-    modified_after: Optional[str] = None,
-    modified_before: Optional[str] = None,
-    accessed_after: Optional[str] = None,
-    accessed_before: Optional[str] = None,
+    min_size: int | None = None,
+    max_size: int | None = None,
+    created_after: str | None = None,
+    created_before: str | None = None,
+    modified_after: str | None = None,
+    modified_before: str | None = None,
+    accessed_after: str | None = None,
+    accessed_before: str | None = None,
     include_directories: bool = False,
     include_readonly: bool = True,
     include_hidden: bool = False,
     include_system: bool = False,
     include_compressed: bool = True,
     include_encrypted: bool = True,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """Search files via named pipe with advanced filters."""
     if not is_service_running():
         logger.warning("FastSearch service is not running")
@@ -149,7 +149,7 @@ async def _search_via_pipe_advanced(
                 return []
 
             # Build request with all filters
-            request: Dict[str, Any] = {
+            request: dict[str, Any] = {
                 "command": "search_files",
                 "pattern": pattern,
                 "directory": directory,
@@ -202,7 +202,7 @@ async def _search_via_pipe_advanced(
                 # Convert NTFS timestamps to Unix timestamps for readability
                 for result in results:
                     for time_key in ["created", "modified", "accessed", "mft_modified"]:
-                        if time_key in result and result[time_key]:
+                        if result.get(time_key):
                             result[f"{time_key}_unix"] = _ntfs_time_to_timestamp(result[time_key])
                 return results
             else:
@@ -221,21 +221,21 @@ async def fastsearch_search_advanced(
     path: str = "C:\\",
     search_all: bool = False,
     max_results: int = 100,
-    min_size: Optional[int] = None,
-    max_size: Optional[int] = None,
-    created_after: Optional[str] = None,
-    created_before: Optional[str] = None,
-    modified_after: Optional[str] = None,
-    modified_before: Optional[str] = None,
-    accessed_after: Optional[str] = None,
-    accessed_before: Optional[str] = None,
+    min_size: int | None = None,
+    max_size: int | None = None,
+    created_after: str | None = None,
+    created_before: str | None = None,
+    modified_after: str | None = None,
+    modified_before: str | None = None,
+    accessed_after: str | None = None,
+    accessed_before: str | None = None,
     include_directories: bool = False,
     include_readonly: bool = True,
     include_hidden: bool = False,
     include_system: bool = False,
     include_compressed: bool = True,
     include_encrypted: bool = True,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Advanced file search using all available NTFS MFT attributes.
 
     Comprehensive file search with filtering by size, timestamps, file attributes,
@@ -409,11 +409,18 @@ async def fastsearch_search_advanced(
 
     # Validate date filters before searching (fail fast on bad input)
     date_fields = {
-        "created_after": created_after, "created_before": created_before,
-        "modified_after": modified_after, "modified_before": modified_before,
-        "accessed_after": accessed_after, "accessed_before": accessed_before,
+        "created_after": created_after,
+        "created_before": created_before,
+        "modified_after": modified_after,
+        "modified_before": modified_before,
+        "accessed_after": accessed_after,
+        "accessed_before": accessed_before,
     }
-    date_errors = [f"Invalid date format for {name}: '{val}'" for name, val in date_fields.items() if val is not None and _parse_date_filter(val) is None]
+    date_errors = [
+        f"Invalid date format for {name}: '{val}'"
+        for name, val in date_fields.items()
+        if val is not None and _parse_date_filter(val) is None
+    ]
     if date_errors:
         return {"success": False, "error": "; ".join(date_errors), "results": [], "count": 0}
 
@@ -421,10 +428,7 @@ async def fastsearch_search_advanced(
         # Determine if we should search all drives
         if search_all or path in ("*", "all", "ALL"):
             drives = _get_ntfs_drives()
-            logger.info(
-                f"Advanced search on all NTFS drives ({len(drives)} drives) "
-                f"for pattern: {pattern}"
-            )
+            logger.info(f"Advanced search on all NTFS drives ({len(drives)} drives) for pattern: {pattern}")
 
             all_results = []
             drive_results = {}
@@ -454,18 +458,15 @@ async def fastsearch_search_advanced(
                                 include_compressed=include_compressed,
                                 include_encrypted=include_encrypted,
                             ),
-                            timeout=30.0
+                            timeout=30.0,
                         )
                         if drive_result:
                             all_results.extend(drive_result)
                             drive_results[drive] = len(drive_result)
                         else:
                             drive_results[drive] = 0
-                    except asyncio.TimeoutError:
-                        logger.warning(
-                            f"Advanced search on drive {drive} "
-                            "timed out after 30 seconds"
-                        )
+                    except TimeoutError:
+                        logger.warning(f"Advanced search on drive {drive} timed out after 30 seconds")
                         drive_results[drive] = {"error": "Timeout after 30 seconds"}
                 except Exception as e:
                     logger.warning(f"Error searching drive {drive}: {e}")

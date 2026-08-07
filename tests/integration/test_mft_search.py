@@ -1,8 +1,9 @@
 """Test NTFS MFT search functionality via the service."""
+
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent / 'src'))
+sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 import asyncio
 import json
@@ -30,12 +31,7 @@ async def test_mft_search():
 
         # Test 1: Simple pattern search
         print("2. Testing simple pattern search (*.txt)...")
-        request = {
-            "command": "search_files",
-            "pattern": "*.txt",
-            "directory": "C:\\Windows",
-            "max_results": 10
-        }
+        request = {"command": "search_files", "pattern": "*.txt", "directory": "C:\\Windows", "max_results": 10}
 
         response = await client.send_request(request)
         if response:
@@ -55,12 +51,7 @@ async def test_mft_search():
 
         # Test 2: Specific file search
         print("3. Testing specific file search (notepad.exe)...")
-        request = {
-            "command": "search_files",
-            "pattern": "notepad.exe",
-            "directory": "C:\\Windows",
-            "max_results": 5
-        }
+        request = {"command": "search_files", "pattern": "notepad.exe", "directory": "C:\\Windows", "max_results": 5}
 
         response = await client.send_request(request)
         if response:
@@ -81,7 +72,7 @@ async def test_mft_search():
             "command": "search_files",
             "pattern": "*.dll",
             "directory": "C:\\Windows\\System32",
-            "max_results": 5
+            "max_results": 5,
         }
 
         response = await client.send_request(request)
@@ -103,9 +94,9 @@ async def test_mft_search():
     except Exception as e:
         print(f"[ERROR] {type(e).__name__}: {e}")
         import traceback
+
         traceback.print_exc()
 
 
 if __name__ == "__main__":
     asyncio.run(test_mft_search())
-

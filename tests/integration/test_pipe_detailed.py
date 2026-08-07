@@ -1,8 +1,9 @@
 """Detailed pipe connection test with error reporting."""
+
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent / 'src'))
+sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 import asyncio
 import traceback
@@ -36,7 +37,7 @@ async def test():
     print()
     print("2. Testing ping command...")
     try:
-        response = await client.send_request({'command': 'ping'})
+        response = await client.send_request({"command": "ping"})
         if response:
             print(f"   [OK] Got response: {response}")
         else:
@@ -52,7 +53,7 @@ async def test():
     print()
     print("3. Testing get_service_info command...")
     try:
-        response = await client.send_request({'command': 'get_service_info'})
+        response = await client.send_request({"command": "get_service_info"})
         if response:
             print(f"   [OK] Got response: {response}")
         else:
@@ -77,4 +78,3 @@ async def test():
 
 if __name__ == "__main__":
     asyncio.run(test())
-

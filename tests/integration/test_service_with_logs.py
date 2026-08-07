@@ -8,6 +8,7 @@ This script will:
 4. Test pipe connection
 5. Stop the service
 """
+
 import asyncio
 import ctypes
 import sys
@@ -15,7 +16,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 # Add src to path
-sys.path.insert(0, str(Path(__file__).parent / 'src'))
+sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from fastsearch_mcp.pipe_client import get_service_info_via_pipe, test_pipe_connection
 from fastsearch_mcp.service_client import (
@@ -42,9 +43,9 @@ def read_service_event_logs(service_name: str = "FastSearchMCP", minutes: int = 
         import win32evtlog
         import win32evtlogutil
 
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"Reading Event Logs for {service_name} (last {minutes} minutes)")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
 
         # Open Application log
         hand = win32evtlog.OpenEventLog(None, "Application")
@@ -71,7 +72,7 @@ def read_service_event_logs(service_name: str = "FastSearchMCP", minutes: int = 
 
                     for event in event_logs:
                         # Check if event is from our service
-                        source = event.SourceName if hasattr(event, 'SourceName') else ''
+                        source = event.SourceName if hasattr(event, "SourceName") else ""
                         if service_name.lower() not in source.lower():
                             continue
 
@@ -86,7 +87,7 @@ def read_service_event_logs(service_name: str = "FastSearchMCP", minutes: int = 
                             win32con.EVENTLOG_WARNING_TYPE: "WARNING",
                             win32con.EVENTLOG_INFORMATION_TYPE: "INFO",
                             win32con.EVENTLOG_AUDIT_SUCCESS: "AUDIT_SUCCESS",
-                            win32con.EVENTLOG_AUDIT_FAILURE: "AUDIT_FAILURE"
+                            win32con.EVENTLOG_AUDIT_FAILURE: "AUDIT_FAILURE",
                         }
                         event_type = event_type_map.get(event.EventType, "UNKNOWN")
 
@@ -96,13 +97,15 @@ def read_service_event_logs(service_name: str = "FastSearchMCP", minutes: int = 
                         except Exception:
                             message = "Could not format message"
 
-                        events.append({
-                            'time': event_time.strftime('%Y-%m-%d %H:%M:%S'),
-                            'type': event_type,
-                            'source': source,
-                            'event_id': event.EventID,
-                            'message': message
-                        })
+                        events.append(
+                            {
+                                "time": event_time.strftime("%Y-%m-%d %H:%M:%S"),
+                                "type": event_type,
+                                "source": source,
+                                "event_id": event.EventID,
+                                "message": message,
+                            }
+                        )
                         count += 1
 
                 except Exception as e:
@@ -232,5 +235,5 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"\n\nERROR: {e}")
         import traceback
-        traceback.print_exc()
 
+        traceback.print_exc()

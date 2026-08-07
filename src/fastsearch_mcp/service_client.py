@@ -9,7 +9,7 @@ import asyncio
 import subprocess
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from .logging_config import get_logger
 from .pipe_client import (
@@ -22,18 +22,13 @@ from .pipe_client import (
 logger = get_logger(__name__)
 
 # Cache for service status to avoid slow checks on every search
-_service_status_cache: Optional[Tuple[bool, float]] = None  # (is_running, timestamp)
+_service_status_cache: tuple[bool, float] | None = None  # (is_running, timestamp)
 _CACHE_TTL = 2.0  # Cache for 2 seconds - fast enough for rapid searches, fresh enough
 
 # Service configuration
 SERVICE_NAME = "FastSearchMCP"
 SERVICE_EXECUTABLE = (
-    Path(__file__).parent.parent.parent
-    / "service"
-    / "build"
-    / "bin"
-    / "Release"
-    / "FastSearchServiceNew.exe"
+    Path(__file__).parent.parent.parent / "service" / "build" / "bin" / "Release" / "FastSearchServiceNew.exe"
 )
 
 
@@ -106,7 +101,7 @@ def is_service_running() -> bool:
         return False
 
 
-async def get_service_status() -> Dict[str, Any]:
+async def get_service_status() -> dict[str, Any]:
     """Get detailed status of the FastSearch C++ service.
 
     Returns:
@@ -184,10 +179,10 @@ async def search_files(
     pattern: str,
     directory: str = ".",
     max_results: int = 100,
-    pagination_mode: Optional[str] = None,
+    pagination_mode: str | None = None,
     page: int = 1,
     page_size: int = 1000,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Search for files using the FastSearch C++ service via direct NTFS MFT access.
 
     This function REQUIRES the FastSearch service to be running. It does NOT fall back
@@ -344,7 +339,7 @@ async def stop_service() -> bool:
         return False
 
 
-async def test_service_connection() -> Dict[str, Any]:
+async def test_service_connection() -> dict[str, Any]:
     """Test the connection to the FastSearch service.
 
     Returns:

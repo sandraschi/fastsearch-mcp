@@ -9,29 +9,23 @@ import json
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent / 'src'))
+sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from fastsearch_mcp import FastSearchServer
 
 
-async def simulate_claude_request(server: FastSearchServer, method: str, params: dict = None):
+async def simulate_claude_request(server: FastSearchServer, method: str, params: dict | None = None):
     """Simulate a JSON-RPC request from Claude Desktop."""
-    request = {
-        "jsonrpc": "2.0",
-        "method": method,
-        "params": params or {},
-        "id": 1
-    }
 
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print("Simulating Claude Desktop Request")
-    print(f"{'='*70}")
+    print(f"{'=' * 70}")
     print(f"Method: {method}")
     print(f"Params: {json.dumps(params, indent=2)}")
-    print(f"{'='*70}\n")
+    print(f"{'=' * 70}\n")
 
     # FastMCP handles this internally, but we can test tool execution directly
-    app = server.get_app()
+    server.get_app()
 
     # For tools/call, we need to execute the tool
     if method == "tools/call":
@@ -59,14 +53,7 @@ async def simulate_claude_request(server: FastSearchServer, method: str, params:
                 response = {
                     "jsonrpc": "2.0",
                     "id": 1,
-                    "result": {
-                        "content": [
-                            {
-                                "type": "text",
-                                "text": json.dumps(result, indent=2, default=str)
-                            }
-                        ]
-                    }
+                    "result": {"content": [{"type": "text", "text": json.dumps(result, indent=2, default=str)}]},
                 }
 
                 print("[OK] Tool executed successfully")
@@ -74,24 +61,14 @@ async def simulate_claude_request(server: FastSearchServer, method: str, params:
                 print(json.dumps(response, indent=2))
                 return response
             except Exception as e:
-                response = {
-                    "jsonrpc": "2.0",
-                    "id": 1,
-                    "error": {
-                        "code": -32603,
-                        "message": str(e)
-                    }
-                }
+                response = {"jsonrpc": "2.0", "id": 1, "error": {"code": -32603, "message": str(e)}}
                 print(f"[ERROR] Tool execution failed: {e}")
                 return response
         else:
             response = {
                 "jsonrpc": "2.0",
                 "id": 1,
-                "error": {
-                    "code": -32601,
-                    "message": f"Tool '{tool_name}' not found"
-                }
+                "error": {"code": -32601, "message": f"Tool '{tool_name}' not found"},
             }
             print(f"[ERROR] Tool not found: {tool_name}")
             return response
@@ -115,14 +92,15 @@ async def main():
     print("\n" + "=" * 70)
     print("Test 1: Initialize")
     print("=" * 70)
-    await simulate_claude_request(server, "initialize", {
-        "protocolVersion": "2024-11-05",
-        "capabilities": {},
-        "clientInfo": {
-            "name": "claude-desktop",
-            "version": "1.0.0"
-        }
-    })
+    await simulate_claude_request(
+        server,
+        "initialize",
+        {
+            "protocolVersion": "2024-11-05",
+            "capabilities": {},
+            "clientInfo": {"name": "claude-desktop", "version": "1.0.0"},
+        },
+    )
 
     # Test 2: List tools
     print("\n" + "=" * 70)
@@ -134,10 +112,7 @@ async def main():
     for tool_class in AVAILABLE_TOOLS:
         try:
             tool_def = tool_class.get_definition()
-            tools_list.append({
-                "name": tool_def.name,
-                "description": tool_def.description
-            })
+            tools_list.append({"name": tool_def.name, "description": tool_def.description})
         except:
             pass
 
@@ -150,24 +125,25 @@ async def main():
     print("\n" + "=" * 70)
     print("Test 3: Call service_status Tool")
     print("=" * 70)
-    await simulate_claude_request(server, "tools/call", {
-        "name": "service_status",
-        "arguments": {}
-    })
+    await simulate_claude_request(server, "tools/call", {"name": "service_status", "arguments": {}})
 
     # Test 4: Call file search (if service is available)
     print("\n" + "=" * 70)
     print("Test 4: Call file_content_search Tool")
     print("=" * 70)
-    await simulate_claude_request(server, "tools/call", {
-        "name": "file_content_search",
-        "arguments": {
-            "search_pattern": "test",
-            "search_dir": "C:\\Windows",
-            "file_pattern": "*.txt",
-            "max_results": 5
-        }
-    })
+    await simulate_claude_request(
+        server,
+        "tools/call",
+        {
+            "name": "file_content_search",
+            "arguments": {
+                "search_pattern": "test",
+                "search_dir": "C:\\Windows",
+                "file_pattern": "*.txt",
+                "max_results": 5,
+            },
+        },
+    )
 
     print("\n" + "=" * 70)
     print("[SUCCESS] All Claude Desktop simulation tests completed!")
@@ -180,4 +156,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Test NTFS tools with admin check - run this after UAC elevation."""
+
 import asyncio
 import ctypes
 import sys
@@ -16,6 +17,7 @@ def is_admin():
         return ctypes.windll.shell32.IsUserAnAdmin() != 0
     except AttributeError:
         return False
+
 
 async def main():
     print("=" * 80)
@@ -49,8 +51,6 @@ async def main():
     except Exception as e:
         print(f"✗ FAILED: {e}")
 
+
 if __name__ == "__main__":
     asyncio.run(main())
-
-
-

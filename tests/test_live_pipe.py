@@ -31,8 +31,7 @@ async def test_live_pipe_and_search() -> None:
     failed = [r for r in results if not r.get("passed")]
     assert total > 0, "run_live_tests should return at least one result"
     assert passed == total, (
-        f"Expected all {total} tests to pass; failed: {[f['name'] for f in failed]}. "
-        f"Details: {failed}"
+        f"Expected all {total} tests to pass; failed: {[f['name'] for f in failed]}. Details: {failed}"
     )
 
 

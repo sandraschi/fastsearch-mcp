@@ -2,10 +2,11 @@
 Simple script to read FastSearch service logs from Windows Event Log.
 Run this to see what the service is logging.
 """
+
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent / 'src'))
+sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 import asyncio
 
@@ -25,11 +26,7 @@ async def main():
     print()
 
     result = await tool.execute(
-        service_name="FastSearchMCP",
-        log_type="Application",
-        last="24h",
-        limit=50,
-        event_level="all"
+        service_name="FastSearchMCP", log_type="Application", last="24h", limit=50, event_level="all"
     )
 
     if result.get("success"):
@@ -74,4 +71,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-

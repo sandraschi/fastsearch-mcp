@@ -5,7 +5,6 @@ import hashlib
 import os
 from collections import defaultdict
 from pathlib import Path
-from typing import Dict, List, Optional
 
 from fastsearch_mcp.logging_config import get_logger
 from fastsearch_mcp.mcp_instance import mcp
@@ -17,7 +16,7 @@ logger = get_logger(__name__)
 CHUNK_SIZE = 1024 * 1024
 
 
-def get_file_hash(file_path: Path, fast_check: bool = False) -> Optional[str]:
+def get_file_hash(file_path: Path, fast_check: bool = False) -> str | None:
     """Calculate the hash of a file's content.
 
     Args:
@@ -63,12 +62,12 @@ def get_file_hash(file_path: Path, fast_check: bool = False) -> Optional[str]:
 def _find_duplicate_files_impl(
     search_dir: str,
     min_size: int = 0,
-    max_size: Optional[int] = None,
+    max_size: int | None = None,
     file_pattern: str = "*",
-    exclude_dirs: Optional[List[str]] = None,
+    exclude_dirs: list[str] | None = None,
     fast_mode: bool = True,
     compare_content: bool = True,
-) -> Dict[str, List[str]]:
+) -> dict[str, list[str]]:
     """Find duplicate files in a directory.
 
     Args:
@@ -108,9 +107,7 @@ def _find_duplicate_files_impl(
 
     if not potential_duplicates or not compare_content:
         # If we're not comparing content, return files with the same size as potential duplicates
-        return {
-            f"size_{size}": [str(p) for p in paths] for size, paths in potential_duplicates.items()
-        }
+        return {f"size_{size}": [str(p) for p in paths] for size, paths in potential_duplicates.items()}
 
     # Now, for files with the same size, compare their content hashes
     hash_map = defaultdict(list)
@@ -126,23 +123,21 @@ def _find_duplicate_files_impl(
                 hash_map[file_hash].append(file_path)
 
     # Filter out hashes with only one file (no duplicates)
-    return {
-        hash_val: [str(p) for p in paths] for hash_val, paths in hash_map.items() if len(paths) > 1
-    }
+    return {hash_val: [str(p) for p in paths] for hash_val, paths in hash_map.items() if len(paths) > 1}
 
 
 @mcp.tool
 async def find_duplicate_files(
     search_dir: str,
     min_size: int = 1024,
-    max_size: Optional[int] = None,
+    max_size: int | None = None,
     file_pattern: str = "*",
-    exclude_dirs: Optional[List[str]] = None,
+    exclude_dirs: list[str] | None = None,
     fast_mode: bool = True,
     compare_content: bool = True,
     min_duplicate_group: int = 2,
     max_results: int = 100,
-) -> Dict:
+) -> dict:
     """Find duplicate files based on content hashing.
 
     Searches for duplicate files by comparing file sizes and content hashes.
@@ -182,14 +177,14 @@ async def find_duplicate_files(
 def _find_duplicates_sync(
     search_dir: str,
     min_size: int = 1024,
-    max_size: Optional[int] = None,
+    max_size: int | None = None,
     file_pattern: str = "*",
-    exclude_dirs: Optional[List[str]] = None,
+    exclude_dirs: list[str] | None = None,
     fast_mode: bool = True,
     compare_content: bool = True,
     min_duplicate_group: int = 2,
     max_results: int = 100,
-) -> Dict:
+) -> dict:
     """Synchronous implementation of duplicate file search."""
     if exclude_dirs is None:
         exclude_dirs = []
@@ -266,12 +261,8 @@ def _find_duplicates_sync(
 
         # Update summary
         result["duplicate_groups"] = len(result["duplicates"])
-        result["duplicate_files"] = sum(
-            len(group["files"]) for group in result["duplicates"].values()
-        )
-        result["total_wasted"] = sum(
-            group["wasted_space"] for group in result["duplicates"].values()
-        )
+        result["duplicate_files"] = sum(len(group["files"]) for group in result["duplicates"].values())
+        result["total_wasted"] = sum(group["wasted_space"] for group in result["duplicates"].values())
         result["total_wasted_human"] = f"{result['total_wasted'] / (1024 * 1024):.2f} MB"
 
     except Exception as e:

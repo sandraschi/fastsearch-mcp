@@ -15,35 +15,26 @@ See docs/TOOL_REDUCTION_PLAN.md and docs/TOOL_ENHANCEMENT_PROPOSALS.md for detai
 # ============================================================================
 # CORE SEARCH TOOLS (3) - MUST KEEP
 # ============================================================================
-from .file_name_search import fastsearch_search
 from .advanced_search import fastsearch_search_advanced
-from .file_search import file_content_search
-
-# ============================================================================
-# FASTSEARCH SERVICE MANAGEMENT (4) - KEEP (Essential)
-# ============================================================================
-from .service_status import service_status
-from .service import (
-    service_start_fastsearch,
-    service_stop_fastsearch,
-    service_restart_fastsearch,
-)
-
-# ============================================================================
-# ESSENTIAL UTILITIES (3) - KEEP
-# ============================================================================
-from .help import help
-from .drive_inventory import drive_inventory
 from .disk_analyzer import analyze_disk_usage
 from .disk_treemap import generate_disk_treemap
+from .drive_inventory import drive_inventory
 
 # ============================================================================
 # ADDITIONAL USEFUL TOOLS (5) - KEEP
 # ============================================================================
 from .duplicate_finder import find_duplicate_files
+from .file_name_search import fastsearch_search
+from .file_search import file_content_search
+
+# ============================================================================
+# ESSENTIAL UTILITIES (3) - KEEP
+# ============================================================================
+from .help import help
+from .integrity_checker import generate_file_hashes
+from .llm_discovery import list_local_models
 from .ntfs import ntfs_volume_info
 from .resource_monitor import get_process_info, monitor_system_resources
-from .integrity_checker import generate_file_hashes
 
 # ============================================================================
 # SEARCH RESULT ENHANCEMENT TOOLS (3) - NEW - Build on superfast search
@@ -51,7 +42,16 @@ from .integrity_checker import generate_file_hashes
 from .search_result_analyze import search_result_analyze
 from .search_result_export import search_result_export
 from .search_result_filter import search_result_filter
-from .llm_discovery import list_local_models
+from .service import (
+    service_restart_fastsearch,
+    service_start_fastsearch,
+    service_stop_fastsearch,
+)
+
+# ============================================================================
+# FASTSEARCH SERVICE MANAGEMENT (4) - KEEP (Essential)
+# ============================================================================
+from .service_status import service_status
 
 # ============================================================================
 # REMOVED FROM PRODUCTION (14 tools) - Keep implementations, don't register
@@ -79,29 +79,29 @@ from .llm_discovery import list_local_models
 # To re-enable any tool, uncomment the import above and add to __all__
 
 __all__ = [
+    "analyze_disk_usage",
+    "drive_inventory",
     # Core Search Tools (3)
     "fastsearch_search",
     "fastsearch_search_advanced",
     "file_content_search",
-    # FastSearch Service Management (4)
-    "service_status",
-    "service_start_fastsearch",
-    "service_stop_fastsearch",
-    "service_restart_fastsearch",
-    # Essential Utilities (3)
-    "help",
-    "drive_inventory",
-    "analyze_disk_usage",
     # Additional Useful Tools (5)
     "find_duplicate_files",
-    "ntfs_volume_info",
-    "get_process_info",
-    "monitor_system_resources",
     "generate_file_hashes",
+    "get_process_info",
+    # Essential Utilities (3)
+    "help",
+    "monitor_system_resources",
+    "ntfs_volume_info",
     # Search Result Enhancement Tools (3)
     "search_result_analyze",
     "search_result_export",
     "search_result_filter",
+    "service_restart_fastsearch",
+    "service_start_fastsearch",
+    # FastSearch Service Management (4)
+    "service_status",
+    "service_stop_fastsearch",
 ]
 
 # Ensure tools are registered (side effect of import)
@@ -129,8 +129,9 @@ _ = search_result_filter
 
 # Unregister tools that were imported but shouldn't be in production
 # (Importing modules registers ALL tools in those modules, so we need to unregister unwanted ones)
-from ..mcp_instance import mcp
 import logging
+
+from ..mcp_instance import mcp
 
 # Tools to remove from production
 _TOOLS_TO_REMOVE = {

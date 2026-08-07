@@ -9,16 +9,16 @@ import json
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent / 'src'))
+sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from fastsearch_mcp.tools import AVAILABLE_TOOLS
 
 
 async def test_tool(tool_name: str, **kwargs):
     """Test a specific tool."""
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print(f"Testing tool: {tool_name}")
-    print(f"{'='*70}\n")
+    print(f"{'=' * 70}\n")
 
     # Find tool
     tool_class = None
@@ -55,6 +55,7 @@ async def test_tool(tool_name: str, **kwargs):
     except Exception as e:
         print(f"\n[ERROR] Error: {e}")
         import traceback
+
         traceback.print_exc()
 
 
@@ -79,7 +80,7 @@ async def interactive_mode():
         try:
             choice = input("\n> ").strip()
 
-            if choice.lower() == 'q':
+            if choice.lower() == "q":
                 break
 
             # Try number first
@@ -112,8 +113,8 @@ async def main():
 
         # Parse additional args
         for arg in sys.argv[2:]:
-            if '=' in arg:
-                key, value = arg.split('=', 1)
+            if "=" in arg:
+                key, value = arg.split("=", 1)
                 args[key] = value
 
         await test_tool(tool_name, **args)
@@ -124,4 +125,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-
