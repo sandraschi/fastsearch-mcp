@@ -11,6 +11,9 @@ import psutil
 from fastsearch_mcp.logging_config import get_logger
 from fastsearch_mcp.mcp_instance import mcp
 
+# Keep references to background monitor tasks so they are not garbage-collected.
+_active_tasks: set[asyncio.Task] = set()
+
 logger = get_logger(__name__)
 
 
@@ -437,7 +440,7 @@ async def _monitor_continuous(
     }
 
     # Start monitoring in the background
-    asyncio.create_task(
+    _monitor_task = asyncio.create_task(
         _monitor_loop(
             result,
             interval,
@@ -452,6 +455,7 @@ async def _monitor_continuous(
             callback_url,
         )
     )
+    _active_tasks.add(_monitor_task)
 
     return result
 

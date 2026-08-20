@@ -57,7 +57,7 @@ class ToolDefinition:
     description: str
     category: ToolCategory
     parameters: list[ToolParameter] = field(default_factory=list)
-    return_type: type = type(None)
+    return_type: type = field(default_factory=lambda: type(None))
     return_description: str = ""
     requires_elevation: bool = False
     tags: set[str] | None = None

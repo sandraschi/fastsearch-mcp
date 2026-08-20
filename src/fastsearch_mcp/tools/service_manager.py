@@ -754,7 +754,7 @@ async def start_service(
         service_name: SCM service name (short name), not display name.
         args: Optional extra arguments passed to the service start (rare; often empty).
         timeout: Seconds to poll for RUNNING after issuing start (default 30). Typical
-            range 5–120; low values may false-fail on slow services.
+            range 5-120; low values may false-fail on slow services.
         dry_run: If True, does not start the service; returns current state and whether
             a start would be attempted (idempotent if already running).
 
@@ -818,7 +818,7 @@ async def stop_service(service_name: str, timeout: int = 30, dry_run: bool = Fal
 
     Args:
         service_name: SCM short name of the service.
-        timeout: Seconds to wait for STOPPED (default 30). Typical range 5–300; some
+        timeout: Seconds to wait for STOPPED (default 30). Typical range 5-300; some
             services take long to drain connections.
         dry_run: If True, does not stop; reports current state and whether a stop would
             be issued (no-op if already stopped).

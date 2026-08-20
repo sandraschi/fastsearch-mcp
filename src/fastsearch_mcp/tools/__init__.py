@@ -17,7 +17,7 @@ See docs/TOOL_REDUCTION_PLAN.md and docs/TOOL_ENHANCEMENT_PROPOSALS.md for detai
 # ============================================================================
 from .advanced_search import fastsearch_search_advanced
 from .disk_analyzer import analyze_disk_usage
-from .disk_treemap import generate_disk_treemap
+from .disk_treemap import generate_disk_treemap as generate_disk_treemap
 from .drive_inventory import drive_inventory
 
 # ============================================================================
@@ -32,7 +32,7 @@ from .file_search import file_content_search
 # ============================================================================
 from .help import help
 from .integrity_checker import generate_file_hashes
-from .llm_discovery import list_local_models
+from .llm_discovery import list_local_models as list_local_models
 from .ntfs import ntfs_volume_info
 from .resource_monitor import get_process_info, monitor_system_resources
 
