@@ -33,7 +33,7 @@ Search for files matching a pattern.
 ```json
 {
   "pattern": "*.rs",
-  "path": "C:\\Dev",
+  "path": "D:\\Dev",
   "max_results": 100,
   "doc_type": "code"
 }
@@ -54,8 +54,8 @@ Search for files matching a pattern.
   "results": [
     {
       "name": "main.rs",
-      "path": "C:\\Dev\\fastsearch\\src",
-      "full_path": "C:\\Dev\\fastsearch\\src\\main.rs",
+      "path": "D:\\Dev\\fastsearch\\src",
+      "full_path": "D:\\Dev\\fastsearch\\src\\main.rs",
       "size": 12345,
       "is_directory": false,
       "size_formatted": "12.1 KB"
@@ -88,7 +88,7 @@ Get the current status of the FastSearch service.
 
 ### Run Benchmark
 
-`GET /api/benchmark?pattern=*.rs&path=C:\\Dev`
+`GET /api/benchmark?pattern=*.rs&path=D:\\Dev`
 
 Run a performance benchmark with the given search parameters.
 
@@ -103,7 +103,7 @@ Run a performance benchmark with the given search parameters.
 {
   "success": true,
   "pattern": "*.rs",
-  "path": "C:\\Dev",
+  "path": "D:\\Dev",
   "matches": 42,
   "duration_ms": 12.34,
   "searches_per_second": 3456.78
@@ -200,7 +200,7 @@ async function searchFiles(options: SearchOptions) {
 // Example usage
 const results = await searchFiles({
   pattern: '*.rs',
-  path: 'C:\\Dev',
+  path: 'D:\\Dev',
   max_results: 10,
   doc_type: 'code'
 });

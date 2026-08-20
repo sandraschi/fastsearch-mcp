@@ -229,7 +229,7 @@ def _get_examples(tool_name: str) -> list:
                     "tool_name": "file_content_search",
                     "arguments": {
                         "search_pattern": "import",
-                        "search_dir": "C:\\Dev",
+                        "search_dir": "D:\\Dev",
                         "file_pattern": "*.py",
                         "max_results": 10,
                     },
