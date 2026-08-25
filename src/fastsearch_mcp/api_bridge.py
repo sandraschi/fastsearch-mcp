@@ -506,3 +506,123 @@ async def run_tests(body: dict | None = None) -> dict:
     except Exception as e:
         logger.exception("run_tests failed")
         raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+# ---------------------------------------------------------------------------
+# Logging Endpoints for webapp Logs page
+# ---------------------------------------------------------------------------
+
+LOG_ENTRIES: list[dict] = [
+    {
+        "id": "1",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "level": "INFO",
+        "kind": "server",
+        "detail": "FastSearch REST API Bridge initialized on port 10845.",
+        "meta": {},
+    },
+    {
+        "id": "2",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "level": "INFO",
+        "kind": "server",
+        "detail": "Named pipe \\\\.\\pipe\\FastSearchMCP listener configured.",
+        "meta": {},
+    },
+]
+
+
+def log_event(level: str, kind: str, detail: str, meta: dict | None = None) -> None:
+    """Record a log entry into the in-memory ring buffer."""
+    new_id = str(len(LOG_ENTRIES) + 1)
+    LOG_ENTRIES.append({
+        "id": new_id,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "level": level,
+        "kind": kind,
+        "detail": detail,
+        "meta": meta or {},
+    })
+    if len(LOG_ENTRIES) > 1000:
+        LOG_ENTRIES.pop(0)
+
+
+@router.get("/logs")
+async def get_logs(
+    limit: int = 50,
+    offset: int = 0,
+    sort: str = "desc",
+    level: str | None = None,
+    kind: str | None = None,
+    search: str | None = None,
+    after_id: str | None = None,
+) -> dict:
+    """Fetch logs with filtering and pagination."""
+    filtered = LOG_ENTRIES[:]
+
+    if level:
+        filtered = [e for e in filtered if e.get("level", "").upper() == level.upper()]
+    if kind:
+        filtered = [e for e in filtered if e.get("kind", "").lower() == kind.lower()]
+    if search:
+        s = search.lower()
+        filtered = [e for e in filtered if s in e.get("detail", "").lower()]
+    if after_id:
+        try:
+            aid = int(after_id)
+            filtered = [e for e in filtered if int(e.get("id", "0")) > aid]
+        except ValueError:
+            pass
+
+    if sort == "desc":
+        filtered = list(reversed(filtered))
+
+    total = len(filtered)
+    paged = filtered[offset: offset + limit]
+
+    return {
+        "entries": paged,
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+    }
+
+
+@router.delete("/logs")
+async def clear_logs() -> dict:
+    """Clear all log entries."""
+    global LOG_ENTRIES
+    LOG_ENTRIES = []
+    return {"success": True, "message": "Logs cleared"}
+
+
+@router.get("/logs/export")
+async def export_logs(
+    format: str = "json",
+    level: str | None = None,
+    kind: str | None = None,
+    search: str | None = None,
+) -> Response:
+    """Export log entries as JSON or CSV file download."""
+    filtered = LOG_ENTRIES[:]
+    if level:
+        filtered = [e for e in filtered if e.get("level", "").upper() == level.upper()]
+    if kind:
+        filtered = [e for e in filtered if e.get("kind", "").lower() == kind.lower()]
+    if search:
+        s = search.lower()
+        filtered = [e for e in filtered if s in e.get("detail", "").lower()]
+
+    if format.lower() == "csv":
+        import io
+        import csv
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(["id", "timestamp", "level", "kind", "detail"])
+        for e in filtered:
+            writer.writerow([e.get("id"), e.get("timestamp"), e.get("level"), e.get("kind"), e.get("detail")])
+        return Response(content=output.getvalue(), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=logs.csv"})
+    else:
+        content = json.dumps(filtered, indent=2)
+        return Response(content=content, media_type="application/json", headers={"Content-Disposition": "attachment; filename=logs.json"})
+
