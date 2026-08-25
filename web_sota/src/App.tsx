@@ -1,14 +1,19 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { AppLayout } from '@/components/layout/app-layout';
-import { Dashboard } from '@/pages/dashboard';
-import { Search } from '@/pages/search';
-import { Tools } from '@/pages/tools';
-import { Service } from '@/pages/service';
-import { Tests } from '@/pages/tests';
-import { Actions } from '@/pages/actions';
-import Logs from '@/pages/logs';
-import { Chat } from '@/pages/chat';
-import { Settings } from '@/pages/settings';
+import {
+  Navigate,
+  Route,
+  BrowserRouter as Router,
+  Routes,
+} from "react-router-dom";
+import { AppLayout } from "@/components/layout/app-layout";
+import { Actions } from "@/pages/actions";
+import { Chat } from "@/pages/chat";
+import { Dashboard } from "@/pages/dashboard";
+import Logs from "@/pages/logs";
+import { Search } from "@/pages/search";
+import { Service } from "@/pages/service";
+import { Settings } from "@/pages/settings";
+import { Tests } from "@/pages/tests";
+import { Tools } from "@/pages/tools";
 
 function App() {
   return (

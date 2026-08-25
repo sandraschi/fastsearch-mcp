@@ -36,46 +36,53 @@ export default function Logs() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [userScrolled, setUserScrolled] = useState(false);
   const afterIdRef = useRef<string | null>(null);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined,
+  );
 
-  const fetchLogs = useCallback(async (opts: { tail?: boolean; after_id?: string } = {}) => {
-    setLoading(true);
-    setErrorMsg(null);
-    const params = new URLSearchParams();
-    params.set("limit", String(limit));
-    params.set("offset", String(offset));
-    params.set("sort", sort);
-    if (level) params.set("level", level);
-    if (kind) params.set("kind", kind);
-    if (search) params.set("search", search);
-    if (opts.after_id) params.set("after_id", opts.after_id);
-    try {
-      const r = await fetch(`${API_BASE}/api/logs?${params}`);
-      if (!r.ok) {
-        throw new Error(`HTTP ${r.status}: ${r.statusText}`);
+  const fetchLogs = useCallback(
+    async (opts: { tail?: boolean; after_id?: string } = {}) => {
+      setLoading(true);
+      setErrorMsg(null);
+      const params = new URLSearchParams();
+      params.set("limit", String(limit));
+      params.set("offset", String(offset));
+      params.set("sort", sort);
+      if (level) params.set("level", level);
+      if (kind) params.set("kind", kind);
+      if (search) params.set("search", search);
+      if (opts.after_id) params.set("after_id", opts.after_id);
+      try {
+        const r = await fetch(`${API_BASE}/api/logs?${params}`);
+        if (!r.ok) {
+          throw new Error(`HTTP ${r.status}: ${r.statusText}`);
+        }
+        const d = await r.json();
+        const list = Array.isArray(d?.entries) ? d.entries : [];
+        if (opts.tail && opts.after_id) {
+          setEntries((prev) => [...(prev || []), ...list].slice(-200));
+        } else {
+          setEntries(list);
+        }
+        setTotal(d?.total ?? list.length);
+        if (list.length > 0 && list[list.length - 1]?.id) {
+          afterIdRef.current = String(list[list.length - 1].id);
+        }
+      } catch (e: unknown) {
+        console.warn("Log fetch warning", e);
+        setErrorMsg(
+          e instanceof Error ? e.message : "Failed to fetch logs from API",
+        );
+        if (!opts.tail) {
+          setEntries([]);
+          setTotal(0);
+        }
+      } finally {
+        setLoading(false);
       }
-      const d = await r.json();
-      const list = Array.isArray(d?.entries) ? d.entries : [];
-      if (opts.tail && opts.after_id) {
-        setEntries((prev) => [...(prev || []), ...list].slice(-200));
-      } else {
-        setEntries(list);
-      }
-      setTotal(d?.total ?? list.length);
-      if (list.length > 0 && list[list.length - 1]?.id) {
-        afterIdRef.current = String(list[list.length - 1].id);
-      }
-    } catch (e: unknown) {
-      console.warn("Log fetch warning", e);
-      setErrorMsg(e instanceof Error ? e.message : "Failed to fetch logs from API");
-      if (!opts.tail) {
-        setEntries([]);
-        setTotal(0);
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, [limit, offset, level, kind, search, sort]);
+    },
+    [limit, offset, level, kind, search, sort],
+  );
 
   useEffect(() => {
     fetchLogs();
@@ -163,19 +170,33 @@ export default function Logs() {
         <select
           className="h-8 rounded border border-slate-700 bg-slate-800 px-2 text-xs text-slate-300 focus:outline-none"
           value={level}
-          onChange={(e) => { setLevel(e.target.value); setOffset(0); }}
+          onChange={(e) => {
+            setLevel(e.target.value);
+            setOffset(0);
+          }}
         >
           <option value="">All levels</option>
-          {LEVELS.map((l) => <option key={l} value={l}>{l}</option>)}
+          {LEVELS.map((l) => (
+            <option key={l} value={l}>
+              {l}
+            </option>
+          ))}
         </select>
 
         <select
           className="h-8 rounded border border-slate-700 bg-slate-800 px-2 text-xs text-slate-300 focus:outline-none"
           value={kind}
-          onChange={(e) => { setKind(e.target.value); setOffset(0); }}
+          onChange={(e) => {
+            setKind(e.target.value);
+            setOffset(0);
+          }}
         >
           <option value="">All kinds</option>
-          {KINDS.filter(Boolean).map((k) => <option key={k} value={k}>{k}</option>)}
+          {KINDS.filter(Boolean).map((k) => (
+            <option key={k} value={k}>
+              {k}
+            </option>
+          ))}
         </select>
 
         <input
@@ -188,7 +209,10 @@ export default function Logs() {
         <select
           className="h-8 rounded border border-slate-700 bg-slate-800 px-2 text-xs text-slate-300 focus:outline-none"
           value={limit}
-          onChange={(e) => { setLimit(Number(e.target.value)); setOffset(0); }}
+          onChange={(e) => {
+            setLimit(Number(e.target.value));
+            setOffset(0);
+          }}
         >
           <option value="25">25</option>
           <option value="50">50</option>
@@ -223,12 +247,15 @@ export default function Logs() {
           Clear
         </button>
 
-        <span className="text-xs text-slate-500 ml-auto">{total || 0} entries</span>
+        <span className="text-xs text-slate-500 ml-auto">
+          {total || 0} entries
+        </span>
       </div>
 
       {errorMsg && (
         <div className="p-3 rounded border border-amber-800/50 bg-amber-950/20 text-xs text-amber-300">
-          ⚠️ API Notice: {errorMsg}. Ensure backend service is running on port 10845.
+          ⚠️ API Notice: {errorMsg}. Ensure backend service is running on port
+          10845.
         </div>
       )}
 
@@ -240,18 +267,34 @@ export default function Logs() {
         {(!entries || entries.length === 0) && !loading && (
           <div className="text-slate-500 text-center py-16 space-y-1">
             <p className="font-semibold text-slate-400">No log entries found</p>
-            <p className="text-xs text-slate-600">Logs will accumulate automatically as FastSearch engine and API tools execute.</p>
+            <p className="text-xs text-slate-600">
+              Logs will accumulate automatically as FastSearch engine and API
+              tools execute.
+            </p>
           </div>
         )}
 
         {(entries || []).map((e, idx) => (
-          <div key={e.id || idx} className="flex items-center gap-3 py-1 hover:bg-slate-900/60 rounded px-2 border-b border-slate-900/40">
-            <span className="text-slate-500 w-20 shrink-0 text-[11px] font-mono">{formatTimestamp(e.timestamp)}</span>
-            <span className={`w-16 shrink-0 text-center rounded px-1.5 py-0.5 text-[10px] font-bold ${LEVEL_COLORS[e.level?.toUpperCase()] || "text-slate-400 bg-slate-900"}`}>
+          <div
+            key={e.id || idx}
+            className="flex items-center gap-3 py-1 hover:bg-slate-900/60 rounded px-2 border-b border-slate-900/40"
+          >
+            <span className="text-slate-500 w-20 shrink-0 text-[11px] font-mono">
+              {formatTimestamp(e.timestamp)}
+            </span>
+            <span
+              className={`w-16 shrink-0 text-center rounded px-1.5 py-0.5 text-[10px] font-bold ${LEVEL_COLORS[e.level?.toUpperCase()] || "text-slate-400 bg-slate-900"}`}
+            >
               {e.level || "INFO"}
             </span>
-            {e.kind && <span className="text-slate-400 w-20 shrink-0 text-[11px]">[{e.kind}]</span>}
-            <span className="text-slate-200 break-all text-[11px] flex-1">{e.detail || JSON.stringify(e)}</span>
+            {e.kind && (
+              <span className="text-slate-400 w-20 shrink-0 text-[11px]">
+                [{e.kind}]
+              </span>
+            )}
+            <span className="text-slate-200 break-all text-[11px] flex-1">
+              {e.detail || JSON.stringify(e)}
+            </span>
           </div>
         ))}
         <div ref={endRef} />
@@ -265,7 +308,9 @@ export default function Logs() {
         >
           Prev
         </button>
-        <span>Page {currentPage} of {totalPages || 1}</span>
+        <span>
+          Page {currentPage} of {totalPages || 1}
+        </span>
         <button
           className="px-3 py-1 rounded border border-slate-700 hover:bg-slate-800 disabled:opacity-30 transition-colors"
           disabled={offset + limit >= total}
@@ -276,10 +321,20 @@ export default function Logs() {
       </div>
 
       {showClear && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={() => setShowClear(false)}>
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 max-w-sm w-full shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-lg font-bold text-slate-200 mb-2">Clear all logs?</h3>
-            <p className="text-sm text-slate-400 mb-4">This cannot be undone. The in-memory log buffer will be emptied.</p>
+        <div
+          className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4"
+          onClick={() => setShowClear(false)}
+        >
+          <div
+            className="bg-slate-900 border border-slate-800 rounded-xl p-6 max-w-sm w-full shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-bold text-slate-200 mb-2">
+              Clear all logs?
+            </h3>
+            <p className="text-sm text-slate-400 mb-4">
+              This cannot be undone. The in-memory log buffer will be emptied.
+            </p>
             <div className="flex gap-3 justify-end">
               <button
                 className="px-4 py-2 rounded border border-slate-700 text-slate-400 text-sm hover:bg-slate-800 transition-colors"

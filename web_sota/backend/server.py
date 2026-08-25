@@ -1,4 +1,5 @@
 """Full FastAPI backend for the web dashboard — health, logs, settings."""
+
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -19,19 +20,22 @@ async def lifespan(app: FastAPI):
     yield
     activity_log.info("server", "Backend stopped")
 
-app = FastAPI(title="fastsearch-mcp-backend", version="0.1.0", lifespan=lifespan,
-              docs_url="/docs", redoc_url="/redoc")
+
+app = FastAPI(title="fastsearch-mcp-backend", version="0.1.0", lifespan=lifespan, docs_url="/docs", redoc_url="/redoc")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 app.include_router(logging_router)
+
 
 @app.get("/health")
 @app.get("/api/health")
 async def health():
     return {"status": "ok", "service": "fastsearch-mcp-backend"}
 
+
 @app.get("/api/llm/providers")
 async def llm_providers():
     import httpx
+
     providers = []
 
     # Probe Ollama
@@ -41,21 +45,25 @@ async def llm_providers():
             if resp.status_code == 200:
                 data = resp.json()
                 models = [m["name"] for m in data.get("models", [])]
-                providers.append({
-                    "id": "ollama",
-                    "label": "Ollama",
-                    "base_url": "http://127.0.0.1:11434/v1",
-                    "models": models,
-                    "needs_key": False,
-                })
+                providers.append(
+                    {
+                        "id": "ollama",
+                        "label": "Ollama",
+                        "base_url": "http://127.0.0.1:11434/v1",
+                        "models": models,
+                        "needs_key": False,
+                    }
+                )
     except Exception:
-        providers.append({
-            "id": "ollama",
-            "label": "Ollama",
-            "base_url": "http://127.0.0.1:11434/v1",
-            "models": [],
-            "needs_key": False,
-        })
+        providers.append(
+            {
+                "id": "ollama",
+                "label": "Ollama",
+                "base_url": "http://127.0.0.1:11434/v1",
+                "models": [],
+                "needs_key": False,
+            }
+        )
 
     # Probe LM Studio
     try:
@@ -64,21 +72,24 @@ async def llm_providers():
             if resp.status_code == 200:
                 data = resp.json()
                 models = [m["id"] for m in data.get("data", [])]
-                providers.append({
-                    "id": "lmstudio",
-                    "label": "LM Studio",
-                    "base_url": "http://127.0.0.1:1234/v1",
-                    "models": models,
-                    "needs_key": False,
-                })
+                providers.append(
+                    {
+                        "id": "lmstudio",
+                        "label": "LM Studio",
+                        "base_url": "http://127.0.0.1:1234/v1",
+                        "models": models,
+                        "needs_key": False,
+                    }
+                )
     except Exception:
-        providers.append({
-            "id": "lmstudio",
-            "label": "LM Studio",
-            "base_url": "http://127.0.0.1:1234/v1",
-            "models": [],
-            "needs_key": False,
-        })
+        providers.append(
+            {
+                "id": "lmstudio",
+                "label": "LM Studio",
+                "base_url": "http://127.0.0.1:1234/v1",
+                "models": [],
+                "needs_key": False,
+            }
+        )
 
     return {"providers": providers}
-
