@@ -4,6 +4,7 @@
 
 ```powershell
 # Install just if you don't have it
+# Install just if you don't have it
 winget install Casey.Just    # Windows
 # scoop install just          # Windows (alternative)
 # brew install just           # macOS
@@ -12,15 +13,17 @@ winget install Casey.Just    # Windows
 
 git clone https://github.com/sandraschi/fastsearch-mcp
 cd fastsearch-mcp
-just
+just onboard
 ```
 
-The interactive recipe dashboard opens in your browser. From there:
+`just onboard` automates the complete onboarding sequence: prompts for Administrator elevation **ONCE** via UAC to register & start the `FastSearchMCP` background Windows Service under `LocalSystem`, then automatically runs unprivileged Win32 Named Pipe IPC diagnostics (`\\.\pipe\FastSearchMCP`). Once complete, all user tools (Claude Desktop, Web UI, Python MCP) query NTFS MFT records with **zero UAC prompts**.
+
+Run `just` to open the interactive dashboard showing all available commands:
 
 ```powershell
 just bootstrap   # install all dependencies
-just serve       # start the server
-just web         # start the frontend (if applicable)
+just dev         # start MCP server & frontend dev environment
+just serve       # start production server
 ```
 
 > **Why not `pip install`?** MCP servers bundle webapps, configs, project scaffolding, and tooling that a flat Python package can't deliver. PyPI offers no safety advantage — it doesn't audit packages either. `just` gives you the complete, ready-to-run stack.

@@ -5,6 +5,20 @@ All notable changes to FastSearch MCP will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] — 2026-08-25
+
+### Added
+- **Automated First-Time Onboarding (`just onboard`)**: Created single-UAC onboarding pipeline (`scripts/onboard-first-time-user.ps1`) that prompts for Administrator elevation **ONCE** via UAC to register & start the `FastSearchMCP` background Windows Service under `LocalSystem`, followed by automated unprivileged Win32 Named Pipe IPC diagnostics (`\\.\pipe\FastSearchMCP`).
+- **4 Windows Explorer Result Display Modes**: Added layout view switcher toolbar to Search page featuring **Details View** (Sortable Table), **Grid / Medium Icons View** (Responsive Cards), **Tiles View** (Multi-column Cards), and **Compact List View** (High-density Rows).
+- **Configurable Results Pagination & Max Limits**: Added switchable page size selector (`25`, `50`, `100`, `250`, `500` per page) and configurable MFT search limit cap (`100`, `250`, `500`, `1,000`, `2,000`, `5,000`, `10,000`).
+- **Advanced Sorting & Multi-Dimensional Filtering**: Added multi-attribute sorting (`Sort: Name`, `Sort: Path`, `Sort: Size`, `Sort: Type/Extension`, `Asc/Desc`), category filter pills, size range filter (`Small < 1MB`, `Medium 1-100MB`, `Large > 100MB`), and live search input.
+- **Live System Logging for Web App Logs Page (`/logs`)**: Attached custom `RingBufferLogHandler` to Python `logging` framework (`fastsearch_mcp` and `uvicorn`), populating real-time system logs (MFT searches, tool calls, service checks, exceptions) on the `/logs` page with exact timestamps, log levels, file origins, and line numbers.
+- **Comprehensive Real-Time Service Diagnostics & Event Logs**: Surfaced SCM/UAC execution traces, exit codes, stderr, and C++ Windows Event Log entries under source `FastSearchMCP` via `GET /api/service/logs` and real-time UI diagnostic drawer.
+
+### Fixed
+- **Web UI "Start Service" UAC Elevation**: Added automatic fallback to UAC elevation prompt (`Start-Process powershell -Verb RunAs`) when starting service from unprivileged Web UI.
+- **Service Disconnection Diagnostics**: Clarified privilege separation architecture notices across UI, `help.tsx`, and CLI scripts.
+
 ## [0.5.1] — 2026-08-25
 
 ### Added

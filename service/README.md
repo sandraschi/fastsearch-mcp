@@ -48,6 +48,13 @@ cd service/build
 cmake --build . --config Release
 ```
 
+## Automated First-Time Setup
+
+To automate building, elevated single-UAC service installation, and named pipe verification:
+```powershell
+just onboard
+```
+
 ## Installing & Starting the Service
 
 To install and start the service (run once as Administrator):
@@ -59,9 +66,11 @@ Start-Service FastSearchMCP
 
 ## Managing the Service
 
+- **Automated Onboarding**: `just onboard`
 - **Start**: `sc start FastSearchMCP` or `Start-Service FastSearchMCP`
 - **Stop**: `sc stop FastSearchMCP` or `Stop-Service FastSearchMCP`
 - **Check Status**: `sc query FastSearchMCP` or `just status`
+- **Inspect Live Event & Execution Logs**: `GET /api/service/logs` or `just logs`
 
 ## Service Details
 
