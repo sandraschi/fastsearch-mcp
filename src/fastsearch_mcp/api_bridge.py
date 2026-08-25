@@ -3,6 +3,7 @@ REST API bridge for the web_sota frontend.
 Exposes GET /health, GET /tools, POST /tools/:name, GET /file, and LLM endpoints for chat and analysis.
 """
 
+from datetime import datetime, timezone
 import base64
 import json
 import logging
@@ -10,7 +11,7 @@ from pathlib import Path
 from typing import Any
 
 import httpx
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Response
 
 from fastsearch_mcp.mcp_instance import mcp
 
