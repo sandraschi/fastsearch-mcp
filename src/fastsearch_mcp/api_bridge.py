@@ -174,13 +174,14 @@ async def api_search(body: dict) -> dict:
         from fastsearch_mcp.service_ensure import ensure_service_available
 
         if not is_service_running():
-            logger.info("Service disconnected during search request; attempting automatic startup...")
+            from fastsearch_mcp.service_ensure import ensure_service_available
+
             ensured = await ensure_service_available(start_if_needed=True)
             if not ensured.get("success") and not is_service_running():
                 return {
                     "success": False,
                     "service_down": True,
-                    "error": "FastSearch service is not running and auto-start failed.",
+                    "error": "FastSearch C++ Windows Service is disconnected. Direct NTFS MFT disk access requires the elevated background service. Run 'sc start FastSearchMCP' or 'just install-service' in an elevated Administrator prompt.",
                     "results": [],
                     "count": 0,
                 }

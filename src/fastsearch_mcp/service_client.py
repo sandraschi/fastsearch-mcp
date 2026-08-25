@@ -7,7 +7,6 @@ via named pipes for NTFS MFT access.
 
 import asyncio
 import subprocess
-import sys
 import time
 from pathlib import Path
 from typing import Any
@@ -287,7 +286,7 @@ async def search_files(
 
 
 async def start_service() -> bool:
-    """Start the FastSearch C++ service via SCM or standalone fallback.
+    """Start the elevated FastSearch Windows Service via SCM.
 
     Returns:
         bool: True if service started successfully, False otherwise
@@ -298,37 +297,27 @@ async def start_service() -> bool:
             logger.error(f"Service executable not found: {SERVICE_EXECUTABLE}")
             return False
 
-        # Try to start the Windows SCM service first
+        # Try to start the elevated Windows SCM service
         result = await asyncio.to_thread(
             subprocess.run, ["sc", "start", SERVICE_NAME], capture_output=True, text=True, timeout=10
         )
 
         if result.returncode == 0:
-            logger.info("FastSearch SCM service started successfully")
-            return True
-
-        logger.info(f"SCM service start returned {result.returncode}; falling back to standalone mode launch")
-
-        # Fallback to standalone mode executable launch (no admin SCM required)
-        creationflags = 0x08000000 if sys.platform == "win32" else 0  # CREATE_NO_WINDOW
-        proc = subprocess.Popen(
-            [str(SERVICE_EXECUTABLE), "--standalone"],
-            creationflags=creationflags,
-        )
-        await asyncio.sleep(1.0)
-
-        if proc.poll() is None or is_service_running():
-            logger.info(f"FastSearch standalone service engine started (PID {proc.pid})")
-            # Invalidate status cache
+            logger.info("FastSearch elevated Windows Service started successfully via SCM")
             global _service_status_cache
             _service_status_cache = None
             return True
 
-        logger.error("FastSearch standalone executable exited immediately after start")
+        logger.warning(
+            "Failed to start FastSearch Windows Service via SCM (code %d): %s. "
+            "Elevated Administrator privileges are required to start or install the Windows Service.",
+            result.returncode,
+            result.stderr.strip(),
+        )
         return False
 
     except Exception as e:
-        logger.error(f"Error starting service: {e}")
+        logger.error(f"Error starting Windows Service via SCM: {e}")
         return False
 
 
