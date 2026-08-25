@@ -10,8 +10,8 @@ import asyncio
 import logging
 import sys
 
-from fastsearch_mcp.pipe_client import PipeClient
-from fastsearch_mcp.service_client import ServiceClient
+from fastsearch_mcp.pipe_client import test_pipe_connection
+from fastsearch_mcp.service_client import get_service_status
 
 __version__ = "0.5.1"
 
@@ -55,10 +55,8 @@ class FastSearchTester:
         """Test basic connection to the server."""
         logger.info("Testing connection to server...")
         try:
-            client = PipeClient(pipe_name=self.pipe_name)
-            is_connected = await client.connect()
+            is_connected = await test_pipe_connection()
             logger.info(f"Pipe connection status: {is_connected}")
-            await client.disconnect()
             return True
         except Exception as e:
             logger.warning(f"Connection test skipped or offline: {e}")
@@ -68,8 +66,7 @@ class FastSearchTester:
         """Test search functionality."""
         logger.info("Testing service client availability...")
         try:
-            client = ServiceClient(pipe_name=self.pipe_name)
-            status = await client.get_service_status()
+            status = await get_service_status()
             logger.info(f"Service status: {status}")
             return True
         except Exception as e:
@@ -110,12 +107,8 @@ class FastSearchTester:
 def test_fastsearch_harness():
     """Pytest wrapper function."""
     tester = FastSearchTester()
-    loop = asyncio.new_event_loop()
-    try:
-        success = loop.run_until_complete(tester.run_tests())
-        assert success
-    finally:
-        loop.close()
+    success = asyncio.run(tester.run_tests())
+    assert success
 
 
 def main():
