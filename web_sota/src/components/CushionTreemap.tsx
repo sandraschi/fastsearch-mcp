@@ -1,4 +1,10 @@
-import { ArrowLeft, RotateCcw } from "lucide-react";
+import {
+  ArrowLeft,
+  Camera,
+  Maximize2,
+  Minimize2,
+  RotateCcw,
+} from "lucide-react";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -444,11 +450,35 @@ export function CushionTreemap({
     }
   };
 
+  const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+
+  // Export Canvas Cushion Treemap as PNG Image
+  const handleExportPNG = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const image = canvas.toDataURL("image/png");
+    const a = document.createElement("a");
+    a.download = `cushion-treemap-${new Date().toISOString().slice(0, 10)}.png`;
+    a.href = image;
+    a.click();
+  };
+
+  const activeHeight = isFullscreen
+    ? Math.max(400, window.innerHeight - 130)
+    : height;
+
   const totalSize = rootNode.current?.size || 1;
 
   return (
-    <div className="space-y-2 select-none" ref={containerRef}>
-      {/* Treemap Breadcrumbs & Navigation Bar */}
+    <div
+      className={
+        isFullscreen
+          ? "fixed inset-0 z-[100] bg-slate-950 p-4 flex flex-col justify-between select-none animate-in fade-in duration-200"
+          : "space-y-2 select-none"
+      }
+      ref={containerRef}
+    >
+      {/* Treemap Breadcrumbs & Action Toolbar */}
       <div className="flex flex-wrap items-center justify-between gap-2 bg-slate-900/90 border border-slate-800 rounded-lg p-2 text-xs">
         <div className="flex items-center gap-2 text-slate-300 font-mono truncate">
           <span className="text-slate-500 font-medium">Path:</span>
@@ -474,8 +504,8 @@ export function CushionTreemap({
           )}
         </div>
 
-        <div className="flex items-center gap-3 text-slate-400 text-[11px]">
-          <span>
+        <div className="flex items-center gap-2 text-slate-400 text-[11px]">
+          <span className="mr-1">
             Total Volume:{" "}
             <strong className="text-white font-mono">
               {formatBytes(totalSize)}
@@ -491,18 +521,48 @@ export function CushionTreemap({
               <ArrowLeft className="h-3 w-3 mr-1" /> Zoom Out
             </Button>
           )}
+
+          {/* Export PNG Image Button */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportPNG}
+            className="h-6 px-2 text-[11px] border-slate-700 bg-slate-800 text-slate-200 hover:text-white hover:bg-slate-700"
+            title="Export Treemap High-Res PNG Image"
+          >
+            <Camera className="h-3 w-3 mr-1 text-emerald-400" /> Export Image
+          </Button>
+
+          {/* Fullscreen Toggle Button */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsFullscreen(!isFullscreen)}
+            className="h-6 px-2 text-[11px] border-slate-700 bg-blue-900/40 text-blue-300 hover:text-white hover:bg-blue-800"
+            title={isFullscreen ? "Exit Fullscreen" : "Full Screen View"}
+          >
+            {isFullscreen ? (
+              <>
+                <Minimize2 className="h-3 w-3 mr-1" /> Exit Fullscreen
+              </>
+            ) : (
+              <>
+                <Maximize2 className="h-3 w-3 mr-1" /> Full Screen
+              </>
+            )}
+          </Button>
         </div>
       </div>
 
       {/* Canvas Viewport */}
-      <div className="relative rounded-lg border border-slate-800 bg-slate-950 overflow-hidden shadow-2xl">
+      <div className="relative flex-1 rounded-lg border border-slate-800 bg-slate-950 overflow-hidden shadow-2xl">
         <canvas
           ref={canvasRef}
           onMouseMove={handleMouseMove}
           onMouseLeave={handleMouseLeave}
           onClick={handleClick}
           className="w-full cursor-pointer block"
-          style={{ height: `${height}px` }}
+          style={{ height: `${activeHeight}px` }}
         />
 
         {/* Hover Tooltip Card */}

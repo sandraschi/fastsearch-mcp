@@ -1,6 +1,8 @@
 import {
   AlertTriangle,
   Clock,
+  Download,
+  FileJson,
   FileText,
   HardDrive,
   Loader2,
@@ -107,6 +109,40 @@ export function TreemapPage() {
     }
   };
 
+  // Export Volume Data as CSV
+  const handleExportCSV = () => {
+    if (!results || results.length === 0) return;
+    const header = "Path,Size Bytes,Formatted Size\n";
+    const rows = results
+      .map((r) => {
+        const p = r.path || r.file_path || r.full_path || "";
+        const s = r.size ?? r.size_bytes ?? r.length ?? 0;
+        return `"${p.replace(/"/g, '""')}",${s},"${formatBytes(s)}"`;
+      })
+      .join("\n");
+
+    const blob = new Blob([header + rows], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.download = `fastsearch-treemap-export-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.href = url;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // Export Volume Data as JSON
+  const handleExportJSON = () => {
+    if (!results || results.length === 0) return;
+    const dataStr = JSON.stringify(results, null, 2);
+    const blob = new Blob([dataStr], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.download = `fastsearch-treemap-export-${new Date().toISOString().slice(0, 10)}.json`;
+    link.href = url;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
   const totalBytes = results.reduce((sum, item) => {
     const s = item.size ?? item.size_bytes ?? item.length ?? 0;
     return sum + s;
@@ -127,18 +163,46 @@ export function TreemapPage() {
           </p>
         </div>
 
-        <Button
-          onClick={() => runTreemapScan()}
-          disabled={loading}
-          className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2 self-start sm:self-auto"
-        >
-          {loading ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <RefreshCw className="h-4 w-4" />
-          )}
-          Rescan Volume
-        </Button>
+        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+          {/* Export CSV */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportCSV}
+            disabled={results.length === 0}
+            className="border-slate-700 bg-slate-900 text-slate-300 hover:text-white hover:bg-slate-800 flex items-center gap-1.5"
+            title="Export Volume Results as CSV"
+          >
+            <Download className="h-4 w-4 text-emerald-400" />
+            Export CSV
+          </Button>
+
+          {/* Export JSON */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportJSON}
+            disabled={results.length === 0}
+            className="border-slate-700 bg-slate-900 text-slate-300 hover:text-white hover:bg-slate-800 flex items-center gap-1.5"
+            title="Export Volume Results as JSON"
+          >
+            <FileJson className="h-4 w-4 text-blue-400" />
+            Export JSON
+          </Button>
+
+          <Button
+            onClick={() => runTreemapScan()}
+            disabled={loading}
+            className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2"
+          >
+            {loading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <RefreshCw className="h-4 w-4" />
+            )}
+            Rescan Volume
+          </Button>
+        </div>
       </div>
 
       {/* Control Bar */}
