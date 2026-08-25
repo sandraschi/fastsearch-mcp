@@ -18,6 +18,7 @@ import {
   LayoutList,
   List,
   Loader2,
+  Map as MapIcon,
   Play,
   Search as SearchIcon,
   Server,
@@ -29,6 +30,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { mcpClient } from "@/common/mcp-client";
+import { CushionTreemap } from "@/components/CushionTreemap";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -150,7 +152,7 @@ export function Search() {
   const [durationMs, setDurationMs] = useState<number | null>(null);
 
   // View & Filter state
-  type ViewMode = "details" | "grid" | "list" | "tiles";
+  type ViewMode = "details" | "grid" | "list" | "tiles" | "treemap";
   const [viewMode, setViewMode] = useState<ViewMode>("details");
   const [filterQuery, setFilterQuery] = useState<string>("");
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
@@ -660,6 +662,20 @@ export function Search() {
                   >
                     <List className="h-3.5 w-3.5" />
                   </button>
+                  <button
+                    onClick={() => setViewMode("treemap")}
+                    title="WizTree 3D Cushion Treemap Visualizer"
+                    className={`p-1.5 rounded transition-colors flex items-center gap-1 ${
+                      viewMode === "treemap"
+                        ? "bg-blue-600 text-white font-semibold"
+                        : "text-slate-400 hover:text-white hover:bg-slate-800"
+                    }`}
+                  >
+                    <MapIcon className="h-3.5 w-3.5" />
+                    <span className="text-[11px] font-sans pr-0.5 hidden sm:inline">
+                      Treemap
+                    </span>
+                  </button>
                 </div>
 
                 <Button
@@ -1006,6 +1022,14 @@ export function Search() {
                   </div>
                 );
               })}
+            </div>
+          ) : viewMode === "treemap" ? (
+            /* WizTree 3D Cushion Treemap View */
+            <div className="p-4 bg-slate-950">
+              <CushionTreemap
+                items={sortedResults}
+                onSelectFile={(path) => handlePreview(path)}
+              />
             </div>
           ) : (
             /* Explorer Details View (Table) */
