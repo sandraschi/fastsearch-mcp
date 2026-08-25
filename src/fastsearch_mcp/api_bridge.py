@@ -164,7 +164,7 @@ async def api_search(body: dict) -> dict:
     """
     pattern = body.get("pattern", "*")
     directory = body.get("directory", "C:\\")
-    max_results = int(body.get("max_results", 100))
+    max_results = int(body.get("max_results", 500))
     pagination_mode = body.get("pagination_mode")
     page = int(body.get("page", 1))
     page_size = int(body.get("page_size", 1000))
@@ -174,8 +174,6 @@ async def api_search(body: dict) -> dict:
         from fastsearch_mcp.service_ensure import ensure_service_available
 
         if not is_service_running():
-            from fastsearch_mcp.service_ensure import ensure_service_available
-
             ensured = await ensure_service_available(start_if_needed=True)
             if not ensured.get("success") and not is_service_running():
                 return {
@@ -193,6 +191,13 @@ async def api_search(body: dict) -> dict:
             pagination_mode=pagination_mode,
             page=page,
             page_size=page_size,
+        )
+        count = res.get("count", len(res.get("results", [])))
+        log_event(
+            level="INFO",
+            kind="tool_call",
+            detail=f"MFT Search: pattern='{pattern}', directory='{directory}', max_results={max_results} -> {count} items found",
+            meta={"pattern": pattern, "directory": directory, "count": count},
         )
         return {"success": True, "service_down": False, **res}
     except Exception as e:
@@ -583,6 +588,29 @@ def log_event(level: str, kind: str, detail: str, meta: dict | None = None) -> N
     )
     if len(LOG_ENTRIES) > 1000:
         LOG_ENTRIES.pop(0)
+
+
+class RingBufferLogHandler(logging.Handler):
+    """Intercept all Python logger events directly into web UI LOG_ENTRIES."""
+
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            msg = record.getMessage()
+            kind = "tool_call" if "search" in msg.lower() or "pipe" in msg.lower() else "server"
+            log_event(
+                level=record.levelname,
+                kind=kind,
+                detail=f"[{record.name}] {msg}",
+                meta={"filename": record.filename, "lineno": record.lineno},
+            )
+        except Exception:
+            pass
+
+
+_ring_handler = RingBufferLogHandler()
+_ring_handler.setLevel(logging.INFO)
+logging.getLogger("fastsearch_mcp").addHandler(_ring_handler)
+logging.getLogger("uvicorn").addHandler(_ring_handler)
 
 
 @router.get("/logs")

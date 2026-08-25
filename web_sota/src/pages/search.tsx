@@ -131,7 +131,7 @@ const LOCAL_STORAGE_HISTORY_KEY = "fastsearch_history_v1";
 export function Search() {
   const [pattern, setPattern] = useState<string>("*.py");
   const [directory, setDirectory] = useState<string>("C:\\");
-  const maxResults = 500;
+  const [maxResults, setMaxResults] = useState<number>(500);
 
   // Service state
   const [serviceRunning, setServiceRunning] = useState<boolean | null>(null);
@@ -148,7 +148,7 @@ export function Search() {
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
   const [sortBy, setSortBy] = useState<"name" | "path" | "size">("name");
   const [sortAsc, setSortAsc] = useState<boolean>(true);
-  const [pageSize] = useState<number>(100);
+  const [pageSize, setPageSize] = useState<number>(50);
   const [currentPage, setCurrentPage] = useState<number>(1);
 
   // UI Drawer / Modal
@@ -476,14 +476,29 @@ export function Search() {
             <div className="flex gap-2">
               <input
                 type="text"
-                className="w-40 sm:w-48 rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white placeholder-slate-500 focus:border-blue-500 focus:outline-none"
+                className="w-32 sm:w-40 rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white placeholder-slate-500 focus:border-blue-500 focus:outline-none"
                 placeholder="Directory (C:\)"
                 value={directory}
                 onChange={(e) => setDirectory(e.target.value)}
               />
 
+              <select
+                value={maxResults}
+                onChange={(e) => setMaxResults(Number(e.target.value))}
+                className="rounded-md border border-slate-700 bg-slate-900 px-2.5 py-2 text-xs font-mono text-slate-200 focus:border-blue-500 focus:outline-none cursor-pointer"
+                title="Maximum MFT search limit"
+              >
+                <option value={100}>Max: 100</option>
+                <option value={250}>Max: 250</option>
+                <option value={500}>Max: 500</option>
+                <option value={1000}>Max: 1,000</option>
+                <option value={2000}>Max: 2,000</option>
+                <option value={5000}>Max: 5,000</option>
+                <option value={10000}>Max: 10,000</option>
+              </select>
+
               <Button
-                className="bg-blue-600 hover:bg-blue-700 text-white px-6 font-medium"
+                className="bg-blue-600 hover:bg-blue-700 text-white px-6 font-medium shrink-0"
                 onClick={() => runSearch()}
                 disabled={searching}
               >
@@ -795,31 +810,77 @@ export function Search() {
             </div>
           )}
 
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="border-t border-slate-800 p-3 px-4 flex items-center justify-between text-xs text-slate-400">
-              <div>
-                Page{" "}
-                <span className="font-semibold text-white">{currentPage}</span>{" "}
-                of{" "}
-                <span className="font-semibold text-white">{totalPages}</span>
+          {/* Pagination Controls */}
+          {results.length > 0 && (
+            <div className="border-t border-slate-800 p-3 px-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-400">
+              <div className="flex items-center gap-2">
+                <span>
+                  Showing{" "}
+                  <span className="font-semibold text-white font-mono">
+                    {sortedResults.length > 0
+                      ? (currentPage - 1) * pageSize + 1
+                      : 0}
+                  </span>{" "}
+                  –{" "}
+                  <span className="font-semibold text-white font-mono">
+                    {Math.min(currentPage * pageSize, sortedResults.length)}
+                  </span>{" "}
+                  of{" "}
+                  <span className="font-semibold text-white font-mono">
+                    {sortedResults.length}
+                  </span>{" "}
+                  results
+                </span>
               </div>
+
+              {/* Switchable Page Size Dropdown */}
+              <div className="flex items-center gap-2">
+                <span className="text-slate-500">Per page:</span>
+                <select
+                  value={pageSize}
+                  onChange={(e) => {
+                    setPageSize(Number(e.target.value));
+                    setCurrentPage(1);
+                  }}
+                  className="rounded border border-slate-800 bg-slate-900 px-2 py-1 text-xs font-mono text-slate-200 focus:border-blue-500 focus:outline-none cursor-pointer"
+                >
+                  <option value={25}>25 / page</option>
+                  <option value={50}>50 / page</option>
+                  <option value={100}>100 / page</option>
+                  <option value={250}>250 / page</option>
+                  <option value={500}>500 / page</option>
+                </select>
+              </div>
+
+              {/* Page Navigation Buttons */}
               <div className="flex items-center gap-2">
                 <Button
                   variant="outline"
                   size="sm"
-                  className="border-slate-800 h-7 text-xs"
+                  className="border-slate-800 h-7 text-xs text-slate-300 hover:text-white"
                   disabled={currentPage <= 1}
-                  onClick={() => setCurrentPage((p) => p - 1)}
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                 >
                   Previous
                 </Button>
+                <span>
+                  Page{" "}
+                  <span className="font-semibold text-white font-mono">
+                    {currentPage}
+                  </span>{" "}
+                  of{" "}
+                  <span className="font-semibold text-white font-mono">
+                    {totalPages}
+                  </span>
+                </span>
                 <Button
                   variant="outline"
                   size="sm"
-                  className="border-slate-800 h-7 text-xs"
+                  className="border-slate-800 h-7 text-xs text-slate-300 hover:text-white"
                   disabled={currentPage >= totalPages}
-                  onClick={() => setCurrentPage((p) => p + 1)}
+                  onClick={() =>
+                    setCurrentPage((p) => Math.min(totalPages, p + 1))
+                  }
                 >
                   Next
                 </Button>
