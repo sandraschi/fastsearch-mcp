@@ -7,6 +7,7 @@ import {
   RefreshCw,
   RotateCcw,
   Server,
+  ShieldCheck,
   Square,
   XCircle,
   Zap,
@@ -300,6 +301,45 @@ export function Service() {
               )}
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      <Card className="border-slate-800 bg-slate-950/50">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-white">
+            <ShieldCheck className="h-5 w-5 text-blue-400" />
+            Privilege Separation Architecture
+          </CardTitle>
+          <CardDescription className="text-slate-400">
+            Security and design model for zero-overhead NTFS MFT search
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4 text-xs text-slate-300">
+          <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-3 font-mono text-[11px] leading-relaxed text-slate-300">
+            <div className="text-amber-400 font-semibold mb-1">Elevated Service Domain (Installed ONCE)</div>
+            <div className="text-slate-400">├── FastSearchMCP Windows Service (LocalSystem / Admin)</div>
+            <div className="text-slate-400">├── Reads raw NTFS MFT volume structures (\\.\C:, \\.\D:)</div>
+            <div className="text-slate-400">└── Listens on IPC Named Pipe (\\.\pipe\FastSearchMCP)</div>
+            <div className="text-blue-400 my-1 font-sans font-medium text-center">▲ IPC Named Pipe Connection (Local RPC) ▼</div>
+            <div className="text-emerald-400 font-semibold mb-1">Unprivileged User Domain (Standard User Space)</div>
+            <div className="text-slate-400">├── Python MCP Server / REST API Bridge / Web UI</div>
+            <div className="text-slate-400">├── ZERO elevation required at runtime for searches</div>
+            <div className="text-slate-400">└── Connects via Win32 Named Pipe client</div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="rounded-md border border-slate-800 bg-slate-900/40 p-3 space-y-1">
+              <div className="font-semibold text-slate-200">Elevated Engine (LocalSystem)</div>
+              <p className="text-slate-400 leading-normal">
+                Installed once as a Windows Service. Accesses raw volume handles (<code className="text-amber-200">\\.\C:</code>) to parse MFT file records directly without background indexing.
+              </p>
+            </div>
+            <div className="rounded-md border border-slate-800 bg-slate-900/40 p-3 space-y-1">
+              <div className="font-semibold text-slate-200">Standard User Client</div>
+              <p className="text-slate-400 leading-normal">
+                The web application and MCP bridge run in normal user space. No admin prompts or elevated rights are needed when running queries over named pipes.
+              </p>
+            </div>
+          </div>
         </CardContent>
       </Card>
     </div>
