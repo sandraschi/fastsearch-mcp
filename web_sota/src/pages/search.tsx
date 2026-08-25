@@ -414,6 +414,37 @@ export function Search() {
         </div>
       </div>
 
+      {!serviceRunning && !serviceLoading && (
+        <div className="rounded-lg border border-amber-800/60 bg-amber-950/20 p-4 space-y-3">
+          <div className="flex items-start justify-between">
+            <div className="flex items-center gap-2 text-amber-300 font-semibold text-sm">
+              <AlertTriangle className="h-5 w-5 text-amber-400 shrink-0" />
+              FastSearch C++ Engine Disconnected
+            </div>
+            <Button
+              size="sm"
+              className="bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-xs h-8 px-3"
+              onClick={handleStartService}
+            >
+              <Play className="h-3.5 w-3.5 mr-1" /> Auto-Connect / Start Engine
+            </Button>
+          </div>
+          <p className="text-xs text-slate-300 leading-relaxed">
+            FastSearch performs live, zero-index reads of the NTFS Master File Table (MFT). Direct volume access requires <b>Administrator</b> or <b>LocalSystem</b> privileges on Windows.
+          </p>
+          <div className="flex flex-wrap items-center gap-2 pt-1 font-mono text-[11px] text-slate-400">
+            <span className="text-slate-500 font-sans font-medium">Elevated start commands:</span>
+            <code className="bg-slate-900 px-2 py-0.5 rounded border border-slate-800 text-amber-200">
+              sc start FastSearchMCP
+            </code>
+            <span className="text-slate-500">or</span>
+            <code className="bg-slate-900 px-2 py-0.5 rounded border border-slate-800 text-amber-200">
+              just install-service
+            </code>
+          </div>
+        </div>
+      )}
+
       {/* Search Input Card */}
       <Card className="border-slate-800 bg-slate-950/60 shadow-xl">
         <CardHeader className="pb-3">

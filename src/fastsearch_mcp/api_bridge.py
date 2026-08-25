@@ -3,10 +3,10 @@ REST API bridge for the web_sota frontend.
 Exposes GET /health, GET /tools, POST /tools/:name, GET /file, and LLM endpoints for chat and analysis.
 """
 
-from datetime import datetime, timezone
 import base64
 import json
 import logging
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -124,7 +124,7 @@ async def list_tools() -> list[dict]:
     try:
         tools = await mcp.list_tools()
         return [_tool_to_dict(t) for t in tools]
-    except Exception as e:
+    except Exception:
         logger.exception("list_tools failed")
         return []
 
@@ -171,14 +171,20 @@ async def api_search(body: dict) -> dict:
 
     try:
         from fastsearch_mcp.service_client import is_service_running, search_files
+        from fastsearch_mcp.service_ensure import ensure_service_available
+
         if not is_service_running():
-            return {
-                "success": False,
-                "service_down": True,
-                "error": "FastSearch Windows Service is not running",
-                "results": [],
-                "count": 0,
-            }
+            logger.info("Service disconnected during search request; attempting automatic startup...")
+            ensured = await ensure_service_available(start_if_needed=True)
+            if not ensured.get("success") and not is_service_running():
+                return {
+                    "success": False,
+                    "service_down": True,
+                    "error": "FastSearch service is not running and auto-start failed.",
+                    "results": [],
+                    "count": 0,
+                }
+
         res = await search_files(
             pattern=pattern,
             directory=directory,
@@ -204,7 +210,13 @@ async def api_service_status() -> dict:
     """Get service status directly without MCP overhead."""
     try:
         from fastsearch_mcp.service_client import get_service_status
+        from fastsearch_mcp.service_ensure import ensure_service_available
+
         status = await get_service_status()
+        if not status.get("running"):
+            ensured = await ensure_service_available(start_if_needed=True)
+            if ensured.get("success"):
+                status = await get_service_status()
         return {"success": True, **status}
     except Exception as e:
         return {"success": False, "running": False, "error": str(e)}
@@ -215,6 +227,7 @@ async def api_service_start() -> dict:
     """Start FastSearch service."""
     try:
         from fastsearch_mcp.service_client import start_service
+
         ok = await start_service()
         return {"success": ok, "message": "Service start command sent" if ok else "Failed to start service"}
     except Exception as e:
@@ -226,6 +239,7 @@ async def api_service_stop() -> dict:
     """Stop FastSearch service."""
     try:
         from fastsearch_mcp.service_client import stop_service
+
         ok = await stop_service()
         return {"success": ok, "message": "Service stop command sent" if ok else "Failed to stop service"}
     except Exception as e:
@@ -237,14 +251,15 @@ async def api_service_restart() -> dict:
     """Restart FastSearch service."""
     try:
         import asyncio
+
         from fastsearch_mcp.service_client import start_service, stop_service
+
         await stop_service()
         await asyncio.sleep(1.0)
         ok = await start_service()
         return {"success": ok, "message": "Service restarted" if ok else "Failed to restart service"}
     except Exception as e:
         return {"success": False, "error": str(e)}
-
 
 
 @router.get("/file")
@@ -516,7 +531,7 @@ async def run_tests(body: dict | None = None) -> dict:
 LOG_ENTRIES: list[dict] = [
     {
         "id": "1",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "level": "INFO",
         "kind": "server",
         "detail": "FastSearch REST API Bridge initialized on port 10845.",
@@ -524,7 +539,7 @@ LOG_ENTRIES: list[dict] = [
     },
     {
         "id": "2",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "level": "INFO",
         "kind": "server",
         "detail": "Named pipe \\\\.\\pipe\\FastSearchMCP listener configured.",
@@ -536,14 +551,16 @@ LOG_ENTRIES: list[dict] = [
 def log_event(level: str, kind: str, detail: str, meta: dict | None = None) -> None:
     """Record a log entry into the in-memory ring buffer."""
     new_id = str(len(LOG_ENTRIES) + 1)
-    LOG_ENTRIES.append({
-        "id": new_id,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "level": level,
-        "kind": kind,
-        "detail": detail,
-        "meta": meta or {},
-    })
+    LOG_ENTRIES.append(
+        {
+            "id": new_id,
+            "timestamp": datetime.now(UTC).isoformat(),
+            "level": level,
+            "kind": kind,
+            "detail": detail,
+            "meta": meta or {},
+        }
+    )
     if len(LOG_ENTRIES) > 1000:
         LOG_ENTRIES.pop(0)
 
@@ -579,7 +596,7 @@ async def get_logs(
         filtered = list(reversed(filtered))
 
     total = len(filtered)
-    paged = filtered[offset: offset + limit]
+    paged = filtered[offset : offset + limit]
 
     return {
         "entries": paged,
@@ -615,15 +632,23 @@ async def export_logs(
         filtered = [e for e in filtered if s in e.get("detail", "").lower()]
 
     if format.lower() == "csv":
-        import io
         import csv
+        import io
+
         output = io.StringIO()
         writer = csv.writer(output)
         writer.writerow(["id", "timestamp", "level", "kind", "detail"])
         for e in filtered:
             writer.writerow([e.get("id"), e.get("timestamp"), e.get("level"), e.get("kind"), e.get("detail")])
-        return Response(content=output.getvalue(), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=logs.csv"})
+        return Response(
+            content=output.getvalue(),
+            media_type="text/csv",
+            headers={"Content-Disposition": "attachment; filename=logs.csv"},
+        )
     else:
         content = json.dumps(filtered, indent=2)
-        return Response(content=content, media_type="application/json", headers={"Content-Disposition": "attachment; filename=logs.json"})
-
+        return Response(
+            content=content,
+            media_type="application/json",
+            headers={"Content-Disposition": "attachment; filename=logs.json"},
+        )

@@ -7,6 +7,7 @@ via named pipes for NTFS MFT access.
 
 import asyncio
 import subprocess
+import sys
 import time
 from pathlib import Path
 from typing import Any
@@ -206,24 +207,23 @@ async def search_files(
         RuntimeError: If the service is not available (no fallback to treewalk)
     """
     try:
-        # Check if service is running
+        # Check if service is running; attempt auto-start if disconnected
         if not is_service_running():
-            error_msg = (
-                "❌ FastSearch service is not running.\n\n"
-                "The FastSearch MCP requires the FastSearch Windows service to be "
-                "installed and running for direct NTFS MFT access. Without the service, "
-                "file searches cannot be performed.\n\n"
-                "To fix this:\n"
-                "1. Check if the service is installed: Open Windows Services "
-                "(Win+R → services.msc)\n"
-                "2. Look for 'FastSearch MCP Service' or 'FastSearchMCP' in the list\n"
-                "3. If installed but stopped: Right-click → Start\n"
-                "4. If not installed: Run the installer as administrator\n\n"
-                "You can also use the 'service_status' tool to check the current "
-                "service status."
-            )
-            logger.error(error_msg)
-            raise RuntimeError(error_msg)
+            logger.info("Service disconnected during search_files; attempting auto-start...")
+            from .service_ensure import ensure_service_available
+
+            ensured = await ensure_service_available(start_if_needed=True)
+            if not ensured.get("success") and not is_service_running():
+                error_msg = (
+                    "❌ FastSearch service is not running and could not be started automatically.\n\n"
+                    "The FastSearch MCP requires the FastSearch Windows service or standalone engine to be "
+                    "running for direct NTFS MFT access.\n\n"
+                    "To fix this:\n"
+                    "1. Use 'start_service' or run `FastSearchServiceNew.exe --standalone` in terminal\n"
+                    "2. Check service status using the 'service_status' tool"
+                )
+                logger.error(error_msg)
+                raise RuntimeError(error_msg)
 
         # Try to communicate with the service via named pipe
         try:
@@ -287,7 +287,7 @@ async def search_files(
 
 
 async def start_service() -> bool:
-    """Start the FastSearch C++ service.
+    """Start the FastSearch C++ service via SCM or standalone fallback.
 
     Returns:
         bool: True if service started successfully, False otherwise
@@ -298,17 +298,34 @@ async def start_service() -> bool:
             logger.error(f"Service executable not found: {SERVICE_EXECUTABLE}")
             return False
 
-        # Try to start the service using sc.exe
+        # Try to start the Windows SCM service first
         result = await asyncio.to_thread(
-            subprocess.run, ["sc", "start", SERVICE_NAME], capture_output=True, text=True, timeout=30
+            subprocess.run, ["sc", "start", SERVICE_NAME], capture_output=True, text=True, timeout=10
         )
 
         if result.returncode == 0:
-            logger.info("FastSearch service started successfully")
+            logger.info("FastSearch SCM service started successfully")
             return True
-        else:
-            logger.error(f"Failed to start service: {result.stderr}")
-            return False
+
+        logger.info(f"SCM service start returned {result.returncode}; falling back to standalone mode launch")
+
+        # Fallback to standalone mode executable launch (no admin SCM required)
+        creationflags = 0x08000000 if sys.platform == "win32" else 0  # CREATE_NO_WINDOW
+        proc = subprocess.Popen(
+            [str(SERVICE_EXECUTABLE), "--standalone"],
+            creationflags=creationflags,
+        )
+        await asyncio.sleep(1.0)
+
+        if proc.poll() is None or is_service_running():
+            logger.info(f"FastSearch standalone service engine started (PID {proc.pid})")
+            # Invalidate status cache
+            global _service_status_cache
+            _service_status_cache = None
+            return True
+
+        logger.error("FastSearch standalone executable exited immediately after start")
+        return False
 
     except Exception as e:
         logger.error(f"Error starting service: {e}")
