@@ -47,7 +47,7 @@ if(WIN32)
 endif()
 
 # Add the service executable
-add_executable(FastSearchServiceNew
+add_executable(FastSearchEngine
     src/fastsearch_service.cpp
     src/mft_search.cpp
     include/fastsearch_service.h
@@ -58,13 +58,13 @@ if(WIN32)
     add_compile_definitions(_WIN32_WINNT=0x0601)  # Target Windows 7 or later
     add_compile_definitions(UNICODE _UNICODE)
     
-    # Link Windows libraries
-    target_link_libraries(FastSearchServiceNew
+    target_link_libraries(FastSearchEngine
         PRIVATE
             advapi32.lib
             shell32.lib
             user32.lib
             aclui.lib
+            shlwapi.lib
     )
     
     # Set Windows SDK version if not specified
@@ -74,7 +74,7 @@ if(WIN32)
 endif()
 
 # Installation
-install(TARGETS FastSearchServiceNew
+install(TARGETS FastSearchEngine
     RUNTIME DESTINATION bin
     CONFIGURATIONS Release
 )

@@ -3,6 +3,8 @@
 
 #include "fastsearch_service.h"
 #include <winioctl.h>
+#include <shlwapi.h>
+#pragma comment(lib, "shlwapi.lib")
 #include <regex>
 #include <vector>
 #include <string>
@@ -144,6 +146,7 @@ int ExtractJsonInt(const std::string& json, const std::string& key, int defaultV
     
     pos = json.find(':', pos);
     if (pos == std::string::npos) return defaultValue;
+    pos++;
     
     while (pos < json.length() && (json[pos] == ' ' || json[pos] == '\t')) pos++;
     
@@ -165,6 +168,7 @@ ULONGLONG ExtractJsonULongLong(const std::string& json, const std::string& key, 
     
     pos = json.find(':', pos);
     if (pos == std::string::npos) return defaultValue;
+    pos++;
     
     while (pos < json.length() && (json[pos] == ' ' || json[pos] == '\t')) pos++;
     
@@ -186,6 +190,7 @@ bool ExtractJsonBool(const std::string& json, const std::string& key, bool defau
     
     pos = json.find(':', pos);
     if (pos == std::string::npos) return defaultValue;
+    pos++;
     
     while (pos < json.length() && (json[pos] == ' ' || json[pos] == '\t')) pos++;
     
@@ -200,27 +205,34 @@ bool ExtractJsonBool(const std::string& json, const std::string& key, bool defau
     return defaultValue;
 }
 
-// Enable backup privilege for volume access
+// Enable backup and volume privileges for full volume & directory access
 bool EnableBackupPrivilege() {
     HANDLE hToken = nullptr;
     if (!OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &hToken)) {
         return false;
     }
     
-    TOKEN_PRIVILEGES tp = {};
-    LUID luid = {};
-    if (!LookupPrivilegeValueW(nullptr, L"SeBackupPrivilege", &luid)) {
-        CloseHandle(hToken);
-        return false;
+    LPCWSTR privileges[] = {
+        SE_BACKUP_NAME,
+        SE_RESTORE_NAME,
+        SE_MANAGE_VOLUME_NAME,
+        SE_SECURITY_NAME,
+        SE_TAKE_OWNERSHIP_NAME
+    };
+    
+    for (LPCWSTR privName : privileges) {
+        TOKEN_PRIVILEGES tp = {};
+        LUID luid = {};
+        if (LookupPrivilegeValueW(nullptr, privName, &luid)) {
+            tp.PrivilegeCount = 1;
+            tp.Privileges[0].Luid = luid;
+            tp.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
+            AdjustTokenPrivileges(hToken, FALSE, &tp, 0, nullptr, nullptr);
+        }
     }
     
-    tp.PrivilegeCount = 1;
-    tp.Privileges[0].Luid = luid;
-    tp.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
-    
-    bool result = AdjustTokenPrivileges(hToken, FALSE, &tp, 0, nullptr, nullptr) != FALSE;
     CloseHandle(hToken);
-    return result;
+    return true;
 }
 
 // Open volume handle
@@ -233,14 +245,134 @@ HANDLE OpenVolume(const std::wstring& volumePath) {
     HANDLE hVolume = CreateFileW(
         volumeName.c_str(),
         GENERIC_READ,
-        FILE_SHARE_READ | FILE_SHARE_WRITE,
+        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
         nullptr,
         OPEN_EXISTING,
         FILE_FLAG_BACKUP_SEMANTICS,
         nullptr
     );
     
+    if (hVolume == INVALID_HANDLE_VALUE) {
+        hVolume = CreateFileW(
+            volumeName.c_str(),
+            GENERIC_READ | READ_CONTROL,
+            FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+            nullptr,
+            OPEN_EXISTING,
+            FILE_FLAG_BACKUP_SEMANTICS,
+            nullptr
+        );
+    }
+    
     return hVolume;
+}
+
+// Helper: Escape JSON string
+std::string EscapeJsonString(const std::string& input) {
+    std::ostringstream ss;
+    for (char c : input) {
+        switch (c) {
+            case '\\': ss << "\\\\"; break;
+            case '"': ss << "\\\""; break;
+            case '\b': ss << "\\b"; break;
+            case '\f': ss << "\\f"; break;
+            case '\n': ss << "\\n"; break;
+            case '\r': ss << "\\r"; break;
+            case '\t': ss << "\\t"; break;
+            default:
+                if (static_cast<unsigned char>(c) < 0x20) {
+                    ss << "\\u" << std::hex << std::setw(4) << std::setfill('0') << static_cast<int>(c);
+                } else {
+                    ss << c;
+                }
+                break;
+        }
+    }
+    return ss.str();
+}
+
+// Native Win32 Directory Search inside the C++ Service
+std::string ExecuteServiceDirectorySearch(
+    const std::string& directory,
+    const std::string& pattern,
+    int maxResults,
+    bool usePagination,
+    int page,
+    int pageSize
+) {
+    std::wstring wdirectory(directory.begin(), directory.end());
+    std::wstring wpattern(pattern.begin(), pattern.end());
+    if (wpattern.empty()) wpattern = L"*";
+
+    std::vector<std::string> results;
+    std::vector<std::wstring> dirStack;
+    dirStack.push_back(wdirectory.empty() ? L"C:\\" : wdirectory);
+
+    while (!dirStack.empty() && (maxResults <= 0 || results.size() < static_cast<size_t>(maxResults))) {
+        std::wstring currentDir = dirStack.back();
+        dirStack.pop_back();
+
+        if (currentDir.back() != L'\\' && currentDir.back() != L'/') {
+            currentDir += L"\\";
+        }
+
+        WIN32_FIND_DATAW findData;
+        HANDLE hFind = FindFirstFileW((currentDir + L"*").c_str(), &findData);
+        if (hFind == INVALID_HANDLE_VALUE) continue;
+
+        do {
+            std::wstring fileOrDirName = findData.cFileName;
+            if (fileOrDirName == L"." || fileOrDirName == L"..") continue;
+
+            std::wstring fullPath = currentDir + fileOrDirName;
+            bool isDir = (findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
+
+            if (isDir) {
+                dirStack.push_back(fullPath);
+            }
+
+            // Pattern match
+            if (wpattern == L"*" || PathMatchSpecW(fileOrDirName.c_str(), wpattern.c_str())) {
+                ULONGLONG fileSize = (static_cast<ULONGLONG>(findData.nFileSizeHigh) << 32) | findData.nFileSizeLow;
+                
+                int utf8PathSize = WideCharToMultiByte(CP_UTF8, 0, fullPath.c_str(), -1, nullptr, 0, nullptr, nullptr);
+                std::string utf8Path(utf8PathSize - 1, '\0');
+                WideCharToMultiByte(CP_UTF8, 0, fullPath.c_str(), -1, &utf8Path[0], utf8PathSize, nullptr, nullptr);
+
+                int utf8NameSize = WideCharToMultiByte(CP_UTF8, 0, fileOrDirName.c_str(), -1, nullptr, 0, nullptr, nullptr);
+                std::string utf8Name(utf8NameSize - 1, '\0');
+                WideCharToMultiByte(CP_UTF8, 0, fileOrDirName.c_str(), -1, &utf8Name[0], utf8NameSize, nullptr, nullptr);
+
+                std::ostringstream ss;
+                ss << "{\"path\":\"" << EscapeJsonString(utf8Path) << "\","
+                   << "\"name\":\"" << EscapeJsonString(utf8Name) << "\","
+                   << "\"size\":" << fileSize << ","
+                   << "\"is_directory\":" << (isDir ? "true" : "false") << "}";
+                
+                results.push_back(ss.str());
+                if (maxResults > 0 && results.size() >= static_cast<size_t>(maxResults)) break;
+            }
+        } while (FindNextFileW(hFind, &findData));
+        FindClose(hFind);
+    }
+
+    size_t totalResults = results.size();
+    size_t startIndex = 0;
+    size_t endIndex = totalResults;
+    if (usePagination && pageSize > 0) {
+        startIndex = static_cast<size_t>((page - 1) * pageSize);
+        if (startIndex > totalResults) startIndex = totalResults;
+        endIndex = (std::min)(startIndex + static_cast<size_t>(pageSize), totalResults);
+    }
+
+    std::ostringstream response;
+    response << "{\"success\":true,\"results\":[";
+    for (size_t i = startIndex; i < endIndex; i++) {
+        response << results[i];
+        if (i + 1 < endIndex) response << ",";
+    }
+    response << "],\"count\":" << totalResults << "}";
+    return response.str();
 }
 
 // Get NTFS volume data (using Windows-defined structure)
@@ -530,34 +662,7 @@ bool MatchPattern(const std::wstring& fileName, const std::wstring& shortFileNam
     return false;
 }
 
-// Escape JSON string
-std::string EscapeJsonString(const std::string& str) {
-    std::string escaped;
-    escaped.reserve(str.length() * 2);
-    
-    for (char c : str) {
-        switch (c) {
-            case '"': escaped += "\\\""; break;
-            case '\\': escaped += "\\\\"; break;
-            case '\b': escaped += "\\b"; break;
-            case '\f': escaped += "\\f"; break;
-            case '\n': escaped += "\\n"; break;
-            case '\r': escaped += "\\r"; break;
-            case '\t': escaped += "\\t"; break;
-            default:
-                if (c >= 0 && c < 32) {
-                    char buf[7];
-                    sprintf_s(buf, sizeof(buf), "\\u%04x", static_cast<unsigned char>(c));
-                    escaped += buf;
-                } else {
-                    escaped += c;
-                }
-                break;
-        }
-    }
-    
-    return escaped;
-}
+// 
 
 // Apply Update Sequence Array (USA) fixup to an MFT record.
 // Without this, the last 2 bytes of each 512-byte sector contain fixup values
@@ -679,9 +784,9 @@ std::string HandleSearchRequestImpl(const std::string& requestJson) {
         if (hVolume == INVALID_HANDLE_VALUE) {
             DWORD error = GetLastError();
             std::wstringstream ss;
-            ss << L"Failed to open volume " << volumePath << L" with error " << error;
-            LogServiceEvent(EVENTLOG_ERROR_TYPE, ss.str(), error);
-            return "{\"success\":false,\"error\":\"Failed to open volume\"}";
+            ss << L"MFT volume handle failed (" << error << L"). Executing privileged service Win32 directory search for " << std::wstring(directory.begin(), directory.end());
+            LogServiceEvent(EVENTLOG_WARNING_TYPE, ss.str(), error);
+            return ExecuteServiceDirectorySearch(directory, pattern, maxResults, usePagination, page, pageSize);
         }
         
         // Get volume data
@@ -689,10 +794,10 @@ std::string HandleSearchRequestImpl(const std::string& requestJson) {
         if (!GetNtfsVolumeData(hVolume, volumeData)) {
             DWORD error = GetLastError();
             std::wstringstream ss;
-            ss << L"Failed to get NTFS volume data with error " << error;
-            LogServiceEvent(EVENTLOG_ERROR_TYPE, ss.str(), error);
+            ss << L"Failed to get NTFS volume data (" << error << L"). Executing privileged service Win32 directory search.";
+            LogServiceEvent(EVENTLOG_WARNING_TYPE, ss.str(), error);
             CloseHandle(hVolume);
-            return "{\"success\":false,\"error\":\"Failed to get volume data\"}";
+            return ExecuteServiceDirectorySearch(directory, pattern, maxResults, usePagination, page, pageSize);
         }
         
         DWORD recordSize = volumeData.BytesPerFileRecordSegment;

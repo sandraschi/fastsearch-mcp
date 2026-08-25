@@ -157,67 +157,6 @@ async def call_tool(name: str, body: dict) -> dict:
         }
 
 
-def _fallback_directory_search(
-    pattern: str = "*",
-    directory: str = ".",
-    max_results: int = 500,
-) -> dict:
-    """Fallback standard user directory search when MFT raw volume access or Windows service is unavailable."""
-    import fnmatch
-    import os
-
-    results = []
-    try:
-        dir_path = Path(directory).resolve() if os.path.exists(directory) else Path(".").resolve()
-    except Exception:
-        dir_path = Path(".").resolve()
-
-    pattern_lower = pattern.lower() if pattern else "*"
-    is_glob = "*" in pattern or "?" in pattern
-
-    try:
-        for root, dirs, files in os.walk(dir_path):
-            entries = files + (dirs if pattern == "*" else [])
-            for name in entries:
-                if is_glob:
-                    match = fnmatch.fnmatch(name.lower(), pattern_lower)
-                else:
-                    match = pattern_lower in name.lower()
-
-                if match:
-                    full_p = os.path.join(root, name)
-                    try:
-                        stat = os.stat(full_p)
-                        size = stat.st_size
-                        modified = int(stat.st_mtime)
-                    except Exception:
-                        size = 0
-                        modified = 0
-
-                    results.append(
-                        {
-                            "path": full_p,
-                            "name": name,
-                            "size": size,
-                            "modified": modified,
-                            "is_directory": os.path.isdir(full_p),
-                        }
-                    )
-                    if max_results > 0 and len(results) >= max_results:
-                        break
-            if max_results > 0 and len(results) >= max_results:
-                break
-    except Exception as e:
-        logger.warning(f"fallback_directory_search error: {e}")
-
-    return {
-        "success": True,
-        "results": results,
-        "count": len(results),
-        "fallback_mode": True,
-    }
-
-
 @router.post("/search")
 async def api_search(body: dict) -> dict:
     """Direct search endpoint for web UI dedicated Search & Treemap pages.
@@ -235,48 +174,32 @@ async def api_search(body: dict) -> dict:
         from fastsearch_mcp.service_ensure import ensure_service_available
 
         if not is_service_running():
-            ensured = await ensure_service_available(start_if_needed=True)
-            if not ensured.get("success") and not is_service_running():
-                # Fallback to standard user directory search when service is offline
-                fallback_res = _fallback_directory_search(pattern=pattern, directory=directory, max_results=max_results)
-                return {
-                    "service_down": True,
-                    "notice": "Service offline. Search executed via unprivileged directory fallback.",
-                    **fallback_res,
-                }
+            await ensure_service_available(start_if_needed=True)
 
-        try:
-            res = await search_files(
-                pattern=pattern,
-                directory=directory,
-                max_results=max_results,
-                pagination_mode=pagination_mode,
-                page=page,
-                page_size=page_size,
-            )
-            count = res.get("count", len(res.get("results", [])))
-            log_event(
-                level="INFO",
-                kind="tool_call",
-                detail=f"MFT Search: pattern='{pattern}', directory='{directory}', max_results={max_results} -> {count} items found",
-                meta={"pattern": pattern, "directory": directory, "count": count},
-            )
-            return {"success": True, "service_down": False, **res}
-        except Exception as search_err:
-            logger.info(f"MFT search exception ({search_err}); falling back to standard user directory search")
-            fallback_res = _fallback_directory_search(pattern=pattern, directory=directory, max_results=max_results)
-            return {
-                "service_down": False,
-                "notice": f"Fallback search executed: {search_err}",
-                **fallback_res,
-            }
+        res = await search_files(
+            pattern=pattern,
+            directory=directory,
+            max_results=max_results,
+            pagination_mode=pagination_mode,
+            page=page,
+            page_size=page_size,
+        )
+        count = res.get("count", len(res.get("results", [])))
+        log_event(
+            level="INFO",
+            kind="tool_call",
+            detail=f"Service Search: pattern='{pattern}', directory='{directory}', max_results={max_results} -> {count} items found",
+            meta={"pattern": pattern, "directory": directory, "count": count},
+        )
+        return {"success": True, "service_down": False, **res}
     except Exception as e:
-        logger.warning("api_search failed: %s; running directory fallback", e)
-        fallback_res = _fallback_directory_search(pattern=pattern, directory=directory, max_results=max_results)
+        logger.warning("api_search error: %s", e)
         return {
-            "service_down": True,
+            "success": False,
+            "service_down": "not running" in str(e).lower(),
             "error": str(e),
-            **fallback_res,
+            "results": [],
+            "count": 0,
         }
 
 

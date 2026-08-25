@@ -36,7 +36,7 @@ function formatBytes(bytes?: number): string {
 }
 
 export function TreemapPage() {
-  const [directory, setDirectory] = useState<string>("d:\\Dev\\repos");
+  const [directory, setDirectory] = useState<string>("C:\\");
   const [pattern, setPattern] = useState<string>("*");
   const [maxResults, setMaxResults] = useState<number>(1000);
 
