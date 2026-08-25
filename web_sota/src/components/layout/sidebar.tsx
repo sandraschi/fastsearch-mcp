@@ -23,6 +23,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
 
     const navItems = [
         { href: '/', label: 'Overview', icon: LayoutDashboard },
+        { href: '/search', label: 'Dedicated Search', icon: Search },
         { href: '/service', label: 'NTFS Search Service', icon: Server },
         { href: '/tests', label: 'Tests', icon: FlaskConical },
         { href: '/tools', label: 'Search Tools', icon: Search },

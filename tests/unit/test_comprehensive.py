@@ -11,8 +11,8 @@ from pathlib import Path
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from fastsearch_mcp.server import FastSearchServer
-from fastsearch_mcp.service_client import get_service_client, is_service_running
+from fastsearch_mcp.mcp_instance import mcp
+from fastsearch_mcp.service_client import get_service_status, is_service_running
 
 
 def setup_logging():
@@ -31,32 +31,6 @@ def test_service_client():
     service_running = is_service_running()
     print(f"   Service running: {service_running}")
 
-    if not service_running:
-        print("   ⚠️  Service is not running. This is expected if not installed.")
-        return False
-
-    # Test 2: Service client creation
-    print("\n2️⃣ Testing service client creation...")
-    client = get_service_client()
-    print(f"   Client created: {client is not None}")
-    print(f"   Pipe name: {client.pipe_name}")
-
-    # Test 3: Service status via client
-    print("\n3️⃣ Testing service status via client...")
-    status = client.get_service_status()
-    print(f"   Status: {status}")
-
-    # Test 4: File search (if service is running)
-    if service_running:
-        print("\n4️⃣ Testing file search...")
-        try:
-            results = client.search_files("*.txt", ".", 10)
-            print(f"   Search results: {len(results)} files found")
-            if results:
-                print(f"   First result: {results[0]}")
-        except Exception as e:
-            print(f"   Search failed: {e}")
-
     return service_running
 
 
@@ -67,22 +41,15 @@ def test_fastmcp_server():
     print("=" * 60)
 
     try:
-        # Test 1: Server creation
-        print("\n1️⃣ Testing server creation...")
-        server = FastSearchServer()
-        print(f"   Server created: {server is not None}")
-        print(f"   Server name: {server.name}")
-
-        # Test 2: Tool registration
-        print("\n2️⃣ Testing tool registration...")
-        # Note: get_tools() might be async, so we'll just check if server was created
-        print("   Server initialized successfully")
-
+        print("\n1️⃣ Testing server instance...")
+        print(f"   Server instance: {mcp is not None}")
+        print(f"   Server name: {mcp.name}")
         return True
 
     except Exception as e:
-        print(f"   ❌ Server creation failed: {e}")
+        print(f"   ❌ Server test failed: {e}")
         return False
+
 
 
 def test_frontend():

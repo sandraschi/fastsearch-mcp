@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/app-layout';
 import { Dashboard } from '@/pages/dashboard';
+import { Search } from '@/pages/search';
 import { Tools } from '@/pages/tools';
 import { Service } from '@/pages/service';
 import { Tests } from '@/pages/tests';
@@ -15,6 +16,7 @@ function App() {
       <AppLayout>
         <Routes>
           <Route path="/" element={<Dashboard />} />
+          <Route path="/search" element={<Search />} />
           <Route path="/tools" element={<Tools />} />
           <Route path="/service" element={<Service />} />
           <Route path="/tests" element={<Tests />} />

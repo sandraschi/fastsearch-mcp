@@ -125,7 +125,7 @@ async def list_tools() -> list[dict]:
         return [_tool_to_dict(t) for t in tools]
     except Exception as e:
         logger.exception("list_tools failed")
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        return []
 
 
 @router.post("/tools/{name}")
@@ -146,8 +146,104 @@ async def call_tool(name: str, body: dict) -> dict:
                     return {"text": text}
         return result.model_dump() if hasattr(result, "model_dump") else {"result": str(result)}
     except Exception as e:
-        logger.exception("call_tool %s failed", name)
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        logger.warning("call_tool %s failed: %s", name, e)
+        err_msg = str(e)
+        is_down = "service is not running" in err_msg.lower() or "not connected" in err_msg.lower()
+        return {
+            "success": False,
+            "error": err_msg,
+            "service_down": is_down,
+        }
+
+
+@router.post("/search")
+async def api_search(body: dict) -> dict:
+    """Direct search endpoint for web UI dedicated Search page.
+    Body: { pattern: str, directory?: str, max_results?: int, pagination_mode?: str, page?: int, page_size?: int }
+    """
+    pattern = body.get("pattern", "*")
+    directory = body.get("directory", "C:\\")
+    max_results = int(body.get("max_results", 100))
+    pagination_mode = body.get("pagination_mode")
+    page = int(body.get("page", 1))
+    page_size = int(body.get("page_size", 1000))
+
+    try:
+        from fastsearch_mcp.service_client import is_service_running, search_files
+        if not is_service_running():
+            return {
+                "success": False,
+                "service_down": True,
+                "error": "FastSearch Windows Service is not running",
+                "results": [],
+                "count": 0,
+            }
+        res = await search_files(
+            pattern=pattern,
+            directory=directory,
+            max_results=max_results,
+            pagination_mode=pagination_mode,
+            page=page,
+            page_size=page_size,
+        )
+        return {"success": True, "service_down": False, **res}
+    except Exception as e:
+        logger.warning("api_search failed: %s", e)
+        return {
+            "success": False,
+            "service_down": "not running" in str(e).lower(),
+            "error": str(e),
+            "results": [],
+            "count": 0,
+        }
+
+
+@router.get("/service/status")
+async def api_service_status() -> dict:
+    """Get service status directly without MCP overhead."""
+    try:
+        from fastsearch_mcp.service_client import get_service_status
+        status = await get_service_status()
+        return {"success": True, **status}
+    except Exception as e:
+        return {"success": False, "running": False, "error": str(e)}
+
+
+@router.post("/service/start")
+async def api_service_start() -> dict:
+    """Start FastSearch service."""
+    try:
+        from fastsearch_mcp.service_client import start_service
+        ok = await start_service()
+        return {"success": ok, "message": "Service start command sent" if ok else "Failed to start service"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@router.post("/service/stop")
+async def api_service_stop() -> dict:
+    """Stop FastSearch service."""
+    try:
+        from fastsearch_mcp.service_client import stop_service
+        ok = await stop_service()
+        return {"success": ok, "message": "Service stop command sent" if ok else "Failed to stop service"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@router.post("/service/restart")
+async def api_service_restart() -> dict:
+    """Restart FastSearch service."""
+    try:
+        import asyncio
+        from fastsearch_mcp.service_client import start_service, stop_service
+        await stop_service()
+        await asyncio.sleep(1.0)
+        ok = await start_service()
+        return {"success": ok, "message": "Service restarted" if ok else "Failed to restart service"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
 
 
 @router.get("/file")

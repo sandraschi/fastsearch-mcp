@@ -16,14 +16,18 @@ The FastSearch MCP service is a minimal Windows service written in C++17. Its so
 
 ---
 
-## Service Entry Point
+## Service Entry Point & Command Dispatch
 
 ```cpp
 int wmain(int argc, wchar_t* argv[]) {
-    FastSearchService service;
-
     if (argc > 1) {
-        return HandleCommandLine(argc, argv, service); // install/uninstall/debug
+        std::wstring arg = argv[1];
+        if (arg == L"install" || arg == L"--install") return InstallService();
+        if (arg == L"uninstall" || arg == L"--uninstall") return UninstallService();
+        if (arg == L"start" || arg == L"--start") return StartServiceCmd();
+        if (arg == L"stop" || arg == L"--stop") return StopServiceCmd();
+        if (arg == L"standalone" || arg == L"--standalone" || arg == L"console") return RunStandaloneMode();
+        // ...
     }
 
     SERVICE_TABLE_ENTRY service_table[] = {
@@ -32,14 +36,16 @@ int wmain(int argc, wchar_t* argv[]) {
     };
 
     if (!StartServiceCtrlDispatcher(service_table)) {
-        SvcLogMessage(EventLogLevel::Error, L"StartServiceCtrlDispatcher failed", GetLastError());
+        // Fallback to standalone mode if launched interactively
+        RunStandaloneMode();
     }
     return 0;
 }
 ```
 
-- `HandleCommandLine` supports `--install`, `--uninstall`, and `--debug` for manual testing.
-- In service mode we register control handlers, initialise logging, and spin up the worker thread that listens on the named pipe.
+- Supports both standard commands (`install`, `uninstall`, `start`, `stop`, `standalone`) and flag-style aliases (`--install`, `--uninstall`, `--start`, `--stop`, `--standalone`).
+- `RunStandaloneMode()` allows running the C++ named pipe server interactively in a console window with `SetConsoleCtrlHandler` for Ctrl+C interception without requiring administrative Windows Service Control Manager setup.
+- When started by Windows SCM, `StartServiceCtrlDispatcher` registers control handlers, initialises logging, and spins up the worker thread pool.
 
 ---
 

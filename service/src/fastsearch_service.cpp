@@ -850,9 +850,65 @@ bool StopExistingService() {
     return true;
 }
 
+BOOL WINAPI ConsoleHandler(DWORD ctrlType) {
+    if (ctrlType == CTRL_C_EVENT || ctrlType == CTRL_BREAK_EVENT || ctrlType == CTRL_CLOSE_EVENT) {
+        std::wcout << L"\nShutting down FastSearch MCP standalone server..." << std::endl;
+        g_ctx.running = false;
+        if (g_ctx.stopEvent) {
+            SetEvent(g_ctx.stopEvent);
+        }
+        return TRUE;
+    }
+    return FALSE;
+}
+
+int RunStandaloneMode() {
+    std::wcout << L"Starting FastSearch MCP Service in standalone/console mode..." << std::endl;
+    SetConsoleCtrlHandler(ConsoleHandler, TRUE);
+    g_ctx.running = true;
+    g_ctx.stopEvent = CreateEventW(nullptr, TRUE, FALSE, nullptr);
+
+    const DWORD NUM_WORKER_THREADS = 10;
+    g_ctx.workerThreadCount = NUM_WORKER_THREADS;
+    g_ctx.workerThreads = new HANDLE[NUM_WORKER_THREADS];
+
+    for (DWORD i = 0; i < NUM_WORKER_THREADS; ++i) {
+        g_ctx.workerThreads[i] = CreateThread(
+            nullptr, 0, ServiceWorkerThread,
+            reinterpret_cast<LPVOID>(static_cast<DWORD_PTR>(i)), 0, nullptr
+        );
+    }
+
+    std::wcout << L"FastSearch MCP Named Pipe Server listening on " << kPipeName
+               << L" with " << NUM_WORKER_THREADS << L" worker threads." << std::endl;
+    std::wcout << L"Press Ctrl+C to stop." << std::endl;
+
+    while (g_ctx.running) {
+        Sleep(500);
+    }
+
+    std::wcout << L"Stopping worker threads..." << std::endl;
+    if (g_ctx.workerThreads && g_ctx.workerThreadCount > 0) {
+        WaitForMultipleObjects(g_ctx.workerThreadCount, g_ctx.workerThreads, TRUE, 3000);
+        for (DWORD i = 0; i < g_ctx.workerThreadCount; ++i) {
+            if (g_ctx.workerThreads[i]) {
+                CloseHandle(g_ctx.workerThreads[i]);
+            }
+        }
+        delete[] g_ctx.workerThreads;
+        g_ctx.workerThreads = nullptr;
+    }
+    if (g_ctx.stopEvent) {
+        CloseHandle(g_ctx.stopEvent);
+        g_ctx.stopEvent = nullptr;
+    }
+    std::wcout << L"Standalone server stopped." << std::endl;
+    return 0;
+}
+
 void PrintUsage() {
     std::wcout << L"FastSearch MCP Service" << std::endl
-               << L"Usage: fastsearchservice [--install|--uninstall|--start|--stop|--help]" << std::endl;
+               << L"Usage: fastsearchservice [install|--install|uninstall|--uninstall|start|--start|stop|--stop|standalone|--standalone|--help]" << std::endl;
 }
 
 std::wstring FormatErrorMessage(DWORD error) {
@@ -878,17 +934,20 @@ int wmain(int argc, wchar_t* argv[]) {
 
     if (argc > 1) {
         const std::wstring command = argv[1];
-        if (command == L"--install") {
+        if (command == L"--install" || command == L"install") {
             return InstallService() ? 0 : 1;
         }
-        if (command == L"--uninstall") {
+        if (command == L"--uninstall" || command == L"uninstall") {
             return UninstallService() ? 0 : 1;
         }
-        if (command == L"--start") {
+        if (command == L"--start" || command == L"start") {
             return StartExistingService() ? 0 : 1;
         }
-        if (command == L"--stop") {
+        if (command == L"--stop" || command == L"stop") {
             return StopExistingService() ? 0 : 1;
+        }
+        if (command == L"--standalone" || command == L"standalone" || command == L"--console" || command == L"console") {
+            return RunStandaloneMode();
         }
         PrintUsage();
         return 0;

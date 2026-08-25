@@ -2,12 +2,12 @@
   "$schema": "https://glama.ai/mcp/schemas/server.json",
   "maintainers": ["sandraschi"],
   "name": "fastsearch-mcp",
-  "description": "File search for Claude Desktop via direct NTFS Master File Table access. Zero indexing, zero caching, sub-second search across millions of files. Beta status.",
+  "description": "Lightning-fast file search for Claude Desktop & Web apps via direct NTFS Master File Table access. Zero indexing, zero caching, sub-second search across millions of files.",
   "type": "mcp_server",
-  "status": "beta",
-  "framework": "FastMCP 2.13+",
-  "tools": 4,
-  "transport": ["stdio"],
+  "status": "production",
+  "framework": "FastMCP 3.2",
+  "tools": 18,
+  "transport": ["stdio", "sse", "http"],
   "keywords": [
     "search",
     "file-search",
@@ -16,12 +16,13 @@
     "filesystem",
     "windows",
     "mcp-server",
-    "fastmcp"
+    "fastmcp",
+    "rest-api"
   ],
   "features": {
     "direct_mft_access": {
       "enabled": true,
-      "note": "Direct NTFS MFT reads, no indexing"
+      "note": "Direct NTFS MFT reads, no background indexing"
     },
     "zero_indexing": {
       "enabled": true
@@ -33,10 +34,21 @@
       "enabled": true,
       "note": "Elevated C++ service + Python bridge"
     },
+    "standalone_mode": {
+      "enabled": true,
+      "note": "Interactive terminal server mode without SCM setup"
+    },
+    "dedicated_search_page": {
+      "enabled": true,
+      "note": "SOTA React UI with live status, filters, and preview drawer"
+    },
+    "direct_rest_api": {
+      "enabled": true,
+      "note": "FastAPI REST API bridge on port 10845"
+    },
     "performance": {
       "enabled": true,
       "note": "Sub-second search, <50MB memory"
     }
   }
 }
-

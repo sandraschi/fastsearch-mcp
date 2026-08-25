@@ -12,11 +12,9 @@ import sys
 from pathlib import Path
 
 # Add the package root to the Python path
-sys.path.insert(0, str(Path(__file__).parent / "fastsearch_mcp_bridge" / "src"))
+from fastsearch_mcp.mcp_instance import mcp
+from fastsearch_mcp.pipe_client import NamedPipeClient
 
-from fastsearch_mcp.ipc import FastSearchClient, IpcError
-
-from fastsearch_mcp import McpServer, __version__
 
 # Configure logging
 logging.basicConfig(

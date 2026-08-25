@@ -182,23 +182,23 @@ This project adheres to **SOTA 14.1** industrial standards for high-fidelity age
 - **Protocol Compliance**: Hardened `stdout/stderr` isolation to ensure crash-resistant JSON-RPC communication.
 - **Automation**: [Justfile](./justfile) recipes for all fleet operations (`just lint`, `just fix`, `just dev`).
 - **Security**: Automated audits via `bandit` and `safety`.
+## 🌐 Webapp Dashboard & Dedicated Search Page
+
+This MCP server includes a free, premium web interface for file search, monitoring, and service control.
+By default, the web dashboard runs on port **10844** with REST API bridge on port **10845**.
+
+**Features & Pages:**
+- **Dedicated Search Page (`/search`)**: SOTA file search UI with live service status badge, instant drive shortcuts (`C:\`, `D:\`), category filters (Code, Docs, Images, Media, Archives, Apps), interactive data table with sorting/pagination, file preview drawer (text, hex, image), JSON/CSV export, and query history.
+- **System Insight (`/`)**: Real-time service operational status and health metrics.
+- **NTFS Search Service (`/service`)**: Start, stop, restart, repair, or monitor the C++ named pipe service.
+- **Tests (`/tests`)**: Live integration test suite verifying named pipe connections and queries.
+- **Tools, Actions, AI Assistant, System Logs, Settings**.
+
+To start the webapp:
+1. `uv run python run_server.py` (API bridge on port 10845)
+2. `cd web_sota && npm run dev` (Frontend on port 10844)
+3. Open `http://localhost:10844/search` in your browser.
 
 ##  License
 
-MIT  see [LICENSE](LICENSE).
-
-
-##  Webapp Dashboard
-
-This MCP server includes a free, premium web interface for monitoring and control.
-By default, the web dashboard runs on port **10844**.
-*(Assigned ports: **10844** (Web dashboard frontend), **10845** (Web dashboard backend (API)))*
-
-**Pages:** Overview, NTFS Search Service, **Tests** (live pipe + search tests), Search Tools, Quick Actions, AI Assistant, System Logs, Settings.
-
-To start the webapp:
-1. Navigate to the `web_sota` (or `webapp`) directory.
-2. Run `start.ps1` (PowerShell).
-3. Open `http://localhost:10844` in your browser.
-
-The **Tests** page runs live integration tests (service process check, pipe connect, get_service_info, real search via pipe) so you can verify the service and search path without leaving the dashboard.
+MIT — see [LICENSE](LICENSE).

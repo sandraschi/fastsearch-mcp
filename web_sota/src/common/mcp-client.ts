@@ -116,6 +116,64 @@ class MCPClient {
         }
         return response.json();
     }
+
+    async searchDirect(params: {
+        pattern: string;
+        directory?: string;
+        max_results?: number;
+        pagination_mode?: string;
+        page?: number;
+        page_size?: number;
+    }): Promise<{ success: boolean; service_down?: boolean; error?: string; results?: any[]; count?: number }> {
+        try {
+            const response = await fetch(`${this.baseUrl}/search`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(params),
+            });
+            return await response.json();
+        } catch (error) {
+            console.error("searchDirect failed:", error);
+            return { success: false, service_down: true, error: String(error), results: [], count: 0 };
+        }
+    }
+
+    async getServiceStatusDirect(): Promise<{ success: boolean; running?: boolean; service_state?: string; pipe_connected?: boolean; executable_path?: string; error?: string }> {
+        try {
+            const response = await fetch(`${this.baseUrl}/service/status`);
+            return await response.json();
+        } catch (error) {
+            return { success: false, running: false, error: String(error) };
+        }
+    }
+
+    async startServiceDirect(): Promise<{ success: boolean; message?: string; error?: string }> {
+        try {
+            const response = await fetch(`${this.baseUrl}/service/start`, { method: "POST" });
+            return await response.json();
+        } catch (error) {
+            return { success: false, error: String(error) };
+        }
+    }
+
+    async stopServiceDirect(): Promise<{ success: boolean; message?: string; error?: string }> {
+        try {
+            const response = await fetch(`${this.baseUrl}/service/stop`, { method: "POST" });
+            return await response.json();
+        } catch (error) {
+            return { success: false, error: String(error) };
+        }
+    }
+
+    async restartServiceDirect(): Promise<{ success: boolean; message?: string; error?: string }> {
+        try {
+            const response = await fetch(`${this.baseUrl}/service/restart`, { method: "POST" });
+            return await response.json();
+        } catch (error) {
+            return { success: false, error: String(error) };
+        }
+    }
 }
 
 export const mcpClient = new MCPClient();
+

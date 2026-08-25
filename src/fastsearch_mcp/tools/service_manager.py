@@ -617,7 +617,7 @@ async def list_services(
     search: str = "",
     include_details: bool = True,
 ) -> dict:
-    """LIST_SERVICES — Enumerate Windows services with optional filters.
+    """LIST_SERVICES - Enumerate Windows services with optional filters.
 
     Use this read-only tool to discover service names, states, and startup types before
     calling get_service, start_service, stop_service, or restart_service. Prefer
@@ -702,7 +702,7 @@ async def list_services(
 
 @mcp.tool
 async def get_service(service_name: str) -> dict:
-    """GET_SERVICE — Read-only snapshot of one Windows service (SCM).
+    """GET_SERVICE - Read-only snapshot of one Windows service (SCM).
 
     Use before start/stop/restart to confirm the exact service ``name``, current
     ``status``, and impact (dependencies, binary_path). Does not change system state.
@@ -744,7 +744,7 @@ async def start_service(
     timeout: int = 30,
     dry_run: bool = False,
 ) -> dict:
-    """START_SERVICE — Start a Windows service and wait until RUNNING or timeout.
+    """START_SERVICE - Start a Windows service and wait until RUNNING or timeout.
 
     Mutates system state: can launch processes depended on by other components. Use
     get_service or list_services first; avoid stopping/starting critical OS services
@@ -811,7 +811,7 @@ async def start_service(
 
 @mcp.tool
 async def stop_service(service_name: str, timeout: int = 30, dry_run: bool = False) -> dict:
-    """STOP_SERVICE — Stop a Windows service and wait until STOPPED or timeout.
+    """STOP_SERVICE - Stop a Windows service and wait until STOPPED or timeout.
 
     Destructive: can interrupt dependent apps (DB, web, print queues). Use get_service
     first; do not stop services you cannot name or that the user did not ask to stop.
@@ -872,7 +872,7 @@ async def stop_service(service_name: str, timeout: int = 30, dry_run: bool = Fal
 
 @mcp.tool
 async def restart_service(service_name: str, timeout: int = 60, dry_run: bool = False) -> dict:
-    """RESTART_SERVICE — Stop then start a Windows service (two-phase, bounded time).
+    """RESTART_SERVICE - Stop then start a Windows service (two-phase, bounded time).
 
     Highest-impact mutation: combines stop + start risks. Use for user-requested
     recovery of a known service; prefer stop_service + start_service separately if you
@@ -936,10 +936,10 @@ async def restart_service(service_name: str, timeout: int = 60, dry_run: bool = 
 
 @mcp.tool
 async def set_service_startup_type(service_name: str, startup_type: ServiceStartupInput) -> dict:
-    """SET_SERVICE_STARTUP_TYPE — Change SCM start mode (boot/system/auto/manual/disabled).
+    """SET_SERVICE_STARTUP_TYPE - Change SCM start mode (boot/system/auto/manual/disabled).
 
     Persists across reboots. Disabling or switching to manual can prevent a service
-    from coming back after restart—confirm with the user before disabling dependencies.
+    from coming back after restart-confirm with the user before disabling dependencies.
 
     Args:
         service_name: SCM short name.

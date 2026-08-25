@@ -8,7 +8,10 @@ import sys
 import time
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).parent / "src"))
+
 
 
 def is_admin():
@@ -69,7 +72,7 @@ from fastsearch_mcp.tools.ntfs import (
 )
 
 
-class TestResults:
+class ResultsContainer:
     def __init__(self):
         self.passed = []
         self.failed = []
@@ -116,9 +119,10 @@ class TestResults:
             print()
 
 
-results = TestResults()
+results = ResultsContainer()
 
 
+@pytest.mark.asyncio
 async def test_ntfs_list_volumes():
     """Test listing all NTFS volumes."""
     test_name = "NTFS List Volumes"
@@ -146,6 +150,7 @@ async def test_ntfs_list_volumes():
         return False
 
 
+@pytest.mark.asyncio
 async def test_ntfs_volume_info():
     """Test getting volume info for C: drive."""
     test_name = "NTFS Volume Info - C:"
@@ -185,6 +190,7 @@ async def test_ntfs_volume_info():
         return False
 
 
+@pytest.mark.asyncio
 async def test_ntfs_volume_info_drive():
     """Test getting volume info for D: drive."""
     test_name = "NTFS Volume Info - D:"
@@ -227,6 +233,7 @@ async def test_ntfs_volume_info_drive():
         return False
 
 
+@pytest.mark.asyncio
 async def test_ntfs_check_health():
     """Test checking volume health for C: drive."""
     test_name = "NTFS Check Health - C:"

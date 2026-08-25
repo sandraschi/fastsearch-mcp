@@ -308,17 +308,17 @@ async def monitor_system_resources(
     include_system: bool = True,
     callback_url: str | None = None,
 ) -> dict:
-    """MONITOR_SYSTEM_RESOURCES — CPU, memory, disk, network, and optional top processes.
+    """MONITOR_SYSTEM_RESOURCES - CPU, memory, disk, network, and optional top processes.
 
     **Duration semantics:** ``duration <= 0`` (default ``0``) returns **one synchronous
-    snapshot** and completes immediately—no blocking loop and no streaming. Use this
+    snapshot** and completes immediately-no blocking loop and no streaming. Use this
     for ad-hoc health checks.
 
     **When ``duration > 0``:** starts a **background** asyncio task that samples every
     ``interval`` seconds until the window elapses. The tool **returns immediately** with
     ``status`` ``monitoring_started``, ``samples`` initially empty, then fills in the
-    background—callers cannot rely on ``samples`` in the same MCP response. This is not
-    a blocking “continuous tail”; for long captures, poll with repeated
+    background-callers cannot rely on ``samples`` in the same MCP response. This is not
+    a blocking "continuous tail"; for long captures, poll with repeated
     ``duration=0`` snapshots or extend the client.
 
     Args:
@@ -337,7 +337,7 @@ async def monitor_system_resources(
         Timed run: ``status``, ``start_time``, ``end_time``, ``interval``, ``samples``
         (list filled asynchronously), later ``sample_count`` when the loop finishes.
 
-    Recovery: Empty ``cpu``/``memory`` on error—check logs; on Windows without ``getloadavg``,
+    Recovery: Empty ``cpu``/``memory`` on error-check logs; on Windows without ``getloadavg``,
     ``load_avg`` may be omitted.
     """
     global _monitoring
@@ -532,11 +532,11 @@ async def get_process_info(
     sort_by: str = "cpu_percent",
     sort_desc: bool = True,
 ) -> list[dict]:
-    """GET_PROCESS_INFO — Detailed rows for selected or filtered processes (psutil).
+    """GET_PROCESS_INFO - Detailed rows for selected or filtered processes (psutil).
 
     **Pagination:** There is **no cursor**. At most ``limit`` rows are returned after
     sort (default 100). The implementation may briefly consider up to ``limit * 2``
-    candidates before sorting—tune ``limit`` if you need a wider net or a smaller response.
+    candidates before sorting-tune ``limit`` if you need a wider net or a smaller response.
 
     Args:
         pids: If non-empty, only these PIDs are resolved (others ignored). If empty,

@@ -8,7 +8,10 @@ import sys
 import time
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).parent / "src"))
+
 
 
 def is_admin():
@@ -57,7 +60,7 @@ from fastsearch_mcp.tools.service import (
 )
 
 
-class TestResults:
+class ResultsContainer:
     def __init__(self):
         self.passed = []
         self.failed = []
@@ -104,9 +107,10 @@ class TestResults:
             print()
 
 
-results = TestResults()
+results = ResultsContainer()
 
 
+@pytest.mark.asyncio
 async def test_service_status():
     """Test getting service status."""
     test_name = "Service Status"
@@ -135,6 +139,7 @@ async def test_service_status():
         return False
 
 
+@pytest.mark.asyncio
 async def test_service_start():
     """Test starting the service."""
     test_name = "Service Start"
@@ -195,6 +200,7 @@ async def test_service_start():
         return False
 
 
+@pytest.mark.asyncio
 async def test_service_stop():
     """Test stopping the service."""
     test_name = "Service Stop"
@@ -255,6 +261,7 @@ async def test_service_stop():
         return False
 
 
+@pytest.mark.asyncio
 async def test_service_restart():
     """Test restarting the service."""
     test_name = "Service Restart"
@@ -315,6 +322,7 @@ async def test_service_restart():
         return False
 
 
+@pytest.mark.asyncio
 async def test_service_repair():
     """Test repairing the service."""
     test_name = "Service Repair"

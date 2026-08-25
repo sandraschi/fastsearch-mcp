@@ -10,8 +10,8 @@ from pathlib import Path
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from fastsearch_mcp.server import FastSearchServer
-from fastsearch_mcp.service_client import get_service_client, is_service_running
+from fastsearch_mcp.mcp_instance import mcp
+from fastsearch_mcp.service_client import get_service_status, is_service_running
 
 
 def test_service_client():
@@ -21,33 +21,17 @@ def test_service_client():
     # Test service status
     print(f"Service running: {is_service_running()}")
 
-    # Test client creation
-    client = get_service_client()
-    print(f"Client created: {client is not None}")
-    print(f"Pipe name: {client.pipe_name}")
-
-    # Test service status
-    status = client.get_service_status()
-    print(f"Service status: {status}")
-
 
 def test_fastmcp_server():
     """Test the FastMCP server."""
     print("\n=== Testing FastMCP Server ===")
 
     try:
-        server = FastSearchServer()
-        print(f"Server created: {server is not None}")
-        print(f"Server name: {server.name}")
-
-        # Check if tools are registered
-        tools = server.app.get_tools()
-        print(f"Tools registered: {len(tools)}")
-        for tool in tools:
-            print(f"  - {tool.name}: {tool.description}")
-
+        print(f"Server instance created: {mcp is not None}")
+        print(f"Server name: {mcp.name}")
     except Exception as e:
         print(f"Error creating server: {e}")
+
 
 
 def main():

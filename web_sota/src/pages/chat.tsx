@@ -5,7 +5,6 @@ import { getLlmConfig, setLlmConfig } from "@/common/llm-config";
 
 const HISTORY_KEY = "fastsearch-chat-history";
 const PERSONALITY_KEY = "fastsearch-chat-personality";
-const MAX_HISTORY = 100;
 
 const PERSONALITIES: Record<string, string> = {
   "Search Expert": "You are a search expert specializing in high-performance file indexing and search. Provide guidance on search patterns, MFT queries, and file system navigation.",
@@ -102,7 +101,7 @@ export function Chat() {
           <div className="p-4 flex-1 overflow-hidden flex flex-col">
             <textarea className="flex-1 min-h-[120px] bg-slate-900 border border-slate-800 text-slate-200 text-sm rounded p-2 resize-none"
               placeholder="Define how the assistant should behave..." value={PERSONALITIES[personality]}
-              onChange={(e) => { /* Personality-managed */ }}
+              onChange={() => { /* Personality-managed */ }}
               onBlur={() => setLlmConfig({ systemPrompt: PERSONALITIES[personality] })}
             />
             <p className="text-xs text-slate-500 mt-2">Managed by personality selector above.</p>

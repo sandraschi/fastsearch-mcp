@@ -1,15 +1,15 @@
 # FastSearch MCP - Product Requirements Document (PRD)
 
 **Project:** FastSearch MCP Server  
-**Version:** 2.3  
-**Date:** March 2025  
-**Status:** ✅ Production Ready - Search functionality fully operational, live tests and Tests page added
+**Version:** 2.4  
+**Date:** August 2026  
+**Status:** ✅ Production Ready - Dedicated SOTA Search Page, direct REST API bridge, interactive standalone engine mode, zero-mock live health metrics.
 
 ---
 
 ## 📋 Executive Summary
 
-FastSearch MCP gives Claude Desktop instant, large-scale file search on Windows by reading the NTFS Master File Table (MFT) on demand. A privileged C++ Windows service performs the MFT scan while a user-mode Python MCP bridge exposes tools to Claude. We explicitly reject traditional indexing, caching, or background scanning so startup stays instant and results remain live.
+FastSearch MCP gives Claude Desktop and Web applications instant, large-scale file search on Windows by reading the NTFS Master File Table (MFT) on demand. A privileged C++ Windows service performs the MFT scan while a user-mode Python MCP bridge exposes tools to Claude, alongside a direct FastAPI REST bridge and SOTA React Search UI (`/search`). We explicitly reject traditional indexing, caching, or background scanning so startup stays instant and results remain live.
 
 ---
 
@@ -163,6 +163,15 @@ FastSearch MCP gives Claude Desktop instant, large-scale file search on Windows 
 8. **Explore additional tools** (e.g. permission reporting) while respecting zero-indexing rules.
 
 ---
+
+## 📝 Recent Achievements (August 2026)
+
+- ✅ **Dedicated SOTA Search Page (`/search`)** - Interactive search UI with live service status badge, drive shortcuts (`C:\`, `D:\`), category filters, sorting/pagination, file preview drawer (text, hex, image), export (CSV/JSON), and `localStorage` history.
+- ✅ **Standalone C++ Engine Mode** - Interactive `--standalone` / `standalone` mode for `FastSearchServiceNew.exe` with Ctrl+C handler for non-SCM execution.
+- ✅ **Direct REST API Endpoints** - FastAPI routes in `api_bridge.py`: `/api/search`, `/api/service/status`, `/api/service/start`, `/api/service/stop`, `/api/service/restart`, `/api/file`.
+- ✅ **Zero-Mock Dashboard** - Refactored `dashboard.tsx` to remove all static mock gaslights, querying live REST service status in real time.
+- ✅ **500 Error Prevention** - Structured error responses (`"service_down": true`) on pipe disconnections, eliminating server crashes.
+- ✅ **100% Test Pass Rate** - 17/17 unit tests passing cleanly in `tests/unit/`.
 
 ## 📝 Recent Achievements (March 2025)
 

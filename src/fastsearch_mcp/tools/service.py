@@ -119,7 +119,7 @@ async def service_status_fastsearch() -> dict[str, str | bool | int]:
 
 @mcp.tool
 async def service_start_fastsearch(dry_run: bool = False) -> dict[str, str | bool]:
-    """SERVICE_START_FASTSEARCH — Start the FastSearch NTFS indexing Windows service.
+    """SERVICE_START_FASTSEARCH - Start the FastSearch NTFS indexing Windows service.
 
     Requires local **Administrator** (elevated). Use ``service_status`` first to see
     whether the service is installed and running. This is narrower than generic
@@ -134,7 +134,7 @@ async def service_start_fastsearch(dry_run: bool = False) -> dict[str, str | boo
         non-admin (unless ``dry_run``).
 
     Recovery: Not installed → install flow; access denied → elevate shell; already running
-    is typically a no-op at SCM level—check ``service_status``.
+    is typically a no-op at SCM level-check ``service_status``.
     """
     if dry_run:
         return {
@@ -157,7 +157,7 @@ async def service_start_fastsearch(dry_run: bool = False) -> dict[str, str | boo
 
 @mcp.tool
 async def service_stop_fastsearch(dry_run: bool = False) -> dict[str, str | bool]:
-    """SERVICE_STOP_FASTSEARCH — Stop the FastSearch indexing service (admin).
+    """SERVICE_STOP_FASTSEARCH - Stop the FastSearch indexing service (admin).
 
     Stopping the service pauses background indexing until started again; active MCP
     clients may lose connectivity to the local indexer depending on deployment.
@@ -191,7 +191,7 @@ async def service_stop_fastsearch(dry_run: bool = False) -> dict[str, str | bool
 
 @mcp.tool
 async def service_restart_fastsearch(dry_run: bool = False) -> dict[str, str | bool]:
-    """SERVICE_RESTART_FASTSEARCH — Restart FastSearch (single SCM restart call; admin).
+    """SERVICE_RESTART_FASTSEARCH - Restart FastSearch (single SCM restart call; admin).
 
     Equivalent to a stop+start from the perspective of dependent apps; brief outage while
     the process recycles.

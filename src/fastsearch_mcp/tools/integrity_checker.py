@@ -407,13 +407,13 @@ async def check_file_integrity(
     exclude_dirs: list[str] | None = None,
     max_file_size: int = 100,
 ) -> dict:
-    """CHECK_FILE_INTEGRITY — Compare files on disk to a persisted hash database.
+    """CHECK_FILE_INTEGRITY - Compare files on disk to a persisted hash database.
 
     **paths:** Each entry may be a **file** or a **directory**. Files are verified
     directly. Directories are walked when ``recursive`` is True (subject to ``patterns``
     and ``exclude_dirs``). If a path does not exist, behavior depends on the checker:
     missing files referenced only from DB surface as ``missing`` in per-file results;
-    completely invalid roots typically yield errors or empty work—prefer validating paths
+    completely invalid roots typically yield errors or empty work-prefer validating paths
     before calling.
 
     **database:** JSON backing store for known-good hashes (default under the user profile).

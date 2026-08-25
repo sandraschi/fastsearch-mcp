@@ -1,16 +1,38 @@
 # FastSearch MCP v0.5.0 — Full Documentation
-Generated: 2026-05-16T05:54:01.910345
+Generated: 2026-08-25T03:14:07.413686
 
 ## README
 Source: README.md
 ```
 # FastSearch MCP
 
-[![GitHub Release](https://img.shields.io/github/v/release/sandraschi/fastsearch-mcp?style=flat-square&logo=github&logoColor=white)](https://github.com/sandraschi/fastsearch-mcp/releases) [![FastMCP](https://img.shields.io/badge/FastMCP-3.2-blue?style=flat-square&logo=python&logoColor=white)](https://fastmcp.ai) [![Windows](https://img.shields.io/badge/Windows-10%2B-0078D6?style=flat-square&logo=windows&logoColor=white)](https://www.microsoft.com/windows) [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff) [![Biome](https://img.shields.io/badge/Linted_with-Biome-60a5fa?style=flat-square&logo=biome&logoColor=white)](https://biomejs.dev/) [![Just](https://img.shields.io/badge/Built_with-Just-000000?style=flat-square&logo=gnu-bash&logoColor=white)](https://github.com/casey/just) [![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue?style=flat-square&logo=python&logoColor=white)](https://www.python.org/) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT) [![Last Commit](https://img.shields.io/github/last-commit/sandraschi/fastsearch-mcp?style=flat-square&logo=github&logoColor=white)](https://github.com/sandraschi/fastsearch-mcp/commits/main) [![Repo Size](https://img.shields.io/github/repo-size/sandraschi/fastsearch-mcp?style=flat-square&logo=github&logoColor=white)](https://github.com/sandraschi/fastsearch-mcp) [![CI](https://img.shields.io/github/actions/workflow/status/sandraschi/fastsearch-mcp/.github/workflows/ci.yml?style=flat-square&logo=githubactions&logoColor=white&label=CI)](https://github.com/sandraschi/fastsearch-mcp/actions)
+<p align="center">
+  <a href="https://github.com/casey/just"><img src="https://img.shields.io/badge/just-ready_to_go-7c5cfc?style=flat-square&logo=just&logoColor=white" alt="Just"></a>
+  <a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json" alt="Ruff"></a>
+  <a href="https://python.org"><img src="https://img.shields.io/badge/Python-3.13+-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python"></a>
+  <a href="https://github.com/PrefectHQ/fastmcp"><img src="https://img.shields.io/badge/FastMCP-3.2-7c5cfc?style=flat-square" alt="FastMCP"></a>
+</p>
 
-  Lightning-fast file search via direct NTFS Master File Table access — zero indexing, zero caching. FastMCP 3.2 with CodeMode, prompts, and skills.
+  
+> 📖 **[Installation Guide](INSTALL.md)** — quick start, manual setup, and troubleshooting
+
+Lightning-fast file search via direct NTFS Master File Table access — zero indexing, zero caching. FastMCP 3.2 with CodeMode, prompts, and skills.
 
 > **Core Principle:** FastSearch MCP follows the WizFile philosophy. Every request reads straight from the NTFS MFT. We never build background indexes, caches, or persistent file databases.
+
+## Quick Start
+
+```powershell
+git clone https://github.com/sandraschi/fastsearch-mcp
+cd fastsearch-mcp
+just
+```
+
+This opens an interactive dashboard showing all available commands. Run `just bootstrap` to install dependencies, then `just serve` or `just dev` to start.
+
+### Manual Setup
+
+If you don't have `just` installed:
 
 ##  Why FastSearch MCP
 
@@ -166,26 +188,26 @@ This project adheres to **SOTA 14.1** industrial standards for high-fidelity age
 - **Protocol Compliance**: Hardened `stdout/stderr` isolation to ensure crash-resistant JSON-RPC communication.
 - **Automation**: [Justfile](./justfile) recipes for all fleet operations (`just lint`, `just fix`, `just dev`).
 - **Security**: Automated audits via `bandit` and `safety`.
+## 🌐 Webapp Dashboard & Dedicated Search Page
+
+This MCP server includes a free, premium web interface for file search, monitoring, and service control.
+By default, the web dashboard runs on port **10844** with REST API bridge on port **10845**.
+
+**Features & Pages:**
+- **Dedicated Search Page (`/search`)**: SOTA file search UI with live service status badge, instant drive shortcuts (`C:\`, `D:\`), category filters (Code, Docs, Images, Media, Archives, Apps), interactive data table with sorting/pagination, file preview drawer (text, hex, image), JSON/CSV export, and query history.
+- **System Insight (`/`)**: Real-time service operational status and health metrics.
+- **NTFS Search Service (`/service`)**: Start, stop, restart, repair, or monitor the C++ named pipe service.
+- **Tests (`/tests`)**: Live integration test suite verifying named pipe connections and queries.
+- **Tools, Actions, AI Assistant, System Logs, Settings**.
+
+To start the webapp:
+1. `uv run python run_server.py` (API bridge on port 10845)
+2. `cd web_sota && npm run dev` (Frontend on port 10844)
+3. Open `http://localhost:10844/search` in your browser.
 
 ##  License
 
-MIT  see [LICENSE](LICENSE).
-
-
-##  Webapp Dashboard
-
-This MCP server includes a free, premium web interface for monitoring and control.
-By default, the web dashboard runs on port **10844**.
-*(Assigned ports: **10844** (Web dashboard frontend), **10845** (Web dashboard backend (API)))*
-
-**Pages:** Overview, NTFS Search Service, **Tests** (live pipe + search tests), Search Tools, Quick Actions, AI Assistant, System Logs, Settings.
-
-To start the webapp:
-1. Navigate to the `web_sota` (or `webapp`) directory.
-2. Run `start.ps1` (PowerShell).
-3. Open `http://localhost:10844` in your browser.
-
-The **Tests** page runs live integration tests (service process check, pipe connect, get_service_info, real search via pipe) so you can verify the service and search path without leaving the dashboard.
+MIT — see [LICENSE](LICENSE).
 ```
 
 ## Status Report
@@ -1344,21 +1366,19 @@ if __name__ == "__main__":
 try:
     from fastmcp import FastMCP
 except ImportError as e:
-    raise ImportError(
-        "FastMCP 3.x is required. Install with: pip install 'fastmcp>=3.0.0,<4'"
-    ) from e
+    raise ImportError("FastMCP 3.x is required. Install with: pip install 'fastmcp>=3.0.0,<4'") from e
 
 # Local imports - import server to register tools
 from .server import server
 
 # Public API
 __all__ = [
-    # Server instance
-    "server",
     # FastMCP class
     "FastMCP",
     # Version
     "__version__",
+    # Server instance
+    "server",
 ]
 ```
 
@@ -1400,10 +1420,9 @@ logger = logging.getLogger(__name__)
 # Tools are registered via @mcp.tool decorator when imported
 # Prompts are registered via @mcp.prompt() decorator when imported
 # Skills are registered via @mcp.skill() decorator when imported
+import fastsearch_mcp.prompts
+import fastsearch_mcp.skills
 import fastsearch_mcp.tools  # noqa: F401
-import fastsearch_mcp.prompts  # noqa: F401
-import fastsearch_mcp.skills  # noqa: F401
-
 from fastsearch_mcp.api_bridge import router as api_router
 
 # REST app for web_sota: GET /health, GET /tools, POST /tools/:name
@@ -1422,6 +1441,7 @@ app.include_router(api_router, prefix="/api")
 async def root_health() -> dict:
     """Fleet manifest healthPath: /health (no /api prefix)."""
     return {"status": "ok", "service": "fastsearch-mcp"}
+
 
 # MCP server reference for CLI / stdio
 server = mcp
@@ -1466,7 +1486,7 @@ import argparse
 import asyncio
 import logging
 import os
-from typing import Literal, Optional
+from typing import Literal
 
 logger = logging.getLogger(__name__)
 
@@ -1527,26 +1547,18 @@ Examples:
     )
 
     transport_group = parser.add_mutually_exclusive_group()
-    transport_group.add_argument(
-        "--stdio", action="store_true", help="Run in STDIO (JSON-RPC) mode (default)"
-    )
-    transport_group.add_argument(
-        "--http", action="store_true", help="Run in HTTP Streamable mode (FastMCP 3.x)"
-    )
-    transport_group.add_argument(
-        "--sse", action="store_true", help="Run in SSE mode (deprecated, use --http)"
-    )
+    transport_group.add_argument("--stdio", action="store_true", help="Run in STDIO (JSON-RPC) mode (default)")
+    transport_group.add_argument("--http", action="store_true", help="Run in HTTP Streamable mode (FastMCP 3.x)")
+    transport_group.add_argument("--sse", action="store_true", help="Run in SSE mode (deprecated, use --http)")
 
+    parser.add_argument("--host", default=None, help=f"Host to bind to (default: ${ENV_HOST} or 127.0.0.1)")
+    parser.add_argument("--port", type=int, default=None, help=f"Port to listen on (default: ${ENV_PORT} or 10845)")
+    parser.add_argument("--path", default=None, help=f"HTTP endpoint path (default: ${ENV_PATH} or /mcp)")
     parser.add_argument(
-        "--host", default=None, help=f"Host to bind to (default: ${ENV_HOST} or 127.0.0.1)"
+        "--agentic",
+        action="store_true",
+        help="Enable CodeMode agentic discovery (collapses tools into search + execute)",
     )
-    parser.add_argument(
-        "--port", type=int, default=None, help=f"Port to listen on (default: ${ENV_PORT} or 10845)"
-    )
-    parser.add_argument(
-        "--path", default=None, help=f"HTTP endpoint path (default: ${ENV_PATH} or /mcp)"
-    )
-    parser.add_argument("--agentic", action="store_true", help="Enable CodeMode agentic discovery (collapses tools into search + execute)")
     parser.add_argument("--debug", action="store_true", help="Enable debug logging")
 
     return parser
@@ -1584,9 +1596,7 @@ def resolve_transport(args: argparse.Namespace) -> TransportType:
             logger.warning(f"Invalid {ENV_TRANSPORT}='{env_transport}', defaulting to stdio")
             return "stdio"
         if env_transport == "sse":
-            logger.warning(
-                "SSE transport is deprecated. Consider using MCP_TRANSPORT=http instead."
-            )
+            logger.warning("SSE transport is deprecated. Consider using MCP_TRANSPORT=http instead.")
         return env_transport  # type: ignore
 
 
@@ -1612,9 +1622,7 @@ def resolve_config(args: argparse.Namespace) -> dict:
     }
 
 
-def run_server(
-    mcp_app, args: Optional[argparse.Namespace] = None, server_name: str = "mcp-server"
-) -> None:
+def run_server(mcp_app, args: argparse.Namespace | None = None, server_name: str = "mcp-server") -> None:
     """
     Unified server runner for all transport modes.
 
@@ -1633,9 +1641,7 @@ def run_server(
     asyncio.run(run_server_async(mcp_app, args, server_name))
 
 
-async def run_server_async(
-    mcp_app, args: Optional[argparse.Namespace] = None, server_name: str = "mcp-server"
-) -> None:
+async def run_server_async(mcp_app, args: argparse.Namespace | None = None, server_name: str = "mcp-server") -> None:
     """
     Asynchronous unified server runner for all transport modes.
 
@@ -1659,6 +1665,26 @@ async def run_server_async(
 
     logger.info(f"Starting {server_name} v{getattr(mcp_app, 'version', '?.?.?')}")
     logger.info(f"Transport: {transport.upper()}")
+
+    try:
+        from fastsearch_mcp.service_ensure import ensure_enabled, ensure_service_available
+
+        if ensure_enabled():
+            ensure_result = await ensure_service_available()
+            if ensure_result.get("success"):
+                if ensure_result.get("action") not in (None, "none"):
+                    logger.info(
+                        "FastSearch service ensure: %s",
+                        ensure_result.get("action"),
+                    )
+            else:
+                logger.warning(
+                    "FastSearch service unavailable at startup: %s",
+                    ensure_result.get("error") or ensure_result.get("error_message") or ensure_result,
+                )
+    except Exception as exc:
+        logger.warning("FastSearch service ensure skipped due to error: %s", exc)
+
     if agentic:
         try:
             from fastmcp.experimental.transforms.code_mode import CodeMode
@@ -1671,7 +1697,7 @@ async def run_server_async(
     try:
         if transport == "stdio":
             logger.info("Running in STDIO mode - Ready for Claude Desktop!")
-            await mcp_app.run_stdio_async()
+            await mcp_app.run_stdio_async(show_banner=False)
 
         elif transport == "http":
             host = config["host"]
@@ -1686,7 +1712,7 @@ async def run_server_async(
             port = config["port"]
             logger.warning("SSE mode is deprecated. Migrate to HTTP Streamable (--http).")
             logger.info(f"Running in SSE mode: http://{host}:{port}")
-            await mcp_app.run_async(transport='sse', host=host, port=port)
+            await mcp_app.run_async(transport="sse", host=host, port=port)
 
     except asyncio.CancelledError:
         logger.info(f"{server_name} task cancelled")
@@ -1697,15 +1723,15 @@ async def run_server_async(
 
 # Export public API
 __all__ = [
-    "TransportType",
-    "ENV_TRANSPORT",
     "ENV_HOST",
-    "ENV_PORT",
     "ENV_PATH",
-    "get_transport_config",
+    "ENV_PORT",
+    "ENV_TRANSPORT",
+    "TransportType",
     "create_argument_parser",
-    "resolve_transport",
+    "get_transport_config",
     "resolve_config",
+    "resolve_transport",
     "run_server",
     "run_server_async",
 ]
@@ -1814,37 +1840,38 @@ If `fastsearch_search` returns 0 results:
 """
 FastMCP 3.2 skill definitions for FastSearch MCP.
 
-Skills are composable workflow units registered at import time.
+Skills are composable workflow units registered at import time when supported.
 """
 
 from fastsearch_mcp.mcp_instance import mcp
 
+_skill = getattr(mcp, "skill", None)
 
-@mcp.skill()
-async def find_recently_modified_files() -> str:
-    """Skill: Find files modified in the last 7 days across all drives."""
-    return """
+if _skill is not None:
+
+    @_skill()
+    async def find_recently_modified_files() -> str:
+        """Skill: Find files modified in the last 7 days across all drives."""
+        return """
 Use fastsearch_search_advanced with modified_after="7d" and search_all=True
 to locate recently changed files across all NTFS drives. Combine with
 file_pattern="*" to find all types, or narrow with "*.py", "*.docx", etc.
 """
 
-
-@mcp.skill()
-async def cleanup_disk_space() -> str:
-    """Skill: Identify large, old, or duplicate files for disk cleanup."""
-    return """
+    @_skill()
+    async def cleanup_disk_space() -> str:
+        """Skill: Identify large, old, or duplicate files for disk cleanup."""
+        return """
 1. Run analyze_disk_usage to find large folders
 2. Run find_duplicate_files to locate redundant data
 3. Run fastsearch_search_advanced with size filters (e.g., min_size=1073741824 for 1GB+)
 4. Combine with accessed_before="365d" to find old large files
 """
 
-
-@mcp.skill()
-async def forensic_file_audit() -> str:
-    """Skill: Audit files for forensic or compliance review."""
-    return """
+    @_skill()
+    async def forensic_file_audit() -> str:
+        """Skill: Audit files for forensic or compliance review."""
+        return """
 1. Search for sensitive file types: fastsearch_search(pattern="*.xlsx", search_all=True)
 2. Find hidden files: fastsearch_search_advanced(pattern="*", include_hidden=True, search_all=True)
 3. Check for recent modifications in sensitive directories
@@ -1867,7 +1894,7 @@ import logging
 import os
 import struct
 import sys
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 # Windows-specific imports
 if sys.platform == "win32":
@@ -1906,11 +1933,11 @@ SERVICE_PIPE_NAME = DEFAULT_PIPE_NAME
 class NamedPipeClient:
     """Client for communicating with FastSearch C++ service via named pipes."""
 
-    def __init__(self, pipe_name: Optional[str] = None):
+    def __init__(self, pipe_name: str | None = None):
         self.pipe_name = pipe_name if pipe_name is not None else get_pipe_name()
         self.handle = None
         self.connected = False
-        self.last_connect_error: Optional[Tuple[int, str]] = None  # (winerror, message) when connect fails
+        self.last_connect_error: tuple[int, str] | None = None  # (winerror, message) when connect fails
 
     async def connect(self, timeout: float = 5.0) -> bool:
         """Connect to the named pipe.
@@ -1948,9 +1975,7 @@ class NamedPipeClient:
             # Set pipe to message mode (blocking Win32 call, run in executor)
             await loop.run_in_executor(
                 None,
-                lambda: win32pipe.SetNamedPipeHandleState(
-                    self.handle, win32pipe.PIPE_READMODE_MESSAGE, None, None
-                ),
+                lambda: win32pipe.SetNamedPipeHandleState(self.handle, win32pipe.PIPE_READMODE_MESSAGE, None, None),
             )
 
             self.connected = True
@@ -1958,7 +1983,7 @@ class NamedPipeClient:
             logger.info(f"Connected to named pipe: {self.pipe_name}")
             return True
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             self.last_connect_error = (0, f"Connection timed out after {timeout}s")
             logger.error(f"Connection to named pipe timed out after {timeout}s: {self.pipe_name}")
             self.connected = False
@@ -1966,7 +1991,9 @@ class NamedPipeClient:
         except pywintypes.error as e:
             self.last_connect_error = (e.winerror, str(e))
             if e.winerror == 2:  # ERROR_FILE_NOT_FOUND
-                logger.debug(f"Named pipe not found: {self.pipe_name} (error 2). Set FASTSEARCH_PIPE_NAME if service uses another name.")
+                logger.debug(
+                    f"Named pipe not found: {self.pipe_name} (error 2). Set FASTSEARCH_PIPE_NAME if service uses another name."
+                )
             else:
                 logger.error(f"Failed to connect to named pipe: {e}")
             self.connected = False
@@ -1989,9 +2016,7 @@ class NamedPipeClient:
                 self.handle = None
                 self.connected = False
 
-    async def send_request(
-        self, request: Dict[str, Any], timeout: float = 10.0
-    ) -> Optional[Dict[str, Any]]:
+    async def send_request(self, request: dict[str, Any], timeout: float = 10.0) -> dict[str, Any] | None:
         """Send a request to the service and get the response.
 
         Args:
@@ -2034,10 +2059,7 @@ class NamedPipeClient:
                     response_length_bytes = win32file.ReadFile(self.handle, 4)[1]
                 except pywintypes.error as e:
                     if e.winerror == 6:  # ERROR_INVALID_HANDLE
-                        logger.error(
-                            "Pipe handle became invalid during read "
-                            "(service may have closed connection)"
-                        )
+                        logger.error("Pipe handle became invalid during read (service may have closed connection)")
                         self.connected = False
                     raise
 
@@ -2052,10 +2074,7 @@ class NamedPipeClient:
                     response_data = win32file.ReadFile(self.handle, response_length)[1]
                 except pywintypes.error as e:
                     if e.winerror == 6:  # ERROR_INVALID_HANDLE
-                        logger.error(
-                            "Pipe handle became invalid during read "
-                            "(service may have closed connection)"
-                        )
+                        logger.error("Pipe handle became invalid during read (service may have closed connection)")
                         self.connected = False
                     raise
 
@@ -2065,7 +2084,7 @@ class NamedPipeClient:
                 return response
 
             except pywintypes.error as e:
-                error_code = e.winerror if hasattr(e, 'winerror') else 0
+                error_code = e.winerror if hasattr(e, "winerror") else 0
                 if error_code == 6:  # ERROR_INVALID_HANDLE
                     logger.error(f"Pipe handle is invalid: {e}")
                 else:
@@ -2088,12 +2107,9 @@ class NamedPipeClient:
         try:
             # Run blocking I/O in executor with timeout
             loop = asyncio.get_event_loop()
-            response = await asyncio.wait_for(
-                loop.run_in_executor(None, _send_request_sync),
-                timeout=timeout
-            )
+            response = await asyncio.wait_for(loop.run_in_executor(None, _send_request_sync), timeout=timeout)
             return response
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.error(f"Request timed out after {timeout} seconds: {request}")
             # Mark connection as potentially invalid after timeout
             # The service may still be processing, but we can't wait
@@ -2125,10 +2141,10 @@ async def search_files_via_pipe(
     directory: str = ".",
     max_results: int = 100,
     timeout: float = 120.0,
-    pagination_mode: Optional[str] = None,
+    pagination_mode: str | None = None,
     page: int = 1,
     page_size: int = 1000,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Search for files using the C++ service via named pipe.
 
     Args:
@@ -2153,7 +2169,12 @@ async def search_files_via_pipe(
     async with NamedPipeClient() as client:
         if not client.connected:
             logger.warning("Could not connect to FastSearch service via named pipe")
-            return {"results": [], "count": 0, "pagination": None, "error": "Could not connect to FastSearch service via named pipe"}
+            return {
+                "results": [],
+                "count": 0,
+                "pagination": None,
+                "error": "Could not connect to FastSearch service via named pipe",
+            }
 
         request = {
             "command": "search_files",
@@ -2161,7 +2182,7 @@ async def search_files_via_pipe(
             "directory": directory,
             "max_results": max_results,
         }
-        
+
         # Add pagination parameters if requested
         if pagination_mode == "offset":
             request["pagination_mode"] = "offset"
@@ -2181,7 +2202,7 @@ async def search_files_via_pipe(
             return {"results": [], "count": 0, "pagination": None, "error": error_msg}
 
 
-async def get_service_info_via_pipe() -> Optional[Dict[str, Any]]:
+async def get_service_info_via_pipe() -> dict[str, Any] | None:
     """Get service information via named pipe.
 
     Returns:
@@ -2217,7 +2238,7 @@ async def test_pipe_connection() -> bool:
     return bool(diag.get("connected") and diag.get("ping_ok"))
 
 
-async def test_pipe_connection_with_diagnostics() -> Dict[str, Any]:
+async def test_pipe_connection_with_diagnostics() -> dict[str, Any]:
     """Test pipe connection and return diagnostics for UI (error code, message, pipe name).
 
     Returns:
@@ -2225,7 +2246,7 @@ async def test_pipe_connection_with_diagnostics() -> Dict[str, Any]:
               error_code (int | None), error_message (str | None)
     """
     pipe_name = get_pipe_name()
-    out: Dict[str, Any] = {
+    out: dict[str, Any] = {
         "connected": False,
         "ping_ok": False,
         "pipe_name": pipe_name,
@@ -2290,7 +2311,7 @@ classifiers = [
 ]
 
 dependencies = [
-    "fastmcp>=3.2.0,<4",
+    "fastmcp>=3.4.4,<4",
     "fastapi>=0.115.0",
     "pydantic>=2.0.0",
     "python-dotenv>=1.0.0",
@@ -2298,7 +2319,6 @@ dependencies = [
     "watchdog>=3.0.0",
     "pywin32>=306; sys_platform == 'win32'",
     "httpx>=0.27.0",
-    "ruff>=0.15.2",
     "prefab-ui>=0.14.0",
 ]
 
@@ -2310,7 +2330,7 @@ dev = [
     "black>=23.0.0",
     "isort>=5.12.0",
     "mypy>=1.0.0",
-    "ruff>=0.1.0",
+    "ruff>=0.16.0,<0.17",
 ]
 
 [project.scripts]
@@ -2332,7 +2352,7 @@ where = ["src"]
 # Black and isort replaced by ruff (see [tool.ruff] section below)
 
 [tool.mypy]
-python_version = "3.8"
+python_version = "3.10"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
@@ -2373,7 +2393,7 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "S", "UP", "RUF"]
-ignore = ["S101", "B008"]
+ignore = ["S101", "B008", "S106", "S110", "S112", "S101", "B008", "S106", "S110", "S112", "RUF012", "S603", "S607", "S324", "E402", "E501"]
 
 [tool.ruff.format]
 quote-style = "double"

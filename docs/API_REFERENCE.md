@@ -799,4 +799,37 @@ curl -X POST http://localhost:3000/search \
 - ✅ For Pandoc formats: Ensure Pandoc is installed and accessible
 - ✅ For PDF export: Ensure LaTeX distribution is installed (for pdflatex)
 
+---
+
+## 🌐 **Direct REST API Endpoints (Port 10845)**
+
+The FastAPI bridge server (`src/fastsearch_mcp/api_bridge.py`) exposes direct REST endpoints for web applications and webapp integrations:
+
+### `POST /api/search`
+Execute file search directly via the named pipe service.
+- **Request Body**: `{"pattern": "*.py", "directory": "C:\\", "max_results": 500}`
+- **Response**: `{"success": true, "pattern": "*.py", "directory": "C:\\", "count": 42, "results": [...]}`
+- **Error Response**: `{"success": false, "error": "...", "service_down": true}`
+
+### `GET /api/service/status`
+Get current FastSearch C++ named pipe service health and process status.
+- **Response**: `{"success": true, "running": true, "pipe_name": "\\\\.\\pipe\\FastSearchMCP", "executable_exists": true, "status": "running"}`
+
+### `POST /api/service/start`
+Start the FastSearch Windows Service or launch interactive process.
+- **Response**: `{"success": true, "message": "Service started successfully"}`
+
+### `POST /api/service/stop`
+Stop the FastSearch service.
+- **Response**: `{"success": true, "message": "Service stopped successfully"}`
+
+### `POST /api/service/restart`
+Restart the FastSearch service.
+- **Response**: `{"success": true, "message": "Service restarted successfully"}`
+
+### `GET /api/file?path=C:\path\to\file`
+Fetch file preview content (text, image base64, or hex dump).
+
+---
+
 **FastSearch MCP: Professional file search at your fingertips** 🚀

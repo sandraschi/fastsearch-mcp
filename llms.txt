@@ -1,5 +1,5 @@
-# FastSearch MCP v0.5.0
-Lightning-fast Windows file search via direct NTFS Master File Table access. FastMCP 3.2 server with sampling, CodeMode, prompts, and skills.
+# FastSearch MCP v0.5.1
+Lightning-fast Windows file search via direct NTFS Master File Table access. FastMCP 3.2 server with sampling, CodeMode, prompts, skills, direct REST API bridge, and dedicated SOTA search page.
 
 ## Quick Start
 ```bash
@@ -8,24 +8,29 @@ uvx fastsearch-mcp
 uvx fastsearch-mcp --agentic
 ```
 
+## Interactive Webapp & Dedicated Search UI
+- Webapp Frontend: `http://localhost:10844` (`/search` page)
+- FastAPI REST Bridge: `http://localhost:10845` (`/api/search`, `/api/service/*`, `/api/file`)
+
 ## Core Tools
-- `fastsearch_search(pattern, path, search_all, max_results)` — Name pattern search via MFT
+- `fastsearch_search(pattern, path, search_all, max_results)` — Name pattern search via direct MFT
 - `fastsearch_search_advanced(...)` — MFT search with size/date/attribute filters
 - `file_content_search(search_pattern, search_dir, ...)` — Regex content search in files
-- `service_status` — Check FastSearch Windows service
+- `service_status_fastsearch` — Check FastSearch Windows service and pipe health
+- `service_start_fastsearch` / `service_stop_fastsearch` — Control service execution
 - `drive_inventory` — List all drives
 - `analyze_disk_usage(path, max_depth)` — Disk space analysis
 - `find_duplicate_files(directories, pattern, min_size)` — Duplicates by hash
 
 ## Architecture
-Python FastMCP 3.2 bridge ↔ Named pipe `\\.\pipe\FastSearchMCP` ↔ C++ Windows service (LocalSystem) ↔ NTFS MFT
+Python FastMCP 3.2 bridge & FastAPI REST bridge (port 10845) ↔ Named pipe `\\.\pipe\FastSearchMCP` ↔ C++ Windows engine (LocalSystem SCM or interactive `--standalone` mode) ↔ Live NTFS MFT
 
 ## Docs
 - [README](README.md) — Full documentation
 - [CHANGELOG](CHANGELOG.md) — Release history
-- [docs/STATUS_REPORT.md](docs/STATUS_REPORT.md) — Current status
-- [docs/TECHNICAL_ARCHITECTURE.md](docs/TECHNICAL_ARCHITECTURE.md) — Architecture deep dive
-- [docs/INSTALL.md](docs/INSTALL.md) — Installation guide
+- [docs/API_REFERENCE](docs/API_REFERENCE.md) — MCP tools & REST API endpoints
+- [docs/CPP_SERVICE_IMPLEMENTATION](docs/CPP_SERVICE_IMPLEMENTATION.md) — C++ engine & standalone mode
+- [docs/PRODUCT_REQUIREMENTS](docs/PRODUCT_REQUIREMENTS.md) — Product requirements document (PRD)
 
 ## Prompts (FastMCP 3.2)
 - `search_files_guide` — How to search files
