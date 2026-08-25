@@ -5,6 +5,7 @@ import {
   Check,
   CheckCircle2,
   Clock,
+  Columns3,
   Copy,
   Download,
   Eye,
@@ -13,10 +14,15 @@ import {
   FileText,
   FileVideo,
   Filter,
+  LayoutGrid,
+  LayoutList,
+  List,
   Loader2,
   Play,
   Search as SearchIcon,
   Server,
+  SortAsc,
+  SortDesc,
   Sparkles,
   X,
   XCircle,
@@ -143,10 +149,17 @@ export function Search() {
   const [searchError, setSearchError] = useState<string | null>(null);
   const [durationMs, setDurationMs] = useState<number | null>(null);
 
-  // Filters & Sorting state
+  // View & Filter state
+  type ViewMode = "details" | "grid" | "list" | "tiles";
+  const [viewMode, setViewMode] = useState<ViewMode>("details");
   const [filterQuery, setFilterQuery] = useState<string>("");
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
-  const [sortBy, setSortBy] = useState<"name" | "path" | "size">("name");
+  const [sizeFilter, setSizeFilter] = useState<
+    "any" | "small" | "medium" | "large"
+  >("any");
+  const [sortBy, setSortBy] = useState<"name" | "path" | "size" | "ext">(
+    "name",
+  );
   const [sortAsc, setSortAsc] = useState<boolean>(true);
   const [pageSize, setPageSize] = useState<number>(50);
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -281,9 +294,21 @@ export function Search() {
         if (!allowedExts.includes(ext)) return false;
       }
 
+      // Size range filter
+      if (sizeFilter !== "any") {
+        const size = getItemSize(item);
+        if (sizeFilter === "small" && size >= 1024 * 1024) return false;
+        if (
+          sizeFilter === "medium" &&
+          (size < 1024 * 1024 || size > 100 * 1024 * 1024)
+        )
+          return false;
+        if (sizeFilter === "large" && size <= 100 * 1024 * 1024) return false;
+      }
+
       return true;
     });
-  }, [results, filterQuery, selectedCategory]);
+  }, [results, filterQuery, selectedCategory, sizeFilter]);
 
   const sortedResults = useMemo(() => {
     return [...filteredResults].sort((a, b) => {
@@ -298,6 +323,9 @@ export function Search() {
       } else if (sortBy === "size") {
         valA = getItemSize(a);
         valB = getItemSize(b);
+      } else if (sortBy === "ext") {
+        valA = getItemName(a).split(".").pop()?.toLowerCase() || "";
+        valB = getItemName(b).split(".").pop()?.toLowerCase() || "";
       }
 
       if (valA < valB) return sortAsc ? -1 : 1;
@@ -583,13 +611,61 @@ export function Search() {
               )}
             </div>
 
-            {/* Export & Actions toolbar */}
+            {/* View Mode Switcher + Export Toolbar */}
             {results.length > 0 && (
               <div className="flex flex-wrap items-center gap-2">
+                {/* Windows Explorer Style View Mode Switcher */}
+                <div className="flex items-center gap-0.5 bg-slate-900 border border-slate-800 rounded-lg p-0.5">
+                  <button
+                    onClick={() => setViewMode("details")}
+                    title="Details View (Table)"
+                    className={`p-1.5 rounded transition-colors ${
+                      viewMode === "details"
+                        ? "bg-blue-600 text-white font-semibold"
+                        : "text-slate-400 hover:text-white hover:bg-slate-800"
+                    }`}
+                  >
+                    <LayoutList className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    onClick={() => setViewMode("grid")}
+                    title="Grid / Icons View"
+                    className={`p-1.5 rounded transition-colors ${
+                      viewMode === "grid"
+                        ? "bg-blue-600 text-white font-semibold"
+                        : "text-slate-400 hover:text-white hover:bg-slate-800"
+                    }`}
+                  >
+                    <LayoutGrid className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    onClick={() => setViewMode("tiles")}
+                    title="Tiles View"
+                    className={`p-1.5 rounded transition-colors ${
+                      viewMode === "tiles"
+                        ? "bg-blue-600 text-white font-semibold"
+                        : "text-slate-400 hover:text-white hover:bg-slate-800"
+                    }`}
+                  >
+                    <Columns3 className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    onClick={() => setViewMode("list")}
+                    title="Compact List View"
+                    className={`p-1.5 rounded transition-colors ${
+                      viewMode === "list"
+                        ? "bg-blue-600 text-white font-semibold"
+                        : "text-slate-400 hover:text-white hover:bg-slate-800"
+                    }`}
+                  >
+                    <List className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+
                 <Button
                   variant="outline"
                   size="sm"
-                  className="border-slate-700 text-slate-300 hover:text-white h-8"
+                  className="border-slate-700 text-slate-300 hover:text-white h-8 text-xs"
                   onClick={() => exportResults("csv")}
                 >
                   <Download className="h-3.5 w-3.5 mr-1" /> Export CSV
@@ -597,7 +673,7 @@ export function Search() {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="border-slate-700 text-slate-300 hover:text-white h-8"
+                  className="border-slate-700 text-slate-300 hover:text-white h-8 text-xs"
                   onClick={() => exportResults("json")}
                 >
                   <Download className="h-3.5 w-3.5 mr-1" /> Export JSON
@@ -651,6 +727,52 @@ export function Search() {
                   </button>
                 ))}
               </div>
+
+              {/* Sorting & Size Filters */}
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Sort By Dropdown */}
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as any)}
+                  className="rounded border border-slate-800 bg-slate-900 px-2 py-1 text-xs text-slate-300 focus:border-blue-500 focus:outline-none cursor-pointer"
+                >
+                  <option value="name">Sort: Name</option>
+                  <option value="path">Sort: Path</option>
+                  <option value="size">Sort: Size</option>
+                  <option value="ext">Sort: Type</option>
+                </select>
+
+                {/* Sort Asc/Desc Button */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="border-slate-800 bg-slate-900 h-7 px-2 text-xs text-slate-300 hover:text-white"
+                  onClick={() => setSortAsc(!sortAsc)}
+                  title={sortAsc ? "Ascending" : "Descending"}
+                >
+                  {sortAsc ? (
+                    <SortAsc className="h-3.5 w-3.5 mr-1 text-blue-400" />
+                  ) : (
+                    <SortDesc className="h-3.5 w-3.5 mr-1 text-amber-400" />
+                  )}
+                  {sortAsc ? "Asc" : "Desc"}
+                </Button>
+
+                {/* Size Filter Dropdown */}
+                <select
+                  value={sizeFilter}
+                  onChange={(e) => {
+                    setSizeFilter(e.target.value as any);
+                    setCurrentPage(1);
+                  }}
+                  className="rounded border border-slate-800 bg-slate-900 px-2 py-1 text-xs text-slate-300 focus:border-blue-500 focus:outline-none cursor-pointer"
+                >
+                  <option value="any">Size: Any</option>
+                  <option value="small">Small (&lt; 1 MB)</option>
+                  <option value="medium">Medium (1-100 MB)</option>
+                  <option value="large">Large (&gt; 100 MB)</option>
+                </select>
+              </div>
             </div>
           )}
         </CardHeader>
@@ -684,12 +806,209 @@ export function Search() {
                 onClick={() => {
                   setFilterQuery("");
                   setSelectedCategory("All");
+                  setSizeFilter("any");
                 }}
               >
                 Clear filters
               </Button>
             </div>
+          ) : viewMode === "grid" ? (
+            /* Explorer Grid / Medium Icons View */
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 p-4">
+              {paginatedResults.map((item, idx) => {
+                const name = getItemName(item);
+                const fullPath = getItemPath(item);
+                const folder = getItemFolder(item);
+                const size = getItemSize(item);
+
+                return (
+                  <div
+                    key={fullPath + idx}
+                    className="rounded-lg border border-slate-800/80 bg-slate-900/60 p-3.5 hover:border-blue-500/50 hover:bg-slate-900 transition-all flex flex-col justify-between group"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="p-2.5 rounded-lg bg-slate-950 border border-slate-800 shrink-0">
+                        {getFileIcon(name)}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div
+                          className="font-medium text-xs text-slate-200 truncate hover:text-blue-400 cursor-pointer"
+                          onClick={() => handlePreview(fullPath)}
+                          title={name}
+                        >
+                          {name}
+                        </div>
+                        <div
+                          className="text-[11px] text-slate-500 truncate mt-0.5 font-mono"
+                          title={fullPath}
+                        >
+                          {folder}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mt-3 pt-2.5 border-t border-slate-800/60 flex items-center justify-between text-[11px] text-slate-400">
+                      <span className="font-mono text-slate-400">
+                        {formatBytes(size)}
+                      </span>
+                      <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0 text-slate-400 hover:text-white"
+                          title="Copy path"
+                          onClick={() => handleCopyPath(fullPath)}
+                        >
+                          {copiedPath === fullPath ? (
+                            <Check className="h-3 w-3 text-emerald-400" />
+                          ) : (
+                            <Copy className="h-3 w-3" />
+                          )}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0 text-slate-400 hover:text-blue-400"
+                          title="Preview file"
+                          onClick={() => handlePreview(fullPath)}
+                        >
+                          <Eye className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : viewMode === "tiles" ? (
+            /* Explorer Tiles View */
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 p-4">
+              {paginatedResults.map((item, idx) => {
+                const name = getItemName(item);
+                const fullPath = getItemPath(item);
+                const folder = getItemFolder(item);
+                const size = getItemSize(item);
+
+                return (
+                  <div
+                    key={fullPath + idx}
+                    className="rounded-lg border border-slate-800 bg-slate-900/80 p-3 flex items-center justify-between hover:border-slate-700 transition-colors group"
+                  >
+                    <div className="flex items-center gap-3 min-w-0 flex-1 pr-2">
+                      <div className="p-2 rounded bg-slate-950 border border-slate-800 shrink-0">
+                        {getFileIcon(name)}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div
+                          className="font-semibold text-xs text-white truncate cursor-pointer hover:text-blue-400"
+                          onClick={() => handlePreview(fullPath)}
+                          title={name}
+                        >
+                          {name}
+                        </div>
+                        <div
+                          className="text-[11px] text-slate-400 truncate font-mono"
+                          title={fullPath}
+                        >
+                          {folder}
+                        </div>
+                        <div className="text-[10px] text-slate-500 font-mono mt-0.5">
+                          {formatBytes(size)}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0 text-slate-400 hover:text-white"
+                        title="Copy path"
+                        onClick={() => handleCopyPath(fullPath)}
+                      >
+                        {copiedPath === fullPath ? (
+                          <Check className="h-3.5 w-3.5 text-emerald-400" />
+                        ) : (
+                          <Copy className="h-3.5 w-3.5" />
+                        )}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0 text-slate-400 hover:text-blue-400"
+                        title="Preview file"
+                        onClick={() => handlePreview(fullPath)}
+                      >
+                        <Eye className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : viewMode === "list" ? (
+            /* Explorer Compact List View */
+            <div className="divide-y divide-slate-800/60 font-mono text-slate-300">
+              {paginatedResults.map((item, idx) => {
+                const name = getItemName(item);
+                const fullPath = getItemPath(item);
+                const folder = getItemFolder(item);
+                const size = getItemSize(item);
+
+                return (
+                  <div
+                    key={fullPath + idx}
+                    className="px-4 py-2 hover:bg-slate-900/60 flex items-center justify-between text-xs group"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0 flex-1 pr-4">
+                      {getFileIcon(name)}
+                      <span
+                        className="font-medium text-slate-200 truncate cursor-pointer hover:text-blue-400 font-sans"
+                        onClick={() => handlePreview(fullPath)}
+                        title={name}
+                      >
+                        {name}
+                      </span>
+                      <span
+                        className="text-slate-500 text-[11px] truncate hidden sm:inline"
+                        title={fullPath}
+                      >
+                        {folder}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-4 shrink-0">
+                      <span className="font-mono text-slate-400 text-[11px]">
+                        {formatBytes(size)}
+                      </span>
+                      <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0 text-slate-400 hover:text-white"
+                          title="Copy path"
+                          onClick={() => handleCopyPath(fullPath)}
+                        >
+                          {copiedPath === fullPath ? (
+                            <Check className="h-3 w-3 text-emerald-400" />
+                          ) : (
+                            <Copy className="h-3 w-3" />
+                          )}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0 text-slate-400 hover:text-blue-400"
+                          title="Preview file"
+                          onClick={() => handlePreview(fullPath)}
+                        >
+                          <Eye className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           ) : (
+            /* Explorer Details View (Table) */
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead className="border-b border-slate-800 bg-slate-900/50 text-slate-400 font-medium">
