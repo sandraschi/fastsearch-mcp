@@ -5,6 +5,7 @@ import {
   ChevronRight,
   FileSearch,
   FlaskConical,
+  HelpCircle,
   LayoutDashboard,
   Search,
   Server,
@@ -31,6 +32,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
     { href: "/chat", label: "AI Assistant", icon: Bot },
     { href: "/logs", label: "System Logs", icon: FileSearch },
     { href: "/settings", label: "Settings", icon: Settings },
+    { href: "/help", label: "Help & Docs", icon: HelpCircle },
   ];
 
   return (

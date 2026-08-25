@@ -8,6 +8,7 @@ import { AppLayout } from "@/components/layout/app-layout";
 import { Actions } from "@/pages/actions";
 import { Chat } from "@/pages/chat";
 import { Dashboard } from "@/pages/dashboard";
+import Help from "@/pages/help";
 import Logs from "@/pages/logs";
 import { Search } from "@/pages/search";
 import { Service } from "@/pages/service";
@@ -29,6 +30,7 @@ function App() {
           <Route path="/logs" element={<Logs />} />
           <Route path="/chat" element={<Chat />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/help" element={<Help />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AppLayout>
