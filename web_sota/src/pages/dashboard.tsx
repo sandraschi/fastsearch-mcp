@@ -1,13 +1,18 @@
 import {
+  ArrowRight,
   CheckCircle2,
   Cpu,
   HardDrive,
   Loader2,
+  PieChart,
   Play,
+  RefreshCw,
   Search,
   Server,
   ShieldCheck,
-  XCircle,
+  Sparkles,
+  Terminal,
+  Zap,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { mcpClient } from "@/common/mcp-client";
@@ -75,73 +80,92 @@ export function Dashboard() {
   const isRunning = status?.running || status?.status === "running";
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight text-white">
-            System Insight
-          </h2>
-          <p className="text-slate-400 text-sm">
-            Real-time status and operational health of FastSearch C++ engine
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={fetchStatus}
-            disabled={loading}
-            className="border-slate-800 bg-slate-900 text-slate-300 hover:text-white"
-          >
-            {loading ? (
-              <Loader2 className="h-4 w-4 animate-spin mr-1" />
-            ) : (
-              "Refresh Health"
-            )}
-          </Button>
-          <a href="/search">
-            <Button
-              size="sm"
-              className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-1.5"
-            >
-              <Search className="h-4 w-4" />
-              Open Search Page
-            </Button>
-          </a>
-        </div>
-      </div>
+    <div className="space-y-6 select-none">
+      {/* 🚀 SOTA Hero Banner */}
+      <div className="relative overflow-hidden rounded-2xl border border-blue-500/20 bg-gradient-to-r from-blue-950/70 via-slate-950 to-indigo-950/70 p-6 md:p-8 shadow-2xl backdrop-blur-xl">
+        <div className="absolute -top-24 -right-24 h-64 w-64 rounded-full bg-blue-500/10 blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-24 -left-24 h-64 w-64 rounded-full bg-purple-500/10 blur-3xl pointer-events-none" />
 
-      {/* Live Operational Status Bar */}
-      <Card className="border-slate-800 bg-slate-950/60">
-        <CardContent className="p-6">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+          <div className="space-y-3 max-w-2xl">
+            <div className="inline-flex items-center gap-2 rounded-full border border-blue-500/30 bg-blue-500/10 px-3 py-1 text-xs font-semibold text-blue-400">
+              <Sparkles className="h-3.5 w-3.5" />
+              SOTA NTFS Master File Table Engine
+            </div>
+
+            <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-white leading-tight">
+              Instant Zero-Indexing <br />
+              <span className="bg-gradient-to-r from-blue-400 via-indigo-300 to-purple-400 bg-clip-text text-transparent">
+                High-Performance File Search
+              </span>
+            </h1>
+
+            <p className="text-slate-300 text-sm md:text-base leading-relaxed">
+              FastSearch MCP queries raw Windows NTFS volume structures
+              (`\\.\C:`, `\\.\D:`) directly over Win32 named pipes with{" "}
+              <strong>zero background indexing overhead</strong> and sub-second
+              MFT search speeds.
+            </p>
+
+            <div className="flex flex-wrap items-center gap-3 pt-2">
+              <a href="/search">
+                <Button className="bg-blue-600 hover:bg-blue-500 text-white font-semibold flex items-center gap-2 shadow-lg shadow-blue-600/20">
+                  <Search className="h-4 w-4" />
+                  Launch Dedicated Search
+                </Button>
+              </a>
+
+              <a href="/treemap">
+                <Button
+                  variant="outline"
+                  className="border-slate-700 bg-slate-900/80 text-slate-200 hover:text-white hover:bg-slate-800 flex items-center gap-2"
+                >
+                  <PieChart className="h-4 w-4 text-purple-400" />
+                  3D Cushion Treemap
+                </Button>
+              </a>
+            </div>
+          </div>
+
+          {/* Engine Status Badge Card */}
+          <div className="shrink-0 rounded-xl border border-slate-800 bg-slate-900/80 p-5 shadow-xl space-y-4 w-full md:w-80 backdrop-blur-md">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                Service Engine
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={fetchStatus}
+                disabled={loading}
+                className="h-7 w-7 p-0 text-slate-400 hover:text-white"
+                title="Refresh Status"
+              >
+                <RefreshCw
+                  className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`}
+                />
+              </Button>
+            </div>
+
+            <div className="flex items-center gap-3">
               <div
-                className={`p-3 rounded-xl ${isRunning ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" : "bg-rose-500/10 text-rose-400 border border-rose-500/20"}`}
+                className={`p-2.5 rounded-lg shrink-0 ${isRunning ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" : "bg-rose-500/10 text-rose-400 border border-rose-500/20"}`}
               >
                 <Server className="h-6 w-6" />
               </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="text-lg font-bold text-white">
-                    C++ FastSearch Core Engine
-                  </h3>
-                  {isRunning ? (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-medium text-emerald-400 border border-emerald-500/20">
-                      <CheckCircle2 className="h-3 w-3" /> Running (Direct MFT
-                      Mode)
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-rose-500/10 px-2.5 py-0.5 text-xs font-medium text-rose-400 border border-rose-500/20">
-                      <XCircle className="h-3 w-3" /> Service Offline
-                    </span>
-                  )}
+              <div className="min-w-0 flex-1">
+                <div className="font-bold text-white text-sm flex items-center gap-1.5 truncate">
+                  FastSearch C++
                 </div>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  {isRunning
-                    ? "Listening on named pipe \\\\.\\pipe\\FastSearchMCP. Direct NTFS Master File Table queries enabled."
-                    : "FastSearch C++ Windows Service is offline. Click Start Service to elevate via UAC or run 'sc start FastSearchMCP' in Admin PowerShell."}
-                </p>
+                {isRunning ? (
+                  <span className="text-xs text-emerald-400 font-medium flex items-center gap-1 mt-0.5">
+                    <CheckCircle2 className="h-3 w-3" /> Online (MFT Mode)
+                  </span>
+                ) : (
+                  <span className="text-xs text-rose-400 font-medium flex items-center gap-1 mt-0.5">
+                    <Zap className="h-3 w-3" /> Service Stopped
+                  </span>
+                )}
               </div>
             </div>
 
@@ -149,71 +173,38 @@ export function Dashboard() {
               <Button
                 onClick={handleStartService}
                 disabled={actionLoading}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white shrink-0"
+                className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-xs flex items-center justify-center gap-2"
               >
                 {actionLoading ? (
-                  <Loader2 className="h-4 w-4 animate-spin mr-1.5" />
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 ) : (
-                  <Play className="h-4 w-4 mr-1.5" />
+                  <Play className="h-3.5 w-3.5" />
                 )}
-                Start Service
+                Elevate & Start Service
               </Button>
             )}
           </div>
+        </div>
+      </div>
 
-          {actionError && (
-            <div className="mt-4 rounded-lg border border-red-800/60 bg-red-950/20 p-4 space-y-2">
-              <div className="text-sm font-semibold text-red-400 flex items-center gap-2">
-                <XCircle className="h-4 w-4 shrink-0" />
-                Service Action Diagnostics: {actionError}
-              </div>
-              {startLogs.length > 0 && (
-                <div className="mt-2 rounded border border-slate-800 bg-slate-950 p-3 font-mono text-[11px] text-slate-300 space-y-1 overflow-x-auto max-h-48">
-                  <div className="text-slate-500 font-sans font-medium text-[10px] uppercase tracking-wider mb-1">
-                    Diagnostic Execution Logs:
-                  </div>
-                  {startLogs.map((logLine, idx) => (
-                    <div
-                      key={idx}
-                      className={
-                        logLine.includes("[ERROR]") ||
-                        logLine.includes("Stderr")
-                          ? "text-red-400"
-                          : logLine.includes("[WARNING]")
-                            ? "text-amber-400"
-                            : logLine.includes("[SUCCESS]")
-                              ? "text-emerald-400"
-                              : "text-slate-300"
-                      }
-                    >
-                      {logLine}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Metric Overview */}
+      {/* 📊 High-Level Metrics & Architecture Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card className="border-slate-800 bg-slate-950/50">
+        <Card className="border-slate-800 bg-slate-950/60 shadow-lg">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-xs font-medium text-slate-400 uppercase tracking-wider">
-              Engine Mode
+              Architecture
             </CardTitle>
             <Cpu className="h-4 w-4 text-blue-400" />
           </CardHeader>
           <CardContent>
             <div className="text-xl font-bold text-white">Direct MFT</div>
-            <p className="text-[11px] text-slate-500 mt-1">
-              No background indexing overhead
+            <p className="text-[11px] text-slate-400 mt-1">
+              0% idle CPU, no indexing services
             </p>
           </CardContent>
         </Card>
 
-        <Card className="border-slate-800 bg-slate-950/50">
+        <Card className="border-slate-800 bg-slate-950/60 shadow-lg">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-xs font-medium text-slate-400 uppercase tracking-wider">
               IPC Transport
@@ -221,88 +212,174 @@ export function Dashboard() {
             <Server className="h-4 w-4 text-purple-400" />
           </CardHeader>
           <CardContent>
-            <div className="text-xl font-bold text-white">Named Pipe</div>
-            <p className="text-[11px] text-slate-500 mt-1">
+            <div className="text-xl font-bold text-white">Win32 Pipe</div>
+            <p className="text-[11px] text-slate-400 font-mono mt-1 truncate">
               \\.\pipe\FastSearchMCP
             </p>
           </CardContent>
         </Card>
 
-        <Card className="border-slate-800 bg-slate-950/50">
+        <Card className="border-slate-800 bg-slate-950/60 shadow-lg">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-xs font-medium text-slate-400 uppercase tracking-wider">
-              Executable
+              C++ Binary
             </CardTitle>
             <ShieldCheck className="h-4 w-4 text-amber-400" />
           </CardHeader>
           <CardContent>
             <div className="text-xl font-bold text-white">
-              {status?.executable_exists !== false ? "Installed" : "Missing"}
+              {status?.executable_exists !== false ? "Ready" : "Missing"}
             </div>
-            <p className="text-[11px] text-slate-500 mt-1">
+            <p className="text-[11px] text-slate-400 font-mono mt-1 truncate">
               FastSearchServiceNew.exe
             </p>
           </CardContent>
         </Card>
 
-        <Card className="border-slate-800 bg-slate-950/50">
+        <Card className="border-slate-800 bg-slate-950/60 shadow-lg">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-xs font-medium text-slate-400 uppercase tracking-wider">
-              Supported FS
+              Filesystem
             </CardTitle>
             <HardDrive className="h-4 w-4 text-emerald-400" />
           </CardHeader>
           <CardContent>
-            <div className="text-xl font-bold text-white">NTFS</div>
-            <p className="text-[11px] text-slate-500 mt-1">
-              Direct volume access
+            <div className="text-xl font-bold text-white">NTFS Master</div>
+            <p className="text-[11px] text-slate-400 mt-1">
+              Direct volume handle read
             </p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Architecture Info */}
-      <Card className="border-slate-800 bg-slate-950/50">
-        <CardHeader>
-          <CardTitle className="text-white text-base">
-            Direct MFT Architecture
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3 text-sm text-slate-300">
-          <p>
-            Unlike traditional file search utilities that run heavy background
-            indexers and consume CPU/RAM, FastSearch queries the NTFS Master
-            File Table directly at search time.
-          </p>
-          <div className="grid gap-3 sm:grid-cols-3 pt-2">
-            <div className="p-3 rounded border border-slate-800 bg-slate-900/40">
-              <span className="font-semibold text-white block mb-1">
-                0% Idle CPU
-              </span>
-              <span className="text-xs text-slate-400">
-                Zero background indexing services running when idle.
-              </span>
+      {/* 🚀 Quick Action Drive Shortcuts & Feature Showcase */}
+      <div className="grid gap-6 md:grid-cols-2">
+        {/* Drive Launchers */}
+        <Card className="border-slate-800 bg-slate-950/60 shadow-xl">
+          <CardHeader className="pb-3 border-b border-slate-800">
+            <CardTitle className="text-base font-bold text-white flex items-center gap-2">
+              <HardDrive className="h-4 w-4 text-blue-400" />
+              Quick Drive & Folder Scans
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-4 space-y-3">
+            {[
+              {
+                path: "C:\\",
+                label: "System Drive C:\\",
+                desc: "MFT Root Volume",
+              },
+              {
+                path: "D:\\",
+                label: "Data Drive D:\\",
+                desc: "MFT Root Volume",
+              },
+              {
+                path: "d:\\Dev\\repos",
+                label: "Dev Fleet Workspace",
+                desc: "Codebase Folder",
+              },
+            ].map((drive) => (
+              <a
+                key={drive.path}
+                href={`/search?directory=${encodeURIComponent(drive.path)}`}
+                className="flex items-center justify-between p-3 rounded-lg border border-slate-800/80 bg-slate-900/50 hover:bg-slate-800/80 hover:border-slate-700 transition-all group"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded bg-slate-950 border border-slate-800 text-blue-400 group-hover:text-blue-300">
+                    <HardDrive className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <div className="font-bold text-white text-xs group-hover:text-blue-300">
+                      {drive.label}
+                    </div>
+                    <div className="text-[11px] text-slate-400 font-mono">
+                      {drive.path} • {drive.desc}
+                    </div>
+                  </div>
+                </div>
+                <ArrowRight className="h-4 w-4 text-slate-500 group-hover:text-white transition-transform group-hover:translate-x-1" />
+              </a>
+            ))}
+          </CardContent>
+        </Card>
+
+        {/* Cushion Treemap Feature Spotlight */}
+        <Card className="border-slate-800 bg-slate-950/60 shadow-xl flex flex-col justify-between">
+          <CardHeader className="pb-3 border-b border-slate-800">
+            <CardTitle className="text-base font-bold text-white flex items-center gap-2">
+              <PieChart className="h-4 w-4 text-purple-400" />
+              3D Disk Cushion Treemap Visualizer
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-4 space-y-3 flex-1 flex flex-col justify-between">
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Explore your hard drives in a full 3D cushion layout with radial
+              lighting, subfolder zoom navigation, file type color-coding, and
+              high-res PNG / CSV export.
+            </p>
+
+            <div className="grid grid-cols-2 gap-2 text-xs font-mono pt-2">
+              <div className="p-2 rounded bg-slate-900/60 border border-slate-800 text-slate-300">
+                🎨 3D Cushion Lighting
+              </div>
+              <div className="p-2 rounded bg-slate-900/60 border border-slate-800 text-slate-300">
+                🔍 Subfolder Zooming
+              </div>
+              <div className="p-2 rounded bg-slate-900/60 border border-slate-800 text-slate-300">
+                📸 4K Image Export
+              </div>
+              <div className="p-2 rounded bg-slate-900/60 border border-slate-800 text-slate-300">
+                📊 CSV & JSON Export
+              </div>
             </div>
-            <div className="p-3 rounded border border-slate-800 bg-slate-900/40">
-              <span className="font-semibold text-white block mb-1">
-                Instant Results
-              </span>
-              <span className="text-xs text-slate-400">
-                Reads raw MFT records directly via Win32 volume handles.
-              </span>
+
+            <a href="/treemap" className="pt-2 block">
+              <Button className="w-full bg-purple-600 hover:bg-purple-500 text-white font-semibold text-xs flex items-center justify-center gap-2">
+                <PieChart className="h-4 w-4" />
+                Open Cushion Treemap Webpage
+              </Button>
+            </a>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Service Action Diagnostics Log Container */}
+      {actionError && (
+        <Card className="border-rose-800/60 bg-rose-950/20">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-bold text-rose-400 flex items-center gap-2">
+              <Terminal className="h-4 w-4" />
+              Service Execution Diagnostic Output
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-4 space-y-2">
+            <div className="text-xs text-rose-300 font-semibold">
+              {actionError}
             </div>
-            <div className="p-3 rounded border border-slate-800 bg-slate-900/40">
-              <span className="font-semibold text-white block mb-1">
-                SOTA Search UI
-              </span>
-              <span className="text-xs text-slate-400">
-                Dedicated Search page with live status, filters, and file
-                preview.
-              </span>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+            {startLogs.length > 0 && (
+              <div className="rounded border border-slate-800 bg-slate-950 p-3 font-mono text-[11px] text-slate-300 space-y-1 overflow-x-auto max-h-48">
+                {startLogs.map((logLine, idx) => (
+                  <div
+                    key={idx}
+                    className={
+                      logLine.includes("[ERROR]") || logLine.includes("Stderr")
+                        ? "text-rose-400"
+                        : logLine.includes("[WARNING]")
+                          ? "text-amber-400"
+                          : logLine.includes("[SUCCESS]")
+                            ? "text-emerald-400"
+                            : "text-slate-300"
+                    }
+                  >
+                    {logLine}
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

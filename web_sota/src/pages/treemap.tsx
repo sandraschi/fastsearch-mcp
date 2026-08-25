@@ -36,7 +36,7 @@ function formatBytes(bytes?: number): string {
 }
 
 export function TreemapPage() {
-  const [directory, setDirectory] = useState<string>("C:\\");
+  const [directory, setDirectory] = useState<string>("d:\\Dev\\repos");
   const [pattern, setPattern] = useState<string>("*");
   const [maxResults, setMaxResults] = useState<number>(1000);
 
@@ -72,7 +72,14 @@ export function TreemapPage() {
           );
           setResults([]);
         } else if (res.success === false) {
-          setErrorMsg(res.error || "MFT volume scan failed.");
+          const rawErr = res.error || "MFT volume scan failed.";
+          if (rawErr.includes("Failed to open volume")) {
+            setErrorMsg(
+              `Failed to open raw volume handle for '${activeDir}'. Direct root volume scanning (C:\\) requires elevated service privileges. Run 'just onboard' once as Administrator, or scan a folder path (e.g. 'd:\\Dev\\repos').`,
+            );
+          } else {
+            setErrorMsg(rawErr);
+          }
           setResults([]);
         } else {
           setResults(res.results || []);
@@ -155,7 +162,7 @@ export function TreemapPage() {
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2.5">
             <PieChart className="h-6 w-6 text-blue-500" />
-            WizTree 3D Cushion Treemap
+            3D Disk Cushion Treemap
           </h2>
           <p className="text-slate-400 text-sm mt-0.5">
             Visual disk space analyzer with 3D cushion layout and interactive
