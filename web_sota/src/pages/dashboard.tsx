@@ -127,7 +127,7 @@ export function Dashboard() {
                 <p className="text-xs text-slate-400 mt-0.5">
                   {isRunning
                     ? "Listening on named pipe \\\\.\\pipe\\FastSearchMCP. Direct NTFS Master File Table queries enabled."
-                    : "FastSearch C++ named pipe service is stopped. Start the service or run standalone mode."}
+                    : "FastSearch C++ Windows Service is offline. Click Start Service to elevate via UAC or run 'sc start FastSearchMCP' in Admin PowerShell."}
                 </p>
               </div>
             </div>

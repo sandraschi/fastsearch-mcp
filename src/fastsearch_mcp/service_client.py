@@ -286,7 +286,7 @@ async def search_files(
 
 
 async def start_service() -> bool:
-    """Start the elevated FastSearch Windows Service via SCM.
+    """Start the elevated FastSearch Windows Service via SCM or UAC prompt.
 
     Returns:
         bool: True if service started successfully, False otherwise
@@ -297,7 +297,7 @@ async def start_service() -> bool:
             logger.error(f"Service executable not found: {SERVICE_EXECUTABLE}")
             return False
 
-        # Try to start the elevated Windows SCM service
+        # Try standard SCM start first (works if shell is already elevated or SCM ACLs permit)
         result = await asyncio.to_thread(
             subprocess.run, ["sc", "start", SERVICE_NAME], capture_output=True, text=True, timeout=10
         )
@@ -308,16 +308,32 @@ async def start_service() -> bool:
             _service_status_cache = None
             return True
 
-        logger.warning(
-            "Failed to start FastSearch Windows Service via SCM (code %d): %s. "
-            "Elevated Administrator privileges are required to start or install the Windows Service.",
+        logger.info(
+            "Standard SCM start returned exit code %d; triggering UAC elevation prompt for Start-Service...",
             result.returncode,
-            result.stderr.strip(),
         )
+
+        # Trigger UAC elevation prompt to start service with Admin rights
+        ps_cmd = f"Start-Process powershell -ArgumentList '-NoProfile -Command Start-Service {SERVICE_NAME}' -Verb RunAs -Wait"
+        await asyncio.to_thread(
+            subprocess.run,
+            ["powershell.exe", "-NoProfile", "-Command", ps_cmd],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+
+        await asyncio.sleep(1.5)
+        if is_service_running():
+            logger.info("FastSearch elevated Windows Service started successfully via UAC prompt")
+            _service_status_cache = None
+            return True
+
+        logger.warning("UAC elevation prompt for service start failed or was cancelled")
         return False
 
     except Exception as e:
-        logger.error(f"Error starting Windows Service via SCM: {e}")
+        logger.error(f"Error starting Windows Service via SCM/UAC: {e}")
         return False
 
 
