@@ -14,7 +14,7 @@ lint:
     Set-Location '{{justfile_directory()}}'
     uv run ruff check src/ tests/
     Set-Location '{{justfile_directory()}}\web_sota'
-    npx @biomejs/biome ci .
+    npx @biomejs/biome ci . --config-path=./biome.json
 
 # Execute Ruff fix and formatting
 fix:
@@ -22,7 +22,7 @@ fix:
     uv run ruff check . --fix --unsafe-fixes
     uv run ruff format .
     Set-Location '{{justfile_directory()}}\web_sota'
-    npx @biomejs/biome check --write .
+    npx @biomejs/biome check --write . --config-path=./biome.json
 
 # ----------------------------------------
 
