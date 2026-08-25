@@ -19,10 +19,12 @@ Lightning-fast file search via direct NTFS Master File Table access — zero ind
 ```powershell
 git clone https://github.com/sandraschi/fastsearch-mcp
 cd fastsearch-mcp
-just
+just onboard
 ```
 
-This opens an interactive dashboard showing all available commands. Run `just bootstrap` to install dependencies, then `just serve` or `just dev` to start.
+`just onboard` requests Administrator elevation **ONCE** via UAC to register the `FastSearchMCP` Windows Service under `LocalSystem`, then automatically runs IPC named pipe diagnostic tests (`\\.\pipe\FastSearchMCP`). Once complete, all user tools (Claude Desktop, Web UI, Python MCP) execute MFT searches with **zero UAC prompts**.
+
+Run `just` to open the interactive dashboard showing all available commands. Run `just bootstrap` to install dependencies, then `just serve` or `just dev` to start.
 
 ### Manual Setup
 

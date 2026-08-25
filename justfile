@@ -11,18 +11,14 @@ default:
 
 # Execute Ruff SOTA linting
 lint:
-    Set-Location '{{justfile_directory()}}'
     uv run ruff check src/ tests/
-    Set-Location '{{justfile_directory()}}\web_sota'
-    npx @biomejs/biome ci . --config-path=./biome.json
+    npx @biomejs/biome ci .
 
 # Execute Ruff fix and formatting
 fix:
-    Set-Location '{{justfile_directory()}}'
     uv run ruff check . --fix --unsafe-fixes
     uv run ruff format .
-    Set-Location '{{justfile_directory()}}\web_sota'
-    npx @biomejs/biome check --write . --config-path=./biome.json
+    npx @biomejs/biome check --write .
 
 # ----------------------------------------
 
@@ -30,6 +26,11 @@ fix:
 build-service:
     Set-Location '{{justfile_directory()}}\service\build'
     cmake --build . --config Release
+
+# Automated first-time onboarding: Single UAC elevation for service install + auto named pipe testing
+onboard:
+    Set-Location '{{justfile_directory()}}'
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\onboard-first-time-user.ps1
 
 # Install/start the C++ service (requires admin)
 install-service:

@@ -7,6 +7,7 @@ import {
   Server,
   ShieldCheck,
   Terminal,
+  Zap,
 } from "lucide-react";
 import {
   Card,
@@ -135,10 +136,29 @@ export function Help() {
         </CardHeader>
         <CardContent className="space-y-4 text-xs">
           <div className="space-y-3">
+            <div className="rounded-lg border border-emerald-900/60 bg-emerald-950/20 p-4 space-y-2">
+              <div className="font-semibold text-emerald-300 flex items-center gap-2 text-sm">
+                <Zap className="h-4 w-4 text-emerald-400" />
+                Automated 1-Click First-Time Onboarding
+              </div>
+              <code className="block bg-slate-950 p-2.5 rounded border border-slate-800 font-mono text-emerald-300 font-bold">
+                just onboard
+              </code>
+              <p className="text-slate-300 leading-relaxed">
+                Executes the complete onboarding sequence: prompts for
+                Administrator elevation <b>ONCE</b> via UAC to register & start
+                the <code className="text-slate-200">FastSearchMCP</code>{" "}
+                Windows Service, then automatically runs Win32 Named Pipe IPC
+                diagnostics (
+                <code className="text-slate-200">\\.\pipe\FastSearchMCP</code>)
+                to verify latency and connectivity.
+              </p>
+            </div>
+
             <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-3 space-y-2">
               <div className="font-semibold text-slate-200 flex items-center gap-2">
                 <Server className="h-4 w-4 text-blue-400" />
-                Install & Start Service (Admin PowerShell)
+                Install & Start Service (Manual Admin PowerShell)
               </div>
               <code className="block bg-slate-950 p-2 rounded border border-slate-800 font-mono text-amber-200">
                 just install-service
