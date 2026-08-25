@@ -7,6 +7,7 @@ import {
   FlaskConical,
   HelpCircle,
   LayoutDashboard,
+  PieChart,
   Search,
   Server,
   Settings,
@@ -25,6 +26,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const navItems = [
     { href: "/", label: "Overview", icon: LayoutDashboard },
     { href: "/search", label: "Dedicated Search", icon: Search },
+    { href: "/treemap", label: "Cushion Treemap", icon: PieChart },
     { href: "/service", label: "NTFS Search Service", icon: Server },
     { href: "/tests", label: "Tests", icon: FlaskConical },
     { href: "/tools", label: "Search Tools", icon: Search },
@@ -42,18 +44,33 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
         collapsed ? "w-16" : "w-64",
       )}
     >
-      <div className="flex h-16 items-center border-b border-slate-800 px-4">
-        <div className="flex items-center gap-2 font-semibold text-slate-100">
-          <Activity className="h-6 w-6 text-blue-500" />
+      {/* Top Header with Standard Show/Hide Sidebar Toggle */}
+      <div className="flex h-16 items-center justify-between border-b border-slate-800 px-3.5">
+        <div className="flex items-center gap-2 font-semibold text-slate-100 min-w-0">
+          <Activity className="h-6 w-6 text-blue-500 shrink-0" />
           {!collapsed && (
-            <span className="animate-in fade-in duration-300">
+            <span className="animate-in fade-in duration-300 font-bold truncate">
               FastSearch-MCP
             </span>
           )}
         </div>
+
+        <button
+          id="sidebar-toggle"
+          onClick={onToggle}
+          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          className="flex items-center justify-center rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white transition-colors border border-slate-800/80 bg-slate-900/60 shrink-0"
+        >
+          {collapsed ? (
+            <ChevronRight className="h-4 w-4 text-blue-400" />
+          ) : (
+            <ChevronLeft className="h-4 w-4" />
+          )}
+        </button>
       </div>
 
-      <nav className="flex-1 space-y-1 p-2">
+      <nav className="flex-1 space-y-1 p-2 overflow-y-auto">
         {navItems
           .filter((item) => !["/control", "/visualizer"].includes(item.href))
           .map((item) => {
@@ -89,25 +106,6 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
             );
           })}
       </nav>
-
-      <div className="border-t border-slate-800 p-2">
-        <button
-          id="sidebar-toggle"
-          onClick={onToggle}
-          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          className="flex w-full items-center justify-center rounded-md p-2 text-slate-400 hover:bg-slate-800 hover:text-white transition-colors"
-        >
-          {collapsed ? (
-            <ChevronRight className="h-5 w-5" />
-          ) : (
-            <div className="flex items-center w-full">
-              <ChevronLeft className="h-5 w-5 mr-3" />
-              <span>Collapse</span>
-            </div>
-          )}
-        </button>
-      </div>
     </aside>
   );
 }

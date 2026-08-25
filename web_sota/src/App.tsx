@@ -15,6 +15,7 @@ import { Service } from "@/pages/service";
 import { Settings } from "@/pages/settings";
 import { Tests } from "@/pages/tests";
 import { Tools } from "@/pages/tools";
+import { TreemapPage } from "@/pages/treemap";
 
 function App() {
   return (
@@ -23,6 +24,7 @@ function App() {
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/search" element={<Search />} />
+          <Route path="/treemap" element={<TreemapPage />} />
           <Route path="/tools" element={<Tools />} />
           <Route path="/service" element={<Service />} />
           <Route path="/tests" element={<Tests />} />
