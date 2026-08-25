@@ -30,6 +30,8 @@ export function Dashboard() {
   const [status, setStatus] = useState<ServiceStatus | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [actionLoading, setActionLoading] = useState<boolean>(false);
+  const [startLogs, setStartLogs] = useState<string[]>([]);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const fetchStatus = async () => {
     setLoading(true);
@@ -49,10 +51,21 @@ export function Dashboard() {
 
   const handleStartService = async () => {
     setActionLoading(true);
+    setActionError(null);
+    setStartLogs([]);
     try {
-      await mcpClient.startServiceDirect();
+      const res = await mcpClient.startServiceDirect();
+      if (res.logs && res.logs.length > 0) {
+        setStartLogs(res.logs);
+      }
+      if (!res.success) {
+        setActionError(
+          res.error || res.message || "Failed to start Windows Service",
+        );
+      }
       await fetchStatus();
-    } catch {
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : String(e));
       fetchStatus();
     } finally {
       setActionLoading(false);
@@ -147,6 +160,39 @@ export function Dashboard() {
               </Button>
             )}
           </div>
+
+          {actionError && (
+            <div className="mt-4 rounded-lg border border-red-800/60 bg-red-950/20 p-4 space-y-2">
+              <div className="text-sm font-semibold text-red-400 flex items-center gap-2">
+                <XCircle className="h-4 w-4 shrink-0" />
+                Service Action Diagnostics: {actionError}
+              </div>
+              {startLogs.length > 0 && (
+                <div className="mt-2 rounded border border-slate-800 bg-slate-950 p-3 font-mono text-[11px] text-slate-300 space-y-1 overflow-x-auto max-h-48">
+                  <div className="text-slate-500 font-sans font-medium text-[10px] uppercase tracking-wider mb-1">
+                    Diagnostic Execution Logs:
+                  </div>
+                  {startLogs.map((logLine, idx) => (
+                    <div
+                      key={idx}
+                      className={
+                        logLine.includes("[ERROR]") ||
+                        logLine.includes("Stderr")
+                          ? "text-red-400"
+                          : logLine.includes("[WARNING]")
+                            ? "text-amber-400"
+                            : logLine.includes("[SUCCESS]")
+                              ? "text-emerald-400"
+                              : "text-slate-300"
+                      }
+                    >
+                      {logLine}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
 

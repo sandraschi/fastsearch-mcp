@@ -222,6 +222,8 @@ class MCPClient {
     success: boolean;
     message?: string;
     error?: string;
+    logs?: string[];
+    details?: Record<string, any>;
   }> {
     try {
       const response = await fetch(`${this.baseUrl}/service/start`, {
@@ -230,6 +232,19 @@ class MCPClient {
       return await response.json();
     } catch (error) {
       return { success: false, error: String(error) };
+    }
+  }
+
+  async getServiceLogsDirect(): Promise<{
+    success: boolean;
+    logs: string[];
+    error?: string;
+  }> {
+    try {
+      const response = await fetch(`${this.baseUrl}/service/logs`);
+      return await response.json();
+    } catch (error) {
+      return { success: false, logs: [], error: String(error) };
     }
   }
 

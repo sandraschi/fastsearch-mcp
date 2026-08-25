@@ -225,14 +225,33 @@ async def api_service_status() -> dict:
 
 @router.post("/service/start")
 async def api_service_start() -> dict:
-    """Start FastSearch service."""
+    """Start FastSearch service with full diagnostic logging."""
     try:
-        from fastsearch_mcp.service_client import start_service
+        from fastsearch_mcp.service_client import start_service_with_details
 
-        ok = await start_service()
-        return {"success": ok, "message": "Service start command sent" if ok else "Failed to start service"}
+        details = await start_service_with_details()
+        return {
+            "success": details.get("success", False),
+            "message": "Service started successfully" if details.get("success") else "Failed to start service",
+            "details": details,
+            "logs": details.get("logs", []),
+            "error": details.get("error"),
+        }
     except Exception as e:
-        return {"success": False, "error": str(e)}
+        logger.exception("api_service_start failed")
+        return {"success": False, "error": str(e), "logs": [f"[EXCEPTION] {e}"]}
+
+
+@router.get("/service/logs")
+async def api_service_logs() -> dict:
+    """Get Windows Event Logs and diagnostic traces for FastSearchMCP service."""
+    try:
+        from fastsearch_mcp.service_client import get_recent_service_logs
+
+        logs = await get_recent_service_logs()
+        return {"success": True, "logs": logs}
+    except Exception as e:
+        return {"success": False, "logs": [], "error": str(e)}
 
 
 @router.post("/service/stop")

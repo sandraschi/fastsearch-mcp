@@ -285,56 +285,142 @@ async def search_files(
         raise RuntimeError(error_msg) from e
 
 
-async def start_service() -> bool:
-    """Start the elevated FastSearch Windows Service via SCM or UAC prompt.
+async def start_service_with_details() -> dict[str, Any]:
+    """Start the elevated FastSearch Windows Service with comprehensive logging and diagnostics.
 
     Returns:
-        bool: True if service started successfully, False otherwise
+        dict: Detailed result containing success status, exit codes, stderr, and Event Log entries.
     """
-    try:
-        # Check if service executable exists
-        if not SERVICE_EXECUTABLE.exists():
-            logger.error(f"Service executable not found: {SERVICE_EXECUTABLE}")
-            return False
+    diagnostics: dict[str, Any] = {
+        "success": False,
+        "installed": True,
+        "executable_exists": SERVICE_EXECUTABLE.exists(),
+        "executable_path": str(SERVICE_EXECUTABLE),
+        "service_name": SERVICE_NAME,
+        "logs": [],
+    }
 
-        # Try standard SCM start first (works if shell is already elevated or SCM ACLs permit)
-        result = await asyncio.to_thread(
-            subprocess.run, ["sc", "start", SERVICE_NAME], capture_output=True, text=True, timeout=10
-        )
+    if not SERVICE_EXECUTABLE.exists():
+        msg = f"Service binary missing: {SERVICE_EXECUTABLE}"
+        logger.error(msg)
+        diagnostics["error"] = msg
+        diagnostics["logs"].append(f"[ERROR] {msg}")
+        return diagnostics
 
-        if result.returncode == 0:
-            logger.info("FastSearch elevated Windows Service started successfully via SCM")
-            global _service_status_cache
-            _service_status_cache = None
-            return True
+    # 1. Query Windows SCM for service registration status
+    scm_check = await asyncio.to_thread(
+        subprocess.run, ["sc", "query", SERVICE_NAME], capture_output=True, text=True, timeout=5
+    )
 
-        logger.info(
-            "Standard SCM start returned exit code %d; triggering UAC elevation prompt for Start-Service...",
-            result.returncode,
-        )
+    if scm_check.returncode == 1060 or "1060" in scm_check.stderr or "1060" in scm_check.stdout:
+        diagnostics["installed"] = False
+        msg = f"Service '{SERVICE_NAME}' is not registered in Windows Service Control Manager (Error 1060)."
+        logger.warning(msg)
+        diagnostics["logs"].append(f"[WARNING] {msg}")
+        diagnostics["logs"].append("[UAC] Triggering elevated installation prompt: FastSearchServiceNew.exe install...")
 
-        # Trigger UAC elevation prompt to start service with Admin rights
-        ps_cmd = f"Start-Process powershell -ArgumentList '-NoProfile -Command Start-Service {SERVICE_NAME}' -Verb RunAs -Wait"
-        await asyncio.to_thread(
+        # Automatic installation via UAC prompt
+        install_cmd = f"Start-Process '{SERVICE_EXECUTABLE}' -ArgumentList 'install' -Verb RunAs -Wait; Start-Service {SERVICE_NAME} -ErrorAction SilentlyContinue"
+        install_res = await asyncio.to_thread(
             subprocess.run,
-            ["powershell.exe", "-NoProfile", "-Command", ps_cmd],
+            ["powershell.exe", "-NoProfile", "-Command", install_cmd],
             capture_output=True,
             text=True,
-            timeout=30,
+            timeout=45,
         )
+        diagnostics["logs"].append(f"[UAC Output] ExitCode: {install_res.returncode}")
+        if install_res.stderr:
+            diagnostics["logs"].append(f"[UAC Stderr] {install_res.stderr.strip()}")
 
-        await asyncio.sleep(1.5)
+        await asyncio.sleep(2.0)
         if is_service_running():
-            logger.info("FastSearch elevated Windows Service started successfully via UAC prompt")
+            global _service_status_cache
             _service_status_cache = None
-            return True
+            diagnostics["success"] = True
+            diagnostics["installed"] = True
+            diagnostics["logs"].append("[SUCCESS] Service installed and started successfully via UAC elevation.")
+            return diagnostics
 
-        logger.warning("UAC elevation prompt for service start failed or was cancelled")
-        return False
+    # 2. Try standard sc start
+    sc_start = await asyncio.to_thread(
+        subprocess.run, ["sc", "start", SERVICE_NAME], capture_output=True, text=True, timeout=10
+    )
+    diagnostics["logs"].append(f"[SCM Start] ExitCode: {sc_start.returncode}")
+    if sc_start.stdout:
+        diagnostics["logs"].append(f"[SCM Stdout] {sc_start.stdout.strip()}")
+    if sc_start.stderr:
+        diagnostics["logs"].append(f"[SCM Stderr] {sc_start.stderr.strip()}")
 
+    if sc_start.returncode == 0:
+        _service_status_cache = None
+        diagnostics["success"] = True
+        diagnostics["logs"].append("[SUCCESS] Service started successfully via SCM.")
+        return diagnostics
+
+    # 3. Trigger UAC elevated start if SCM start returned access denied or failed
+    logger.info("SCM start returned code %d; prompting for UAC elevation...", sc_start.returncode)
+    ps_cmd = (
+        f"Start-Process powershell -ArgumentList '-NoProfile -Command Start-Service {SERVICE_NAME}' -Verb RunAs -Wait"
+    )
+    uac_res = await asyncio.to_thread(
+        subprocess.run,
+        ["powershell.exe", "-NoProfile", "-Command", ps_cmd],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    diagnostics["logs"].append(f"[UAC Start Output] ExitCode: {uac_res.returncode}")
+
+    await asyncio.sleep(1.5)
+    if is_service_running():
+        _service_status_cache = None
+        diagnostics["success"] = True
+        diagnostics["logs"].append("[SUCCESS] Service started successfully after UAC elevation.")
+        return diagnostics
+
+    # 4. Fetch recent Windows Event Log entries for FastSearchMCP source to extract exact error trace
+    try:
+        evt_cmd = f"Get-WinEvent -ProviderName '{SERVICE_NAME}' -MaxEvents 5 -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Message"
+        evt_res = await asyncio.to_thread(
+            subprocess.run,
+            ["powershell.exe", "-NoProfile", "-Command", evt_cmd],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if evt_res.stdout.strip():
+            diagnostics["event_logs"] = [line.strip() for line in evt_res.stdout.strip().splitlines() if line.strip()]
+            diagnostics["logs"].append(f"[EventLog] {evt_res.stdout.strip()}")
     except Exception as e:
-        logger.error(f"Error starting Windows Service via SCM/UAC: {e}")
-        return False
+        logger.debug("Failed to query EventLog: %s", e)
+
+    diagnostics["error"] = diagnostics["logs"][-1] if diagnostics["logs"] else "Service start failed"
+    return diagnostics
+
+
+async def start_service() -> bool:
+    """Start the FastSearch C++ service (returns bool for backward compatibility)."""
+    res = await start_service_with_details()
+    return res.get("success", False)
+
+
+async def get_recent_service_logs() -> list[str]:
+    """Retrieve recent Windows Event Log entries and runtime traces for FastSearchMCP service."""
+    logs: list[str] = []
+    try:
+        evt_cmd = f"Get-WinEvent -ProviderName '{SERVICE_NAME}' -MaxEvents 15 -ErrorAction SilentlyContinue | Format-Table -AutoSize TimeCreated, Id, LevelDisplayName, Message | Out-String"
+        evt_res = await asyncio.to_thread(
+            subprocess.run,
+            ["powershell.exe", "-NoProfile", "-Command", evt_cmd],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if evt_res.stdout.strip():
+            logs.extend(evt_res.stdout.strip().splitlines())
+    except Exception as e:
+        logger.debug("Failed to fetch Windows Event Log: %s", e)
+    return logs
 
 
 async def stop_service() -> bool:
