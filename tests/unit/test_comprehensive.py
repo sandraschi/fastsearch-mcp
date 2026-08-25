@@ -12,7 +12,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from fastsearch_mcp.mcp_instance import mcp
-from fastsearch_mcp.service_client import get_service_status, is_service_running
+from fastsearch_mcp.service_client import is_service_running
 
 
 def setup_logging():
@@ -49,7 +49,6 @@ def test_fastmcp_server():
     except Exception as e:
         print(f"   ❌ Server test failed: {e}")
         return False
-
 
 
 def test_frontend():

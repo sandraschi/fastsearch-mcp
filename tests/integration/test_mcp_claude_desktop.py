@@ -42,7 +42,7 @@ async def simulate_claude_request(server: FastSearchServer, method: str, params:
                 if tool_def.name == tool_name:
                     tool_class = tc
                     break
-            except:
+            except Exception:
                 continue
 
         if tool_class:
@@ -113,7 +113,7 @@ async def main():
         try:
             tool_def = tool_class.get_definition()
             tools_list.append({"name": tool_def.name, "description": tool_def.description})
-        except:
+        except Exception:
             pass
 
     print(f"[OK] Found {len(tools_list)} tools")

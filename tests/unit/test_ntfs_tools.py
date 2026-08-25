@@ -13,7 +13,6 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 
-
 def is_admin():
     """Check if running with administrator privileges."""
     try:
@@ -36,7 +35,7 @@ def elevate_if_needed():
         # Request elevation - redirect output to file so we can read it back
         import subprocess
 
-        subprocess.Popen(
+        subprocess.Popen(  # noqa: S602
             [sys.executable, script, "--elevated", "--result-file", result_file],
             shell=True,
             creationflags=0x08000000,  # CREATE_NO_WINDOW - but this won't work with UAC

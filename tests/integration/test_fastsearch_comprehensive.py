@@ -32,6 +32,8 @@ from fastsearch_mcp.tools import (
     ntfs_volume_info,
     service_status,
 )
+from fastsearch_mcp.tools.ntfs import ntfs_list_volumes
+from fastsearch_mcp.tools.service_manager import list_services
 
 
 class TestResults:
@@ -875,7 +877,7 @@ async def run_all_tests():
 
     # Service connection test first
     service_available = False
-    for test_name, test_func, _ in all_tests[:1]:
+    for _test_name, test_func, _ in all_tests[:1]:
         service_available = await test_func()
         if not service_available:
             print("\n[WARNING] Service not available. Some tests will be skipped.\n")

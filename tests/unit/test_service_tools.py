@@ -13,7 +13,6 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 
-
 def is_admin():
     """Check if running with administrator privileges."""
     try:

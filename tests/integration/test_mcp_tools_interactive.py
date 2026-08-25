@@ -28,7 +28,7 @@ async def test_tool(tool_name: str, **kwargs):
             if tool_def.name == tool_name:
                 tool_class = tc
                 break
-        except:
+        except Exception:
             continue
 
     if not tool_class:
@@ -38,7 +38,7 @@ async def test_tool(tool_name: str, **kwargs):
             try:
                 tool_def = tc.get_definition()
                 print(f"  - {tool_def.name}")
-            except:
+            except Exception:
                 pass
         return
 
@@ -71,7 +71,7 @@ async def interactive_mode():
             tool_def = tool_class.get_definition()
             tools.append(tool_def.name)
             print(f"  {i}. {tool_def.name}")
-        except:
+        except Exception:
             pass
 
     print("\nEnter tool name or number (or 'q' to quit):")

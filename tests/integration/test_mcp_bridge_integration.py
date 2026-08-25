@@ -137,7 +137,7 @@ async def test_tool_execution(server: FastSearchServer):
                     if tool_def.name == tool_name:
                         tool_class = tc
                         break
-                except:
+                except Exception:
                     continue
 
             if tool_class:
@@ -192,7 +192,7 @@ def test_claude_desktop_config():
 
     # Check if module can be imported
     try:
-        import fastsearch_mcp
+        import fastsearch_mcp  # noqa: F401
 
         print_success("Module can be imported: fastsearch_mcp")
     except ImportError as e:

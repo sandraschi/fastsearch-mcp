@@ -70,7 +70,7 @@ async def test_unlimited_safety():
             elif count >= 1000000:
                 print(f"   ⚠️  WARNING: Large result set ({count:,} files)")
             else:
-                print("   ℹ️  Result count is reasonable")
+                print("   [INFO] Result count is reasonable")
 
         except Exception as e:
             duration = time.time() - start

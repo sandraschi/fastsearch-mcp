@@ -25,4 +25,3 @@ class TestMcpError:
         assert isinstance(err2, McpError)
         assert isinstance(err3, McpError)
         assert isinstance(err4, McpError)
-
