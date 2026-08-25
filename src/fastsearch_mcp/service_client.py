@@ -25,10 +25,12 @@ logger = get_logger(__name__)
 _service_status_cache: tuple[bool, float] | None = None  # (is_running, timestamp)
 _CACHE_TTL = 2.0  # Cache for 2 seconds - fast enough for rapid searches, fresh enough
 
-# Service configuration
 SERVICE_NAME = "FastSearchMCP"
+_BIN_DIR = Path(__file__).parent.parent.parent / "service" / "build" / "bin" / "Release"
 SERVICE_EXECUTABLE = (
-    Path(__file__).parent.parent.parent / "service" / "build" / "bin" / "Release" / "FastSearchServiceNew.exe"
+    _BIN_DIR / "FastSearchEngine.exe"
+    if (_BIN_DIR / "FastSearchEngine.exe").exists()
+    else _BIN_DIR / "FastSearchServiceNew.exe"
 )
 
 
@@ -36,7 +38,7 @@ def is_service_running() -> bool:
     """Check if the FastSearch C++ service is running (fast, cached check).
 
     Uses a fast pipe connection attempt first (fails immediately if service is down),
-    with caching to avoid repeated checks. Falls back to process check only if needed.
+    with caching to avoid repeated checks. Falls back to SCM and process checks if needed.
 
     Returns:
         bool: True if the service is running, False otherwise
@@ -50,13 +52,11 @@ def is_service_running() -> bool:
         if now - cache_time < _CACHE_TTL:
             return cached_status
 
-    # Fast check: Try to connect to pipe (fails immediately if service is down)
-    # This is much faster than tasklist
+    # 1. Fast check: Try to connect to pipe
     try:
         import pywintypes
         import win32file
 
-        # Try to open pipe - this fails fast (ERROR_FILE_NOT_FOUND = 2) if service is down
         handle = win32file.CreateFile(
             get_pipe_name(),
             win32file.GENERIC_READ | win32file.GENERIC_WRITE,
@@ -66,32 +66,45 @@ def is_service_running() -> bool:
             0,
             None,
         )
-        # If we got here, pipe exists and service is running
         win32file.CloseHandle(handle)
         _service_status_cache = (True, now)
         return True
     except pywintypes.error as e:
-        if e.winerror == 2:  # ERROR_FILE_NOT_FOUND - pipe doesn't exist, service is down
-            _service_status_cache = (False, now)
-            return False
-        # Other errors might mean service is running but busy - fall through to process check
-        logger.debug(f"Pipe check ambiguous (error {e.winerror}), falling back to process check")
+        # ERROR_PIPE_BUSY (231) or ERROR_ACCESS_DENIED (5) means pipe exists & service is RUNNING!
+        if e.winerror in (231, 5):
+            _service_status_cache = (True, now)
+            return True
+        if e.winerror == 2:  # ERROR_FILE_NOT_FOUND - pipe doesn't exist
+            pass
     except Exception as e:
-        logger.debug(f"Pipe check failed: {e}, falling back to process check")
+        logger.debug(f"Pipe check exception: {e}")
 
-    # Fallback: Check process list (slower, but more reliable for edge cases)
+    # 2. Check SCM service state
     try:
-        result = subprocess.run(
-            ["tasklist", "/FI", "IMAGENAME eq FastSearchServiceNew.exe"],
+        res = subprocess.run(
+            ["sc", "query", SERVICE_NAME],
             capture_output=True,
             text=True,
-            timeout=2,  # Reduced timeout - 2 seconds max
+            timeout=2,
         )
-        is_running = "FastSearchServiceNew.exe" in result.stdout
+        if "STATE" in res.stdout and "RUNNING" in res.stdout:
+            _service_status_cache = (True, now)
+            return True
+    except Exception as e:
+        logger.debug(f"SCM query exception: {e}")
+
+    # 3. Fallback: Check process list (tasklist)
+    try:
+        result = subprocess.run(
+            ["tasklist"],
+            capture_output=True,
+            text=True,
+            timeout=2,
+        )
+        is_running = "FastSearchEngine.exe" in result.stdout or "FastSearchServiceNew.exe" in result.stdout
         _service_status_cache = (is_running, now)
         return is_running
     except subprocess.TimeoutExpired:
-        # tasklist timed out - assume service is not running to avoid blocking
         logger.warning("Service check timed out, assuming service is not running")
         _service_status_cache = (False, now)
         return False
@@ -291,6 +304,8 @@ async def start_service_with_details() -> dict[str, Any]:
     Returns:
         dict: Detailed result containing success status, exit codes, stderr, and Event Log entries.
     """
+    global _service_status_cache
+
     diagnostics: dict[str, Any] = {
         "success": False,
         "installed": True,
@@ -334,7 +349,6 @@ async def start_service_with_details() -> dict[str, Any]:
 
         await asyncio.sleep(2.0)
         if is_service_running():
-            global _service_status_cache
             _service_status_cache = None
             diagnostics["success"] = True
             diagnostics["installed"] = True
@@ -393,6 +407,27 @@ async def start_service_with_details() -> dict[str, Any]:
             diagnostics["logs"].append(f"[EventLog] {evt_res.stdout.strip()}")
     except Exception as e:
         logger.debug("Failed to query EventLog: %s", e)
+
+    # 5. Fallback: Launch in standalone background mode if SCM / UAC service start didn't connect
+    if not is_service_running() and SERVICE_EXECUTABLE.exists():
+        logger.info("Service SCM start unavailable; launching FastSearch engine in standalone background mode...")
+        try:
+            creation_flags = getattr(subprocess, "CREATE_NO_WINDOW", 0) | getattr(subprocess, "DETACHED_PROCESS", 0)
+            subprocess.Popen(
+                [str(SERVICE_EXECUTABLE), "--standalone"],
+                creationflags=creation_flags,
+                close_fds=True,
+            )
+            await asyncio.sleep(1.0)
+            if is_service_running():
+                _service_status_cache = None
+                diagnostics["success"] = True
+                diagnostics["logs"].append(
+                    "[SUCCESS] FastSearch Engine started successfully in standalone background mode."
+                )
+                return diagnostics
+        except Exception as standalone_err:
+            diagnostics["logs"].append(f"[Standalone Error] {standalone_err}")
 
     diagnostics["error"] = diagnostics["logs"][-1] if diagnostics["logs"] else "Service start failed"
     return diagnostics

@@ -33,9 +33,9 @@ logger = get_logger(__name__)
 
 # Service configuration: pipe name must match service\src\fastsearch_service.h kPipeName
 # (L"\\\\.\\pipe\\FastSearchMCP"). Override with FASTSEARCH_PIPE_NAME if using a different build.
-DEFAULT_PIPE_NAME = r"\\.\pipe\FastSearchMCP"
+DEFAULT_PIPE_NAME = r"\\.\pipe\FastSearchMCP_v2"
 PIPE_TIMEOUT = 5000  # 5 seconds in milliseconds
-MAX_PIPE_BUFFER = 65536  # 64KB buffer
+MAX_PIPE_BUFFER = 32 * 1024 * 1024  # 32MB buffer
 
 
 def get_pipe_name() -> str:
@@ -70,56 +70,71 @@ class NamedPipeClient:
             return False
 
         self.last_connect_error = None
-        try:
-            # Try to open the named pipe (blocking Win32 call, run in executor)
-            loop = asyncio.get_event_loop()
-            self.handle = await asyncio.wait_for(
-                loop.run_in_executor(
+        pipe_names_to_try = [self.pipe_name]
+        if self.pipe_name != r"\\.\pipe\FastSearchMCP":
+            pipe_names_to_try.append(r"\\.\pipe\FastSearchMCP")
+
+        def _open_pipe_sync(p_name: str) -> Any:
+            try:
+                return win32file.CreateFile(
+                    p_name,
+                    win32file.GENERIC_READ | win32file.GENERIC_WRITE,
+                    0,
                     None,
-                    lambda: win32file.CreateFile(
-                        self.pipe_name,
+                    win32file.OPEN_EXISTING,
+                    0,
+                    None,
+                )
+            except pywintypes.error as e:
+                if e.winerror == 231:  # ERROR_PIPE_BUSY
+                    win32pipe.WaitNamedPipe(p_name, int(timeout * 1000))
+                    return win32file.CreateFile(
+                        p_name,
                         win32file.GENERIC_READ | win32file.GENERIC_WRITE,
                         0,
                         None,
                         win32file.OPEN_EXISTING,
                         0,
                         None,
-                    ),
-                ),
-                timeout=timeout,
-            )
+                    )
+                raise
 
-            # Set pipe to message mode (blocking Win32 call, run in executor)
-            await loop.run_in_executor(
-                None,
-                lambda: win32pipe.SetNamedPipeHandleState(self.handle, win32pipe.PIPE_READMODE_MESSAGE, None, None),
-            )
+        loop = asyncio.get_event_loop()
+        h_file = None
+        last_err = None
 
-            self.connected = True
-            self.last_connect_error = None
-            logger.info(f"Connected to named pipe: {self.pipe_name}")
-            return True
-
-        except TimeoutError:
-            self.last_connect_error = (0, f"Connection timed out after {timeout}s")
-            logger.error(f"Connection to named pipe timed out after {timeout}s: {self.pipe_name}")
-            self.connected = False
-            return False
-        except pywintypes.error as e:
-            self.last_connect_error = (e.winerror, str(e))
-            if e.winerror == 2:  # ERROR_FILE_NOT_FOUND
-                logger.debug(
-                    f"Named pipe not found: {self.pipe_name} (error 2). Set FASTSEARCH_PIPE_NAME if service uses another name."
+        for p_name in pipe_names_to_try:
+            try:
+                h_file = await asyncio.wait_for(
+                    loop.run_in_executor(None, _open_pipe_sync, p_name),
+                    timeout=timeout,
                 )
+                self.pipe_name = p_name
+                break
+            except (TimeoutError, pywintypes.error, Exception) as e:
+                last_err = e
+                continue
+
+        if not h_file:
+            if isinstance(last_err, pywintypes.error):
+                self.last_connect_error = (last_err.winerror, str(last_err))
+                logger.error(f"Failed to connect to named pipe: {last_err}")
             else:
-                logger.error(f"Failed to connect to named pipe: {e}")
+                self.last_connect_error = (0, str(last_err))
+                logger.error(f"Named pipe connection failed: {last_err}")
             self.connected = False
             return False
-        except Exception as e:
-            self.last_connect_error = (0, str(e))
-            logger.error(f"Unexpected error connecting to named pipe: {e}")
-            self.connected = False
-            return False
+
+        self.handle = h_file
+        # Set pipe to message mode
+        await loop.run_in_executor(
+            None,
+            lambda: win32pipe.SetNamedPipeHandleState(self.handle, win32pipe.PIPE_READMODE_MESSAGE, None, None),
+        )
+        self.connected = True
+        self.last_connect_error = None
+        logger.info(f"Connected to named pipe: {self.pipe_name}")
+        return True
 
     async def disconnect(self):
         """Disconnect from the named pipe."""
