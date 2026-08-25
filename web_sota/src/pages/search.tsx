@@ -1,4 +1,5 @@
 import {
+  AlertTriangle,
   Archive,
   ArrowUpDown,
   Check,
@@ -430,10 +431,14 @@ export function Search() {
             </Button>
           </div>
           <p className="text-xs text-slate-300 leading-relaxed">
-            FastSearch performs live, zero-index reads of the NTFS Master File Table (MFT). Direct volume access requires <b>Administrator</b> or <b>LocalSystem</b> privileges on Windows.
+            FastSearch performs live, zero-index reads of the NTFS Master File
+            Table (MFT). Direct volume access requires <b>Administrator</b> or{" "}
+            <b>LocalSystem</b> privileges on Windows.
           </p>
           <div className="flex flex-wrap items-center gap-2 pt-1 font-mono text-[11px] text-slate-400">
-            <span className="text-slate-500 font-sans font-medium">Elevated start commands:</span>
+            <span className="text-slate-500 font-sans font-medium">
+              Elevated start commands:
+            </span>
             <code className="bg-slate-900 px-2 py-0.5 rounded border border-slate-800 text-amber-200">
               sc start FastSearchMCP
             </code>
