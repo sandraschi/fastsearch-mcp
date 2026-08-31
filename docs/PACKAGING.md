@@ -37,7 +37,7 @@ The DXT package will include:
    ```
 
 3. The script will create two files in the `dist` directory:
-   - `fastsearch-mcp-<version>.dxt` - The DXT package
+   - `fastsearch-mcp-<version>.mcpb` - The DXT package
    - `fastsearch-mcp-<version>.zip` - A zip archive of the package
 
 ## Installing the Package
@@ -45,7 +45,7 @@ The DXT package will include:
 To install the package locally:
 
 ```powershell
-dxt install .\dist\fastsearch-mcp-<version>.dxt
+npx @anthropic-ai/mcpb pack .\dist\fastsearch-mcp-<version>.mcpb
 ```
 
 ## Verifying the Installation
@@ -60,8 +60,8 @@ dxt list | findstr fastsearch-mcp
 
 To distribute the package:
 
-1. Share the `.dxt` file with users
-2. They can install it using the `dxt install` command
+1. Share the `.mcpb` file with users
+2. They can install it using the `npx @anthropic-ai/mcpb pack` command
 3. Or use the zip archive for manual installation
 
 ## Versioning
@@ -81,3 +81,4 @@ Update the version in:
 ## License
 
 MIT - See [LICENSE](LICENSE) for more information.
+

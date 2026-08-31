@@ -11,7 +11,7 @@ import logging
 import sys
 import time
 import uuid
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from fastmcp import FastMCP
 
@@ -134,8 +134,7 @@ class McpServer:
             self.service_available = False
             logger.warning(f"Running in offline mode - could not connect to service: {e}")
             self._show_service_error_dialog(
-                f"Running in limited mode. Some features require the FastSearch service.\n\n"
-                f"Error: {str(e)}"
+                f"Running in limited mode. Some features require the FastSearch service.\n\nError: {e!s}"
             )
 
         try:
@@ -162,7 +161,7 @@ class McpServer:
                                 None, lambda r=response: stdout.write(f"{r}\n") or stdout.flush()
                             )
 
-                    except asyncio.TimeoutError:
+                    except TimeoutError:
                         # Timeout is expected, just continue the loop
                         continue
 
@@ -192,7 +191,7 @@ class McpServer:
                 pass
         await self.pipe_client.close()
 
-    def _get_or_create_session(self, session_id: Optional[str] = None) -> str:
+    def _get_or_create_session(self, session_id: str | None = None) -> str:
         """Get existing session or create a new one.
 
         Args:
@@ -213,7 +212,7 @@ class McpServer:
         self.sessions[session_id] = {"created_at": now, "last_activity": now, "data": {}}
         return session_id, self.sessions[session_id]
 
-    async def _process_message(self, message: str) -> Optional[str]:
+    async def _process_message(self, message: str) -> str | None:
         """Process a single incoming message.
 
         Args:
@@ -299,12 +298,12 @@ class McpServer:
         query: str,
         search_type: str = "glob",
         limit: int = 100,
-        include: List[str] = None,
-        exclude: List[str] = None,
+        include: list[str] | None = None,
+        exclude: list[str] | None = None,
         case_sensitive: bool = False,
         path: str = "C:\\",
-        _session: dict = None,
-    ) -> Dict[str, Any]:
+        _session: dict | None = None,
+    ) -> dict[str, Any]:
         """Search for files using the FastSearch service.
 
         Args:
@@ -325,8 +324,7 @@ class McpServer:
         """
         if not self.service_available:
             raise RuntimeError(
-                "FastSearch service is not available. "
-                "Please ensure the service is installed and running."
+                "FastSearch service is not available. Please ensure the service is installed and running."
             )
 
         # Prepare search parameters
@@ -375,7 +373,7 @@ class McpServer:
         except Exception as e:
             raise RuntimeError(f"Search failed: {e}") from e
 
-    async def get_status(self) -> Dict[str, Any]:
+    async def get_status(self) -> dict[str, Any]:
         """Get the current status of the FastSearch service.
 
         Returns a detailed status including:
@@ -410,9 +408,7 @@ class McpServer:
                     return {
                         "service_available": False,
                         "status": "Service not installed",
-                        "details": {
-                            "error": "The FastSearch service is not installed on this system"
-                        },
+                        "details": {"error": "The FastSearch service is not installed on this system"},
                         "suggestions": [
                             "Install the FastSearch service using the installer",
                             "Check if the installation completed successfully",
@@ -453,7 +449,7 @@ class McpServer:
                 win32api.RegCloseKey(key)
 
             except Exception as e:
-                image_path = f"Error retrieving path: {str(e)}"
+                image_path = f"Error retrieving path: {e!s}"
 
             # Check if we can connect to the service
             can_connect = False
@@ -498,7 +494,7 @@ class McpServer:
             # Other error checking service status
             return {
                 "service_available": False,
-                "status": f"Error checking service status: {str(e)}",
+                "status": f"Error checking service status: {e!s}",
                 "details": {"error": str(e)},
                 "suggestions": [
                     "Check if you have administrator privileges",
@@ -518,7 +514,7 @@ class McpServer:
                 ],
             }
 
-    async def get_capabilities(self) -> Dict[str, Any]:
+    async def get_capabilities(self) -> dict[str, Any]:
         """Return capabilities of the FastSearch service."""
         capabilities = {
             "fastsearch": {

@@ -11,6 +11,6 @@ for f in results:
 ```
 """
 
-from .client import FastSearchClient, search_files, get_service_info, test_connection
+from .client import FastSearchClient, get_service_info, search_files, test_connection
 
-__all__ = ["FastSearchClient", "search_files", "get_service_info", "test_connection"]
+__all__ = ["FastSearchClient", "get_service_info", "search_files", "test_connection"]

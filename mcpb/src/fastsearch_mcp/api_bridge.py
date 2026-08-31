@@ -6,11 +6,12 @@ Exposes GET /health, GET /tools, POST /tools/:name, GET /file, and LLM endpoints
 import base64
 import json
 import logging
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 import httpx
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Response
 
 from fastsearch_mcp.mcp_instance import mcp
 
@@ -55,13 +56,41 @@ def _detect_type(path: Path, raw: bytes) -> tuple[str, str]:
     """Return (type, mime). type is text, image, video, audio, or binary."""
     ext = path.suffix.lower() if path.suffix else ""
     if ext in IMAGE_EXTENSIONS:
-        mime = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png", "gif": "image/gif", "webp": "image/webp", "bmp": "image/bmp", "svg": "image/svg+xml", "ico": "image/x-icon"}.get(ext, "application/octet-stream")
+        mime = {
+            "jpg": "image/jpeg",
+            "jpeg": "image/jpeg",
+            "png": "image/png",
+            "gif": "image/gif",
+            "webp": "image/webp",
+            "bmp": "image/bmp",
+            "svg": "image/svg+xml",
+            "ico": "image/x-icon",
+        }.get(ext, "application/octet-stream")
         return "image", mime
     if ext in VIDEO_EXTENSIONS:
-        mime = {"mp4": "video/mp4", "webm": "video/webm", "mov": "video/quicktime", "avi": "video/x-msvideo", "mkv": "video/x-matroska", "m4v": "video/mp4"}.get(ext, "video/mp4")
+        mime = {
+            "mp4": "video/mp4",
+            "webm": "video/webm",
+            "mov": "video/quicktime",
+            "avi": "video/x-msvideo",
+            "mkv": "video/x-matroska",
+            "m4v": "video/mp4",
+        }.get(ext, "video/mp4")
         return "video", mime
     if ext in AUDIO_EXTENSIONS:
-        mime = "audio/mpeg" if ext == "mp3" else "audio/wav" if ext == "wav" else "audio/ogg" if ext == "ogg" else "audio/mp4" if ext in (".m4a", ".aac") else "audio/flac" if ext == "flac" else "application/octet-stream"
+        mime = (
+            "audio/mpeg"
+            if ext == "mp3"
+            else "audio/wav"
+            if ext == "wav"
+            else "audio/ogg"
+            if ext == "ogg"
+            else "audio/mp4"
+            if ext in (".m4a", ".aac")
+            else "audio/flac"
+            if ext == "flac"
+            else "application/octet-stream"
+        )
         return "audio", mime
     if ext in TEXT_EXTENSIONS or not ext:
         try:
@@ -95,9 +124,9 @@ async def list_tools() -> list[dict]:
     try:
         tools = await mcp.list_tools()
         return [_tool_to_dict(t) for t in tools]
-    except Exception as e:
+    except Exception:
         logger.exception("list_tools failed")
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        return []
 
 
 @router.post("/tools/{name}")
@@ -118,8 +147,136 @@ async def call_tool(name: str, body: dict) -> dict:
                     return {"text": text}
         return result.model_dump() if hasattr(result, "model_dump") else {"result": str(result)}
     except Exception as e:
-        logger.exception("call_tool %s failed", name)
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        logger.warning("call_tool %s failed: %s", name, e)
+        err_msg = str(e)
+        is_down = "service is not running" in err_msg.lower() or "not connected" in err_msg.lower()
+        return {
+            "success": False,
+            "error": err_msg,
+            "service_down": is_down,
+        }
+
+
+@router.post("/search")
+async def api_search(body: dict) -> dict:
+    """Direct search endpoint for web UI dedicated Search & Treemap pages.
+    Body: { pattern: str, directory?: str, max_results?: int, pagination_mode?: str, page?: int, page_size?: int }
+    """
+    pattern = body.get("pattern", "*")
+    directory = body.get("directory", "C:\\")
+    max_results = int(body.get("max_results", 500))
+    pagination_mode = body.get("pagination_mode")
+    page = int(body.get("page", 1))
+    page_size = int(body.get("page_size", 1000))
+
+    try:
+        from fastsearch_mcp.service_client import is_service_running, search_files
+        from fastsearch_mcp.service_ensure import ensure_service_available
+
+        if not is_service_running():
+            await ensure_service_available(start_if_needed=True)
+
+        res = await search_files(
+            pattern=pattern,
+            directory=directory,
+            max_results=max_results,
+            pagination_mode=pagination_mode,
+            page=page,
+            page_size=page_size,
+        )
+        count = res.get("count", len(res.get("results", [])))
+        log_event(
+            level="INFO",
+            kind="tool_call",
+            detail=f"Service Search: pattern='{pattern}', directory='{directory}', max_results={max_results} -> {count} items found",
+            meta={"pattern": pattern, "directory": directory, "count": count},
+        )
+        return {"success": True, "service_down": False, **res}
+    except Exception as e:
+        logger.warning("api_search error: %s", e)
+        return {
+            "success": False,
+            "service_down": "not running" in str(e).lower(),
+            "error": str(e),
+            "results": [],
+            "count": 0,
+        }
+
+
+@router.get("/service/status")
+async def api_service_status() -> dict:
+    """Get service status directly without MCP overhead."""
+    try:
+        from fastsearch_mcp.service_client import get_service_status
+        from fastsearch_mcp.service_ensure import ensure_service_available
+
+        status = await get_service_status()
+        if not status.get("running"):
+            ensured = await ensure_service_available(start_if_needed=True)
+            if ensured.get("success"):
+                status = await get_service_status()
+        return {"success": True, **status}
+    except Exception as e:
+        return {"success": False, "running": False, "error": str(e)}
+
+
+@router.post("/service/start")
+async def api_service_start() -> dict:
+    """Start FastSearch service with full diagnostic logging."""
+    try:
+        from fastsearch_mcp.service_client import start_service_with_details
+
+        details = await start_service_with_details()
+        return {
+            "success": details.get("success", False),
+            "message": "Service started successfully" if details.get("success") else "Failed to start service",
+            "details": details,
+            "logs": details.get("logs", []),
+            "error": details.get("error"),
+        }
+    except Exception as e:
+        logger.exception("api_service_start failed")
+        return {"success": False, "error": str(e), "logs": [f"[EXCEPTION] {e}"]}
+
+
+@router.get("/service/logs")
+async def api_service_logs() -> dict:
+    """Get Windows Event Logs and diagnostic traces for FastSearchMCP service."""
+    try:
+        from fastsearch_mcp.service_client import get_recent_service_logs
+
+        logs = await get_recent_service_logs()
+        return {"success": True, "logs": logs}
+    except Exception as e:
+        return {"success": False, "logs": [], "error": str(e)}
+
+
+@router.post("/service/stop")
+async def api_service_stop() -> dict:
+    """Stop FastSearch service."""
+    try:
+        from fastsearch_mcp.service_client import stop_service
+
+        ok = await stop_service()
+        return {"success": ok, "message": "Service stop command sent" if ok else "Failed to stop service"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@router.post("/service/restart")
+async def api_service_restart() -> dict:
+    """Restart FastSearch service."""
+    try:
+        import asyncio
+
+        from fastsearch_mcp.service_client import start_service, stop_service
+
+        await stop_service()
+        await asyncio.sleep(1.0)
+        ok = await start_service()
+        return {"success": ok, "message": "Service restarted" if ok else "Failed to restart service"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
 
 
 @router.get("/file")
@@ -258,6 +415,7 @@ async def llm_analyze(body: dict) -> dict:
         "3) practical recommendations (e.g. cleanup, archiving, security). Be concise and actionable. Output plain text, no code blocks unless listing paths."
     )
     import json as _json
+
     results_str = _json.dumps(search_results, indent=2) if search_results is not None else "{}"
     messages = [
         {"role": "system", "content": system_prompt},
@@ -312,6 +470,7 @@ async def llm_analyze_forensic(body: dict) -> dict:
     base_url = body.get("base_url") or (DEFAULT_OLLAMA_BASE if provider == "ollama" else DEFAULT_LMSTUDIO_BASE)
     base = base_url.rstrip("/")
     import json as _json
+
     results_str = _json.dumps(search_results, indent=2) if search_results is not None else "{}"
     user_content = (
         "Review this list of file search results (paths, names, sizes, dates). "
@@ -356,6 +515,7 @@ async def llm_analyze_forensic(body: dict) -> dict:
 # Live tests (pipe + real search) for webapp Tests page
 # ---------------------------------------------------------------------------
 
+
 @router.post("/tests/run")
 async def run_tests(body: dict | None = None) -> dict:
     """Run live integration tests: pipe connect, service info, real search via pipe.
@@ -363,6 +523,7 @@ async def run_tests(body: dict | None = None) -> dict:
     Body (optional): { "pattern": "*.txt", "directory": "C:\\\\", "max_results": 5 }
     """
     from fastsearch_mcp.live_tests import run_live_tests
+
     args = body or {}
     pattern = args.get("pattern", "*.txt")
     directory = args.get("directory", "C:\\")
@@ -378,3 +539,156 @@ async def run_tests(body: dict | None = None) -> dict:
     except Exception as e:
         logger.exception("run_tests failed")
         raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+# ---------------------------------------------------------------------------
+# Logging Endpoints for webapp Logs page
+# ---------------------------------------------------------------------------
+
+LOG_ENTRIES: list[dict] = [
+    {
+        "id": "1",
+        "timestamp": datetime.now(UTC).isoformat(),
+        "level": "INFO",
+        "kind": "server",
+        "detail": "FastSearch REST API Bridge initialized on port 10845.",
+        "meta": {},
+    },
+    {
+        "id": "2",
+        "timestamp": datetime.now(UTC).isoformat(),
+        "level": "INFO",
+        "kind": "server",
+        "detail": "Named pipe \\\\.\\pipe\\FastSearchMCP listener configured.",
+        "meta": {},
+    },
+]
+
+
+def log_event(level: str, kind: str, detail: str, meta: dict | None = None) -> None:
+    """Record a log entry into the in-memory ring buffer."""
+    new_id = str(len(LOG_ENTRIES) + 1)
+    LOG_ENTRIES.append(
+        {
+            "id": new_id,
+            "timestamp": datetime.now(UTC).isoformat(),
+            "level": level,
+            "kind": kind,
+            "detail": detail,
+            "meta": meta or {},
+        }
+    )
+    if len(LOG_ENTRIES) > 1000:
+        LOG_ENTRIES.pop(0)
+
+
+class RingBufferLogHandler(logging.Handler):
+    """Intercept all Python logger events directly into web UI LOG_ENTRIES."""
+
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            msg = record.getMessage()
+            kind = "tool_call" if "search" in msg.lower() or "pipe" in msg.lower() else "server"
+            log_event(
+                level=record.levelname,
+                kind=kind,
+                detail=f"[{record.name}] {msg}",
+                meta={"filename": record.filename, "lineno": record.lineno},
+            )
+        except Exception:
+            pass
+
+
+_ring_handler = RingBufferLogHandler()
+_ring_handler.setLevel(logging.INFO)
+logging.getLogger("fastsearch_mcp").addHandler(_ring_handler)
+logging.getLogger("uvicorn").addHandler(_ring_handler)
+
+
+@router.get("/logs")
+async def get_logs(
+    limit: int = 50,
+    offset: int = 0,
+    sort: str = "desc",
+    level: str | None = None,
+    kind: str | None = None,
+    search: str | None = None,
+    after_id: str | None = None,
+) -> dict:
+    """Fetch logs with filtering and pagination."""
+    filtered = LOG_ENTRIES[:]
+
+    if level:
+        filtered = [e for e in filtered if e.get("level", "").upper() == level.upper()]
+    if kind:
+        filtered = [e for e in filtered if e.get("kind", "").lower() == kind.lower()]
+    if search:
+        s = search.lower()
+        filtered = [e for e in filtered if s in e.get("detail", "").lower()]
+    if after_id:
+        try:
+            aid = int(after_id)
+            filtered = [e for e in filtered if int(e.get("id", "0")) > aid]
+        except ValueError:
+            pass
+
+    if sort == "desc":
+        filtered = list(reversed(filtered))
+
+    total = len(filtered)
+    paged = filtered[offset : offset + limit]
+
+    return {
+        "entries": paged,
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+    }
+
+
+@router.delete("/logs")
+async def clear_logs() -> dict:
+    """Clear all log entries."""
+    global LOG_ENTRIES
+    LOG_ENTRIES = []
+    return {"success": True, "message": "Logs cleared"}
+
+
+@router.get("/logs/export")
+async def export_logs(
+    format: str = "json",
+    level: str | None = None,
+    kind: str | None = None,
+    search: str | None = None,
+) -> Response:
+    """Export log entries as JSON or CSV file download."""
+    filtered = LOG_ENTRIES[:]
+    if level:
+        filtered = [e for e in filtered if e.get("level", "").upper() == level.upper()]
+    if kind:
+        filtered = [e for e in filtered if e.get("kind", "").lower() == kind.lower()]
+    if search:
+        s = search.lower()
+        filtered = [e for e in filtered if s in e.get("detail", "").lower()]
+
+    if format.lower() == "csv":
+        import csv
+        import io
+
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(["id", "timestamp", "level", "kind", "detail"])
+        for e in filtered:
+            writer.writerow([e.get("id"), e.get("timestamp"), e.get("level"), e.get("kind"), e.get("detail")])
+        return Response(
+            content=output.getvalue(),
+            media_type="text/csv",
+            headers={"Content-Disposition": "attachment; filename=logs.csv"},
+        )
+    else:
+        content = json.dumps(filtered, indent=2)
+        return Response(
+            content=content,
+            media_type="application/json",
+            headers={"Content-Disposition": "attachment; filename=logs.json"},
+        )

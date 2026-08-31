@@ -32,9 +32,7 @@ if sys.platform == "win32":
         WINDOWS_AVAILABLE = True
     except ImportError:
         WINDOWS_AVAILABLE = False
-        logging.getLogger(__name__).warning(
-            "pywin32 not installed. `pip install pywin32` for Windows pipe support."
-        )
+        logging.getLogger(__name__).warning("pywin32 not installed. `pip install pywin32` for Windows pipe support.")
 else:
     WINDOWS_AVAILABLE = False
 
@@ -48,6 +46,7 @@ MAX_PIPE_BUFFER = 65536
 # Public helpers
 # ---------------------------------------------------------------------------
 
+
 def get_pipe_name() -> str:
     """Return the named pipe path.
 
@@ -60,6 +59,7 @@ def get_pipe_name() -> str:
 # Low-level async pipe client
 # ---------------------------------------------------------------------------
 
+
 class _PipeTransport:
     """Async context manager wrapping the ``win32pipe`` named pipe."""
 
@@ -68,7 +68,7 @@ class _PipeTransport:
         self._handle: Any = None
         self._connected = False
 
-    async def __aenter__(self) -> "_PipeTransport":
+    async def __aenter__(self) -> _PipeTransport:
         await self._connect()
         return self
 
@@ -98,9 +98,7 @@ class _PipeTransport:
         )
         await loop.run_in_executor(
             None,
-            lambda: win32pipe.SetNamedPipeHandleState(
-                self._handle, win32pipe.PIPE_READMODE_MESSAGE, None, None
-            ),
+            lambda: win32pipe.SetNamedPipeHandleState(self._handle, win32pipe.PIPE_READMODE_MESSAGE, None, None),
         )
         self._connected = True
 
@@ -135,10 +133,8 @@ class _PipeTransport:
 
         loop = asyncio.get_event_loop()
         try:
-            return await asyncio.wait_for(
-                loop.run_in_executor(None, _sync_io), timeout=timeout
-            )
-        except asyncio.TimeoutError:
+            return await asyncio.wait_for(loop.run_in_executor(None, _sync_io), timeout=timeout)
+        except TimeoutError:
             await self._disconnect()
             raise RuntimeError(f"Request timed out after {timeout}s") from None
 
@@ -146,6 +142,7 @@ class _PipeTransport:
 # ---------------------------------------------------------------------------
 # High-level client
 # ---------------------------------------------------------------------------
+
 
 class FastSearchClient:
     """Async client for the FastSearch Windows service.
@@ -161,7 +158,7 @@ class FastSearchClient:
         self._pipe_name = pipe_name or get_pipe_name()
         self._transport: _PipeTransport | None = None
 
-    async def __aenter__(self) -> "FastSearchClient":
+    async def __aenter__(self) -> FastSearchClient:
         self._transport = _PipeTransport(self._pipe_name)
         await self._transport.__aenter__()
         return self
@@ -221,22 +218,27 @@ class FastSearchClient:
 
     def search_sync(self, pattern: str, directory: str = ".", max_results: int = 100) -> list[dict]:
         """Synchronous version of :meth:`search` (runs a temporary event loop)."""
+
         async def _run() -> list[dict]:
             async with FastSearchClient(self._pipe_name) as c:
                 return await c.search(pattern, directory, max_results)
+
         return asyncio.run(_run())
 
     def ping_sync(self) -> bool:
         """Synchronous version of :meth:`ping`."""
+
         async def _run() -> bool:
             async with FastSearchClient(self._pipe_name) as c:
                 return await c.ping()
+
         return asyncio.run(_run())
 
 
 # ---------------------------------------------------------------------------
 # Module-level convenience functions  (sync, no class needed)
 # ---------------------------------------------------------------------------
+
 
 def search_files(pattern: str, directory: str = ".", max_results: int = 100) -> list[dict]:
     """Quick one-shot file search.

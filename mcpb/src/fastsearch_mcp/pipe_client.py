@@ -11,7 +11,7 @@ import logging
 import os
 import struct
 import sys
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 # Windows-specific imports
 if sys.platform == "win32":
@@ -33,9 +33,9 @@ logger = get_logger(__name__)
 
 # Service configuration: pipe name must match service\src\fastsearch_service.h kPipeName
 # (L"\\\\.\\pipe\\FastSearchMCP"). Override with FASTSEARCH_PIPE_NAME if using a different build.
-DEFAULT_PIPE_NAME = r"\\.\pipe\FastSearchMCP"
+DEFAULT_PIPE_NAME = r"\\.\pipe\FastSearchMCP_v2"
 PIPE_TIMEOUT = 5000  # 5 seconds in milliseconds
-MAX_PIPE_BUFFER = 65536  # 64KB buffer
+MAX_PIPE_BUFFER = 32 * 1024 * 1024  # 32MB buffer
 
 
 def get_pipe_name() -> str:
@@ -50,11 +50,11 @@ SERVICE_PIPE_NAME = DEFAULT_PIPE_NAME
 class NamedPipeClient:
     """Client for communicating with FastSearch C++ service via named pipes."""
 
-    def __init__(self, pipe_name: Optional[str] = None):
+    def __init__(self, pipe_name: str | None = None):
         self.pipe_name = pipe_name if pipe_name is not None else get_pipe_name()
         self.handle = None
         self.connected = False
-        self.last_connect_error: Optional[Tuple[int, str]] = None  # (winerror, message) when connect fails
+        self.last_connect_error: tuple[int, str] | None = None  # (winerror, message) when connect fails
 
     async def connect(self, timeout: float = 5.0) -> bool:
         """Connect to the named pipe.
@@ -70,56 +70,71 @@ class NamedPipeClient:
             return False
 
         self.last_connect_error = None
-        try:
-            # Try to open the named pipe (blocking Win32 call, run in executor)
-            loop = asyncio.get_event_loop()
-            self.handle = await asyncio.wait_for(
-                loop.run_in_executor(
+        pipe_names_to_try = [self.pipe_name]
+        if self.pipe_name != r"\\.\pipe\FastSearchMCP":
+            pipe_names_to_try.append(r"\\.\pipe\FastSearchMCP")
+
+        def _open_pipe_sync(p_name: str) -> Any:
+            try:
+                return win32file.CreateFile(
+                    p_name,
+                    win32file.GENERIC_READ | win32file.GENERIC_WRITE,
+                    0,
                     None,
-                    lambda: win32file.CreateFile(
-                        self.pipe_name,
+                    win32file.OPEN_EXISTING,
+                    0,
+                    None,
+                )
+            except pywintypes.error as e:
+                if e.winerror == 231:  # ERROR_PIPE_BUSY
+                    win32pipe.WaitNamedPipe(p_name, int(timeout * 1000))
+                    return win32file.CreateFile(
+                        p_name,
                         win32file.GENERIC_READ | win32file.GENERIC_WRITE,
                         0,
                         None,
                         win32file.OPEN_EXISTING,
                         0,
                         None,
-                    ),
-                ),
-                timeout=timeout,
-            )
+                    )
+                raise
 
-            # Set pipe to message mode (blocking Win32 call, run in executor)
-            await loop.run_in_executor(
-                None,
-                lambda: win32pipe.SetNamedPipeHandleState(
-                    self.handle, win32pipe.PIPE_READMODE_MESSAGE, None, None
-                ),
-            )
+        loop = asyncio.get_event_loop()
+        h_file = None
+        last_err = None
 
-            self.connected = True
-            self.last_connect_error = None
-            logger.info(f"Connected to named pipe: {self.pipe_name}")
-            return True
+        for p_name in pipe_names_to_try:
+            try:
+                h_file = await asyncio.wait_for(
+                    loop.run_in_executor(None, _open_pipe_sync, p_name),
+                    timeout=timeout,
+                )
+                self.pipe_name = p_name
+                break
+            except (TimeoutError, pywintypes.error, Exception) as e:
+                last_err = e
+                continue
 
-        except asyncio.TimeoutError:
-            self.last_connect_error = (0, f"Connection timed out after {timeout}s")
-            logger.error(f"Connection to named pipe timed out after {timeout}s: {self.pipe_name}")
-            self.connected = False
-            return False
-        except pywintypes.error as e:
-            self.last_connect_error = (e.winerror, str(e))
-            if e.winerror == 2:  # ERROR_FILE_NOT_FOUND
-                logger.debug(f"Named pipe not found: {self.pipe_name} (error 2). Set FASTSEARCH_PIPE_NAME if service uses another name.")
+        if not h_file:
+            if isinstance(last_err, pywintypes.error):
+                self.last_connect_error = (last_err.winerror, str(last_err))
+                logger.error(f"Failed to connect to named pipe: {last_err}")
             else:
-                logger.error(f"Failed to connect to named pipe: {e}")
+                self.last_connect_error = (0, str(last_err))
+                logger.error(f"Named pipe connection failed: {last_err}")
             self.connected = False
             return False
-        except Exception as e:
-            self.last_connect_error = (0, str(e))
-            logger.error(f"Unexpected error connecting to named pipe: {e}")
-            self.connected = False
-            return False
+
+        self.handle = h_file
+        # Set pipe to message mode
+        await loop.run_in_executor(
+            None,
+            lambda: win32pipe.SetNamedPipeHandleState(self.handle, win32pipe.PIPE_READMODE_MESSAGE, None, None),
+        )
+        self.connected = True
+        self.last_connect_error = None
+        logger.info(f"Connected to named pipe: {self.pipe_name}")
+        return True
 
     async def disconnect(self):
         """Disconnect from the named pipe."""
@@ -133,9 +148,7 @@ class NamedPipeClient:
                 self.handle = None
                 self.connected = False
 
-    async def send_request(
-        self, request: Dict[str, Any], timeout: float = 10.0
-    ) -> Optional[Dict[str, Any]]:
+    async def send_request(self, request: dict[str, Any], timeout: float = 10.0) -> dict[str, Any] | None:
         """Send a request to the service and get the response.
 
         Args:
@@ -178,10 +191,7 @@ class NamedPipeClient:
                     response_length_bytes = win32file.ReadFile(self.handle, 4)[1]
                 except pywintypes.error as e:
                     if e.winerror == 6:  # ERROR_INVALID_HANDLE
-                        logger.error(
-                            "Pipe handle became invalid during read "
-                            "(service may have closed connection)"
-                        )
+                        logger.error("Pipe handle became invalid during read (service may have closed connection)")
                         self.connected = False
                     raise
 
@@ -196,10 +206,7 @@ class NamedPipeClient:
                     response_data = win32file.ReadFile(self.handle, response_length)[1]
                 except pywintypes.error as e:
                     if e.winerror == 6:  # ERROR_INVALID_HANDLE
-                        logger.error(
-                            "Pipe handle became invalid during read "
-                            "(service may have closed connection)"
-                        )
+                        logger.error("Pipe handle became invalid during read (service may have closed connection)")
                         self.connected = False
                     raise
 
@@ -209,7 +216,7 @@ class NamedPipeClient:
                 return response
 
             except pywintypes.error as e:
-                error_code = e.winerror if hasattr(e, 'winerror') else 0
+                error_code = e.winerror if hasattr(e, "winerror") else 0
                 if error_code == 6:  # ERROR_INVALID_HANDLE
                     logger.error(f"Pipe handle is invalid: {e}")
                 else:
@@ -232,12 +239,9 @@ class NamedPipeClient:
         try:
             # Run blocking I/O in executor with timeout
             loop = asyncio.get_event_loop()
-            response = await asyncio.wait_for(
-                loop.run_in_executor(None, _send_request_sync),
-                timeout=timeout
-            )
+            response = await asyncio.wait_for(loop.run_in_executor(None, _send_request_sync), timeout=timeout)
             return response
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.error(f"Request timed out after {timeout} seconds: {request}")
             # Mark connection as potentially invalid after timeout
             # The service may still be processing, but we can't wait
@@ -269,10 +273,10 @@ async def search_files_via_pipe(
     directory: str = ".",
     max_results: int = 100,
     timeout: float = 120.0,
-    pagination_mode: Optional[str] = None,
+    pagination_mode: str | None = None,
     page: int = 1,
     page_size: int = 1000,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Search for files using the C++ service via named pipe.
 
     Args:
@@ -297,7 +301,12 @@ async def search_files_via_pipe(
     async with NamedPipeClient() as client:
         if not client.connected:
             logger.warning("Could not connect to FastSearch service via named pipe")
-            return {"results": [], "count": 0, "pagination": None, "error": "Could not connect to FastSearch service via named pipe"}
+            return {
+                "results": [],
+                "count": 0,
+                "pagination": None,
+                "error": "Could not connect to FastSearch service via named pipe",
+            }
 
         request = {
             "command": "search_files",
@@ -305,7 +314,7 @@ async def search_files_via_pipe(
             "directory": directory,
             "max_results": max_results,
         }
-        
+
         # Add pagination parameters if requested
         if pagination_mode == "offset":
             request["pagination_mode"] = "offset"
@@ -325,7 +334,7 @@ async def search_files_via_pipe(
             return {"results": [], "count": 0, "pagination": None, "error": error_msg}
 
 
-async def get_service_info_via_pipe() -> Optional[Dict[str, Any]]:
+async def get_service_info_via_pipe() -> dict[str, Any] | None:
     """Get service information via named pipe.
 
     Returns:
@@ -361,7 +370,7 @@ async def test_pipe_connection() -> bool:
     return bool(diag.get("connected") and diag.get("ping_ok"))
 
 
-async def test_pipe_connection_with_diagnostics() -> Dict[str, Any]:
+async def test_pipe_connection_with_diagnostics() -> dict[str, Any]:
     """Test pipe connection and return diagnostics for UI (error code, message, pipe name).
 
     Returns:
@@ -369,7 +378,7 @@ async def test_pipe_connection_with_diagnostics() -> Dict[str, Any]:
               error_code (int | None), error_message (str | None)
     """
     pipe_name = get_pipe_name()
-    out: Dict[str, Any] = {
+    out: dict[str, Any] = {
         "connected": False,
         "ping_ok": False,
         "pipe_name": pipe_name,

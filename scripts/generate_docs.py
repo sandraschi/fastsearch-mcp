@@ -28,9 +28,10 @@ def main():
     modules = [mcp_server]  # Add more modules here as needed
 
     for module in modules:
-        module_name = module.__name__.split('.')[-1]
+        module_name = module.__name__.split(".")[-1]
         output_file = docs_dir / f"{module_name}_api.md"
         generate_markdown_docs(module, str(output_file))
+
 
 if __name__ == "__main__":
     main()

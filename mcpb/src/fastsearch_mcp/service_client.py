@@ -9,7 +9,7 @@ import asyncio
 import subprocess
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from .logging_config import get_logger
 from .pipe_client import (
@@ -22,18 +22,15 @@ from .pipe_client import (
 logger = get_logger(__name__)
 
 # Cache for service status to avoid slow checks on every search
-_service_status_cache: Optional[Tuple[bool, float]] = None  # (is_running, timestamp)
+_service_status_cache: tuple[bool, float] | None = None  # (is_running, timestamp)
 _CACHE_TTL = 2.0  # Cache for 2 seconds - fast enough for rapid searches, fresh enough
 
-# Service configuration
 SERVICE_NAME = "FastSearchMCP"
+_BIN_DIR = Path(__file__).parent.parent.parent / "service" / "build" / "bin" / "Release"
 SERVICE_EXECUTABLE = (
-    Path(__file__).parent.parent.parent
-    / "service"
-    / "build"
-    / "bin"
-    / "Release"
-    / "FastSearchServiceNew.exe"
+    _BIN_DIR / "FastSearchEngine.exe"
+    if (_BIN_DIR / "FastSearchEngine.exe").exists()
+    else _BIN_DIR / "FastSearchServiceNew.exe"
 )
 
 
@@ -41,7 +38,7 @@ def is_service_running() -> bool:
     """Check if the FastSearch C++ service is running (fast, cached check).
 
     Uses a fast pipe connection attempt first (fails immediately if service is down),
-    with caching to avoid repeated checks. Falls back to process check only if needed.
+    with caching to avoid repeated checks. Falls back to SCM and process checks if needed.
 
     Returns:
         bool: True if the service is running, False otherwise
@@ -55,13 +52,11 @@ def is_service_running() -> bool:
         if now - cache_time < _CACHE_TTL:
             return cached_status
 
-    # Fast check: Try to connect to pipe (fails immediately if service is down)
-    # This is much faster than tasklist
+    # 1. Fast check: Try to connect to pipe
     try:
         import pywintypes
         import win32file
 
-        # Try to open pipe - this fails fast (ERROR_FILE_NOT_FOUND = 2) if service is down
         handle = win32file.CreateFile(
             get_pipe_name(),
             win32file.GENERIC_READ | win32file.GENERIC_WRITE,
@@ -71,32 +66,45 @@ def is_service_running() -> bool:
             0,
             None,
         )
-        # If we got here, pipe exists and service is running
         win32file.CloseHandle(handle)
         _service_status_cache = (True, now)
         return True
     except pywintypes.error as e:
-        if e.winerror == 2:  # ERROR_FILE_NOT_FOUND - pipe doesn't exist, service is down
-            _service_status_cache = (False, now)
-            return False
-        # Other errors might mean service is running but busy - fall through to process check
-        logger.debug(f"Pipe check ambiguous (error {e.winerror}), falling back to process check")
+        # ERROR_PIPE_BUSY (231) or ERROR_ACCESS_DENIED (5) means pipe exists & service is RUNNING!
+        if e.winerror in (231, 5):
+            _service_status_cache = (True, now)
+            return True
+        if e.winerror == 2:  # ERROR_FILE_NOT_FOUND - pipe doesn't exist
+            pass
     except Exception as e:
-        logger.debug(f"Pipe check failed: {e}, falling back to process check")
+        logger.debug(f"Pipe check exception: {e}")
 
-    # Fallback: Check process list (slower, but more reliable for edge cases)
+    # 2. Check SCM service state
     try:
-        result = subprocess.run(
-            ["tasklist", "/FI", "IMAGENAME eq FastSearchServiceNew.exe"],
+        res = subprocess.run(
+            ["sc", "query", SERVICE_NAME],
             capture_output=True,
             text=True,
-            timeout=2,  # Reduced timeout - 2 seconds max
+            timeout=2,
         )
-        is_running = "FastSearchServiceNew.exe" in result.stdout
+        if "STATE" in res.stdout and "RUNNING" in res.stdout:
+            _service_status_cache = (True, now)
+            return True
+    except Exception as e:
+        logger.debug(f"SCM query exception: {e}")
+
+    # 3. Fallback: Check process list (tasklist)
+    try:
+        result = subprocess.run(
+            ["tasklist"],
+            capture_output=True,
+            text=True,
+            timeout=2,
+        )
+        is_running = "FastSearchEngine.exe" in result.stdout or "FastSearchServiceNew.exe" in result.stdout
         _service_status_cache = (is_running, now)
         return is_running
     except subprocess.TimeoutExpired:
-        # tasklist timed out - assume service is not running to avoid blocking
         logger.warning("Service check timed out, assuming service is not running")
         _service_status_cache = (False, now)
         return False
@@ -106,7 +114,7 @@ def is_service_running() -> bool:
         return False
 
 
-async def get_service_status() -> Dict[str, Any]:
+async def get_service_status() -> dict[str, Any]:
     """Get detailed status of the FastSearch C++ service.
 
     Returns:
@@ -184,10 +192,10 @@ async def search_files(
     pattern: str,
     directory: str = ".",
     max_results: int = 100,
-    pagination_mode: Optional[str] = None,
+    pagination_mode: str | None = None,
     page: int = 1,
     page_size: int = 1000,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Search for files using the FastSearch C++ service via direct NTFS MFT access.
 
     This function REQUIRES the FastSearch service to be running. It does NOT fall back
@@ -211,24 +219,23 @@ async def search_files(
         RuntimeError: If the service is not available (no fallback to treewalk)
     """
     try:
-        # Check if service is running
+        # Check if service is running; attempt auto-start if disconnected
         if not is_service_running():
-            error_msg = (
-                "❌ FastSearch service is not running.\n\n"
-                "The FastSearch MCP requires the FastSearch Windows service to be "
-                "installed and running for direct NTFS MFT access. Without the service, "
-                "file searches cannot be performed.\n\n"
-                "To fix this:\n"
-                "1. Check if the service is installed: Open Windows Services "
-                "(Win+R → services.msc)\n"
-                "2. Look for 'FastSearch MCP Service' or 'FastSearchMCP' in the list\n"
-                "3. If installed but stopped: Right-click → Start\n"
-                "4. If not installed: Run the installer as administrator\n\n"
-                "You can also use the 'service_status' tool to check the current "
-                "service status."
-            )
-            logger.error(error_msg)
-            raise RuntimeError(error_msg)
+            logger.info("Service disconnected during search_files; attempting auto-start...")
+            from .service_ensure import ensure_service_available
+
+            ensured = await ensure_service_available(start_if_needed=True)
+            if not ensured.get("success") and not is_service_running():
+                error_msg = (
+                    "❌ FastSearch service is not running and could not be started automatically.\n\n"
+                    "The FastSearch MCP requires the FastSearch Windows service or standalone engine to be "
+                    "running for direct NTFS MFT access.\n\n"
+                    "To fix this:\n"
+                    "1. Use 'start_service' or run `FastSearchServiceNew.exe --standalone` in terminal\n"
+                    "2. Check service status using the 'service_status' tool"
+                )
+                logger.error(error_msg)
+                raise RuntimeError(error_msg)
 
         # Try to communicate with the service via named pipe
         try:
@@ -291,33 +298,164 @@ async def search_files(
         raise RuntimeError(error_msg) from e
 
 
-async def start_service() -> bool:
-    """Start the FastSearch C++ service.
+async def start_service_with_details() -> dict[str, Any]:
+    """Start the elevated FastSearch Windows Service with comprehensive logging and diagnostics.
 
     Returns:
-        bool: True if service started successfully, False otherwise
+        dict: Detailed result containing success status, exit codes, stderr, and Event Log entries.
     """
-    try:
-        # Check if service executable exists
-        if not SERVICE_EXECUTABLE.exists():
-            logger.error(f"Service executable not found: {SERVICE_EXECUTABLE}")
-            return False
+    global _service_status_cache
 
-        # Try to start the service using sc.exe
-        result = await asyncio.to_thread(
-            subprocess.run, ["sc", "start", SERVICE_NAME], capture_output=True, text=True, timeout=30
+    diagnostics: dict[str, Any] = {
+        "success": False,
+        "installed": True,
+        "executable_exists": SERVICE_EXECUTABLE.exists(),
+        "executable_path": str(SERVICE_EXECUTABLE),
+        "service_name": SERVICE_NAME,
+        "logs": [],
+    }
+
+    if not SERVICE_EXECUTABLE.exists():
+        msg = f"Service binary missing: {SERVICE_EXECUTABLE}"
+        logger.error(msg)
+        diagnostics["error"] = msg
+        diagnostics["logs"].append(f"[ERROR] {msg}")
+        return diagnostics
+
+    # 1. Query Windows SCM for service registration status
+    scm_check = await asyncio.to_thread(
+        subprocess.run, ["sc", "query", SERVICE_NAME], capture_output=True, text=True, timeout=5
+    )
+
+    if scm_check.returncode == 1060 or "1060" in scm_check.stderr or "1060" in scm_check.stdout:
+        diagnostics["installed"] = False
+        msg = f"Service '{SERVICE_NAME}' is not registered in Windows Service Control Manager (Error 1060)."
+        logger.warning(msg)
+        diagnostics["logs"].append(f"[WARNING] {msg}")
+        diagnostics["logs"].append("[UAC] Triggering elevated installation prompt: FastSearchServiceNew.exe install...")
+
+        # Automatic installation via UAC prompt
+        install_cmd = f"Start-Process '{SERVICE_EXECUTABLE}' -ArgumentList 'install' -Verb RunAs -Wait; Start-Service {SERVICE_NAME} -ErrorAction SilentlyContinue"
+        install_res = await asyncio.to_thread(
+            subprocess.run,
+            ["powershell.exe", "-NoProfile", "-Command", install_cmd],
+            capture_output=True,
+            text=True,
+            timeout=45,
         )
+        diagnostics["logs"].append(f"[UAC Output] ExitCode: {install_res.returncode}")
+        if install_res.stderr:
+            diagnostics["logs"].append(f"[UAC Stderr] {install_res.stderr.strip()}")
 
-        if result.returncode == 0:
-            logger.info("FastSearch service started successfully")
-            return True
-        else:
-            logger.error(f"Failed to start service: {result.stderr}")
-            return False
+        await asyncio.sleep(2.0)
+        if is_service_running():
+            _service_status_cache = None
+            diagnostics["success"] = True
+            diagnostics["installed"] = True
+            diagnostics["logs"].append("[SUCCESS] Service installed and started successfully via UAC elevation.")
+            return diagnostics
 
+    # 2. Try standard sc start
+    sc_start = await asyncio.to_thread(
+        subprocess.run, ["sc", "start", SERVICE_NAME], capture_output=True, text=True, timeout=10
+    )
+    diagnostics["logs"].append(f"[SCM Start] ExitCode: {sc_start.returncode}")
+    if sc_start.stdout:
+        diagnostics["logs"].append(f"[SCM Stdout] {sc_start.stdout.strip()}")
+    if sc_start.stderr:
+        diagnostics["logs"].append(f"[SCM Stderr] {sc_start.stderr.strip()}")
+
+    if sc_start.returncode == 0:
+        _service_status_cache = None
+        diagnostics["success"] = True
+        diagnostics["logs"].append("[SUCCESS] Service started successfully via SCM.")
+        return diagnostics
+
+    # 3. Trigger UAC elevated start if SCM start returned access denied or failed
+    logger.info("SCM start returned code %d; prompting for UAC elevation...", sc_start.returncode)
+    ps_cmd = (
+        f"Start-Process powershell -ArgumentList '-NoProfile -Command Start-Service {SERVICE_NAME}' -Verb RunAs -Wait"
+    )
+    uac_res = await asyncio.to_thread(
+        subprocess.run,
+        ["powershell.exe", "-NoProfile", "-Command", ps_cmd],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    diagnostics["logs"].append(f"[UAC Start Output] ExitCode: {uac_res.returncode}")
+
+    await asyncio.sleep(1.5)
+    if is_service_running():
+        _service_status_cache = None
+        diagnostics["success"] = True
+        diagnostics["logs"].append("[SUCCESS] Service started successfully after UAC elevation.")
+        return diagnostics
+
+    # 4. Fetch recent Windows Event Log entries for FastSearchMCP source to extract exact error trace
+    try:
+        evt_cmd = f"Get-WinEvent -ProviderName '{SERVICE_NAME}' -MaxEvents 5 -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Message"
+        evt_res = await asyncio.to_thread(
+            subprocess.run,
+            ["powershell.exe", "-NoProfile", "-Command", evt_cmd],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if evt_res.stdout.strip():
+            diagnostics["event_logs"] = [line.strip() for line in evt_res.stdout.strip().splitlines() if line.strip()]
+            diagnostics["logs"].append(f"[EventLog] {evt_res.stdout.strip()}")
     except Exception as e:
-        logger.error(f"Error starting service: {e}")
-        return False
+        logger.debug("Failed to query EventLog: %s", e)
+
+    # 5. Fallback: Launch in standalone background mode if SCM / UAC service start didn't connect
+    if not is_service_running() and SERVICE_EXECUTABLE.exists():
+        logger.info("Service SCM start unavailable; launching FastSearch engine in standalone background mode...")
+        try:
+            creation_flags = getattr(subprocess, "CREATE_NO_WINDOW", 0) | getattr(subprocess, "DETACHED_PROCESS", 0)
+            subprocess.Popen(
+                [str(SERVICE_EXECUTABLE), "--standalone"],
+                creationflags=creation_flags,
+                close_fds=True,
+            )
+            await asyncio.sleep(1.0)
+            if is_service_running():
+                _service_status_cache = None
+                diagnostics["success"] = True
+                diagnostics["logs"].append(
+                    "[SUCCESS] FastSearch Engine started successfully in standalone background mode."
+                )
+                return diagnostics
+        except Exception as standalone_err:
+            diagnostics["logs"].append(f"[Standalone Error] {standalone_err}")
+
+    diagnostics["error"] = diagnostics["logs"][-1] if diagnostics["logs"] else "Service start failed"
+    return diagnostics
+
+
+async def start_service() -> bool:
+    """Start the FastSearch C++ service (returns bool for backward compatibility)."""
+    res = await start_service_with_details()
+    return res.get("success", False)
+
+
+async def get_recent_service_logs() -> list[str]:
+    """Retrieve recent Windows Event Log entries and runtime traces for FastSearchMCP service."""
+    logs: list[str] = []
+    try:
+        evt_cmd = f"Get-WinEvent -ProviderName '{SERVICE_NAME}' -MaxEvents 15 -ErrorAction SilentlyContinue | Format-Table -AutoSize TimeCreated, Id, LevelDisplayName, Message | Out-String"
+        evt_res = await asyncio.to_thread(
+            subprocess.run,
+            ["powershell.exe", "-NoProfile", "-Command", evt_cmd],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if evt_res.stdout.strip():
+            logs.extend(evt_res.stdout.strip().splitlines())
+    except Exception as e:
+        logger.debug("Failed to fetch Windows Event Log: %s", e)
+    return logs
 
 
 async def stop_service() -> bool:
@@ -344,7 +482,7 @@ async def stop_service() -> bool:
         return False
 
 
-async def test_service_connection() -> Dict[str, Any]:
+async def test_service_connection() -> dict[str, Any]:
     """Test the connection to the FastSearch service.
 
     Returns:

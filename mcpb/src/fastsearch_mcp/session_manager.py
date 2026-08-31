@@ -4,7 +4,7 @@ import asyncio
 import logging
 import time
 import uuid
-from typing import Any, Dict, Optional, Tuple
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -18,9 +18,9 @@ class SessionManager:
         Args:
             session_timeout: Session timeout in seconds (default: 1 hour)
         """
-        self.sessions: Dict[str, Dict[str, Any]] = {}
+        self.sessions: dict[str, dict[str, Any]] = {}
         self.session_timeout = session_timeout
-        self._cleanup_task: Optional[asyncio.Task] = None
+        self._cleanup_task: asyncio.Task | None = None
         self._running = False
 
     async def start(self) -> None:
@@ -39,7 +39,7 @@ class SessionManager:
             except asyncio.CancelledError:
                 pass
 
-    def get_or_create_session(self, session_id: Optional[str] = None) -> Tuple[str, Dict[str, Any]]:
+    def get_or_create_session(self, session_id: str | None = None) -> tuple[str, dict[str, Any]]:
         """Get an existing session or create a new one.
 
         Args:
@@ -60,7 +60,7 @@ class SessionManager:
         self.sessions[session_id] = {"created_at": now, "last_activity": now, "data": {}}
         return session_id, self.sessions[session_id]
 
-    def get_session(self, session_id: str) -> Optional[Dict[str, Any]]:
+    def get_session(self, session_id: str) -> dict[str, Any] | None:
         """Get a session by ID if it exists and is not expired.
 
         Args:

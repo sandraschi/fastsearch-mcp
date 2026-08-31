@@ -23,4 +23,3 @@ if __name__ == "__main__":
     port = int(os.environ.get("FASTSEARCH_PORT", os.environ.get("MCP_PORT", "10845")))
     log_level = os.environ.get("FASTSEARCH_LOG_LEVEL", "info")
     uvicorn.run(app, host=host, port=port, log_level=log_level)
-

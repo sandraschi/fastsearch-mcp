@@ -46,8 +46,14 @@ if(WIN32)
     add_definitions(-DUNICODE -D_UNICODE)
 endif()
 
-# Add the service executable
+# Add the service executables
 add_executable(FastSearchEngine
+    src/fastsearch_service.cpp
+    src/mft_search.cpp
+    include/fastsearch_service.h
+)
+
+add_executable(FastSearchServiceNew
     src/fastsearch_service.cpp
     src/mft_search.cpp
     include/fastsearch_service.h
@@ -59,6 +65,15 @@ if(WIN32)
     add_compile_definitions(UNICODE _UNICODE)
     
     target_link_libraries(FastSearchEngine
+        PRIVATE
+            advapi32.lib
+            shell32.lib
+            user32.lib
+            aclui.lib
+            shlwapi.lib
+    )
+    
+    target_link_libraries(FastSearchServiceNew
         PRIVATE
             advapi32.lib
             shell32.lib

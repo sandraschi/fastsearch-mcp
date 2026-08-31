@@ -3,6 +3,7 @@
 FastSearch MCP Launcher
 A simple launcher for the FastSearch MCP service.
 """
+
 import ctypes
 import os
 import sys
@@ -14,6 +15,7 @@ def is_admin():
         return ctypes.windll.shell32.IsUserAnAdmin()
     except Exception:
         return False
+
 
 def main():
     print("FastSearch MCP Launcher")
@@ -27,7 +29,7 @@ def main():
         return 1
 
     # Get the path to the Python interpreter in the packaged environment
-    if getattr(sys, 'frozen', False):
+    if getattr(sys, "frozen", False):
         # Running in a PyInstaller bundle
         base_dir = sys._MEIPASS
     else:
@@ -40,6 +42,7 @@ def main():
     try:
         # Import and run the MCP server
         from fastsearch_mcp.mcp_server import main as mcp_main
+
         print("Starting FastSearch MCP service...")
         mcp_main()
     except ImportError as e:
@@ -51,6 +54,7 @@ def main():
         return 1
 
     return 0
+
 
 if __name__ == "__main__":
     sys.exit(main())

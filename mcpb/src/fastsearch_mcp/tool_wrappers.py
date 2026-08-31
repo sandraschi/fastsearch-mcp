@@ -11,7 +11,7 @@ from fastsearch_mcp.tools.base import _sanitize_for_json
 def create_help_wrapper(tool_instance):
     """Create a wrapper for the help tool."""
 
-    async def help_wrapper(tool_name: str = None):
+    async def help_wrapper(tool_name: str | None = None):
         """Get help for available tools"""
         result = await tool_instance.execute(tool_name=tool_name)
         return _sanitize_for_json(result)
@@ -27,9 +27,7 @@ def create_file_name_search_wrapper(tool_instance):
     ):
         """Search for files by name pattern using direct NTFS MFT access.
         Can search all NTFS drives."""
-        result = await tool_instance.execute(
-            pattern=pattern, path=path, search_all=search_all, max_results=max_results
-        )
+        result = await tool_instance.execute(pattern=pattern, path=path, search_all=search_all, max_results=max_results)
         return _sanitize_for_json(result)
 
     return file_name_search_wrapper
@@ -43,14 +41,14 @@ def create_advanced_search_wrapper(tool_instance):
         path: str = "C:\\",
         search_all: bool = False,
         max_results: int = 100,
-        min_size: int = None,
-        max_size: int = None,
-        created_after: str = None,
-        created_before: str = None,
-        modified_after: str = None,
-        modified_before: str = None,
-        accessed_after: str = None,
-        accessed_before: str = None,
+        min_size: int | None = None,
+        max_size: int | None = None,
+        created_after: str | None = None,
+        created_before: str | None = None,
+        modified_after: str | None = None,
+        modified_before: str | None = None,
+        accessed_after: str | None = None,
+        accessed_before: str | None = None,
         include_directories: bool = False,
         include_readonly: bool = True,
         include_hidden: bool = False,
@@ -92,7 +90,7 @@ def create_file_search_wrapper(tool_instance):
         search_pattern: str,
         search_dir: str,
         file_pattern: str = "*",
-        exclude_dirs: list = None,
+        exclude_dirs: list | None = None,
         case_sensitive: bool = False,
         whole_word: bool = False,
         max_results: int = 100,
@@ -100,17 +98,17 @@ def create_file_search_wrapper(tool_instance):
         max_file_size_mb: int = 10,
         skip_binary: bool = True,
         min_file_size_mb: int = 0,
-        modified_after: str = None,
-        modified_before: str = None,
-        created_after: str = None,
-        created_before: str = None,
-        accessed_after: str = None,
-        accessed_before: str = None,
+        modified_after: str | None = None,
+        modified_before: str | None = None,
+        created_after: str | None = None,
+        created_before: str | None = None,
+        accessed_after: str | None = None,
+        accessed_before: str | None = None,
         include_hidden: bool = False,
         files_only: bool = True,
         directories_only: bool = False,
-        file_attributes: list = None,
-        owner: str = None,
+        file_attributes: list | None = None,
+        owner: str | None = None,
     ):
         """Search for text patterns in files with advanced filtering"""
         result = await tool_instance.execute(
@@ -172,9 +170,7 @@ def create_drive_inventory_wrapper(tool_instance):
 
     async def drive_inventory_wrapper(filesystem_type: str = "", include_unmounted: bool = False):
         """List all connected drives and partitions with their basic information"""
-        result = await tool_instance.execute(
-            filesystem_type=filesystem_type, include_unmounted=include_unmounted
-        )
+        result = await tool_instance.execute(filesystem_type=filesystem_type, include_unmounted=include_unmounted)
         return _sanitize_for_json(result)
 
     return drive_inventory_wrapper
@@ -186,9 +182,9 @@ def create_duplicate_finder_wrapper(tool_instance):
     async def duplicate_finder_wrapper(
         search_dir: str,
         min_size: int = 1024,
-        max_size: int = None,
+        max_size: int | None = None,
         file_pattern: str = "*",
-        exclude_dirs: list = None,
+        exclude_dirs: list | None = None,
         fast_mode: bool = True,
         compare_content: bool = True,
         min_duplicate_group: int = 2,
@@ -220,8 +216,8 @@ def create_integrity_checker_wrapper(tool_instance):
         algorithm: str = "sha256",
         update: bool = False,
         recursive: bool = True,
-        patterns: list = None,
-        exclude_dirs: list = None,
+        patterns: list | None = None,
+        exclude_dirs: list | None = None,
         max_file_size: int = 100,
     ):
         """Check the integrity of files by verifying their checksums"""
@@ -253,7 +249,7 @@ def create_resource_monitor_wrapper(tool_instance):
         include_disk: bool = True,
         include_network: bool = True,
         include_system: bool = True,
-        callback_url: str = None,
+        callback_url: str | None = None,
     ):
         """Monitor system resources including CPU, memory, disk, and network usage"""
         result = await tool_instance.execute(
@@ -277,9 +273,9 @@ def create_process_info_wrapper(tool_instance):
     """Create a wrapper for the process info tool."""
 
     async def process_info_wrapper(
-        pids: list = None,
-        name: str = None,
-        user: str = None,
+        pids: list | None = None,
+        name: str | None = None,
+        user: str | None = None,
         limit: int = 100,
         sort_by: str = "cpu_percent",
         sort_desc: bool = True,
@@ -325,7 +321,7 @@ def create_get_service_wrapper(tool_instance):
 def create_start_service_wrapper(tool_instance):
     """Create a wrapper for the start service tool."""
 
-    async def start_service_wrapper(service_name: str, args: list = None, timeout: int = 30):
+    async def start_service_wrapper(service_name: str, args: list | None = None, timeout: int = 30):
         """Start a Windows service"""
         result = await tool_instance.execute(service_name=service_name, args=args, timeout=timeout)
         return _sanitize_for_json(result)

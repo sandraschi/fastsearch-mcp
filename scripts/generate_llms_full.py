@@ -18,12 +18,20 @@ CORE_DOCS = [
 ]
 
 IGNORE_PATTERNS = [
-    "node_modules", ".git", "__pycache__", ".venv", "build",
-    ".windsurf", ".cursor", ".trash",
+    "node_modules",
+    ".git",
+    "__pycache__",
+    ".venv",
+    "build",
+    ".windsurf",
+    ".cursor",
+    ".trash",
 ]
 
 IGNORE_FILES = {
-    "package-lock.json", "uv.lock", ".mcpbignore",
+    "package-lock.json",
+    "uv.lock",
+    ".mcpbignore",
 }
 
 
@@ -33,13 +41,26 @@ def should_include(path: Path) -> bool:
             return False
     if path.name in IGNORE_FILES:
         return False
-    if path.suffix not in (".md", ".py", ".toml", ".json", ".yml", ".yaml", ".txt", ".ps1", ".bat", ".cfg", ".ini", ".cff"):
+    if path.suffix not in (
+        ".md",
+        ".py",
+        ".toml",
+        ".json",
+        ".yml",
+        ".yaml",
+        ".txt",
+        ".ps1",
+        ".bat",
+        ".cfg",
+        ".ini",
+        ".cff",
+    ):
         return False
     return True
 
 
 def main():
-    lines = [f"# FastSearch MCP v0.5.0 — Full Documentation", f"Generated: {datetime.now().isoformat()}", ""]
+    lines = ["# FastSearch MCP v0.5.0 — Full Documentation", f"Generated: {datetime.now().isoformat()}", ""]
 
     # Core docs
     for rel_path, label in CORE_DOCS:

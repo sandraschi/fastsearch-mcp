@@ -18,7 +18,7 @@
 constexpr wchar_t kServiceName[] = L"FastSearchMCP";
 constexpr wchar_t kServiceDisplayName[] = L"FastSearch MCP Service";
 constexpr wchar_t kServiceDescription[] = L"Provides direct NTFS MFT search via named pipe";
-constexpr wchar_t kPipeName[] = L"\\\\.\\pipe\\FastSearchMCP";
+constexpr wchar_t kPipeName[] = L"\\\\.\\pipe\\FastSearchMCP_v2";
 
 // Logging helpers
 void LogServiceEvent(WORD level, const std::wstring& message, DWORD errorCode = 0);

@@ -585,7 +585,7 @@ bool ReadPipeMessage(HANDLE pipe, std::string& payload) {
             return false;
         }
 
-        if (length == 0 || length > (64 * 1024)) {
+        if (length == 0 || length > (32 * 1024 * 1024)) {
             std::wstringstream ss;
             ss << L"Invalid message length: " << length;
             LogServiceEvent(EVENTLOG_WARNING_TYPE, ss.str());

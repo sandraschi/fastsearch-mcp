@@ -13,20 +13,18 @@ import sys
 from pathlib import Path
 
 # Add the package root to the Python path
-sys.path.insert(0, str(Path(__file__).parent.parent / 'fastsearch_mcp_bridge' / 'src'))
+sys.path.insert(0, str(Path(__file__).parent.parent / "fastsearch_mcp_bridge" / "src"))
 
 from fastsearch_mcp import McpServer, __version__
 
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler('server.log')
-    ]
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[logging.StreamHandler(), logging.FileHandler("server.log")],
 )
-logger = logging.getLogger('fastsearch_mcp')
+logger = logging.getLogger("fastsearch_mcp")
+
 
 async def main():
     """Start the MCP server and keep it running."""
@@ -71,10 +69,11 @@ async def main():
             pass
 
         # Close the server
-        if hasattr(server, 'close'):
+        if hasattr(server, "close"):
             await server.close()
 
         logger.info("Server shutdown complete")
+
 
 if __name__ == "__main__":
     try:
