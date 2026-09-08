@@ -173,7 +173,88 @@ function buildDirectoryTree(items: FileItem[]): TreeNode {
   return root;
 }
 
-// Squarified Treemap algorithm (Bruls, Huizing, van Wijk)
+// Worst aspect ratio (max of width/height, height/width) across a candidate
+// row, given the row's breadth (the shorter side of the remaining
+// container). Sizes are already scaled to pixel-area units. Infinity for an
+// empty/zero-area row so the caller always prefers starting a real row over
+// one that can't be laid out.
+function worstRatio(rowSizes: number[], breadth: number): number {
+  if (rowSizes.length === 0 || breadth <= 0) return Infinity;
+  const rowTotal = rowSizes.reduce((a, b) => a + b, 0);
+  if (rowTotal <= 0) return Infinity;
+  let worst = 0;
+  for (const size of rowSizes) {
+    const itemLength = size / breadth; // extent along the row's long axis
+    if (itemLength <= 0) return Infinity;
+    const ratio = Math.max(breadth / itemLength, itemLength / breadth);
+    if (ratio > worst) worst = ratio;
+  }
+  return worst;
+}
+
+// Squarified Treemap algorithm (Bruls, Huizing, van Wijk): fills the
+// container by building one "row" at a time along its current shorter side,
+// greedily adding children to the row only while doing so keeps the row's
+// worst aspect ratio from getting worse -- this is what keeps the resulting
+// rectangles roughly square rather than degenerating into thin slivers. Each
+// closed row consumes a strip of the container; the next row lays out in
+// whatever rectangle remains.
+function squarifyRow(
+  sizes: number[],
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+): { rowRects: { x: number; y: number; w: number; h: number }[]; consumed: number; remaining: { x: number; y: number; w: number; h: number } } {
+  const vertical = w >= h; // rows stack along the shorter side
+  const breadth = vertical ? h : w;
+  const row: number[] = [];
+  let i = 0;
+  while (i < sizes.length) {
+    const candidate = [...row, sizes[i]];
+    if (row.length === 0 || worstRatio(candidate, breadth) <= worstRatio(row, breadth)) {
+      row.push(sizes[i]);
+      i++;
+    } else {
+      break;
+    }
+  }
+
+  const rowTotal = row.reduce((a, b) => a + b, 0);
+  const rowThickness = breadth > 0 ? rowTotal / breadth : 0;
+  const rowRects: { x: number; y: number; w: number; h: number }[] = [];
+
+  if (vertical) {
+    // Row is a vertical strip on the left, full container height (`h`),
+    // width = rowThickness; items stack top-to-bottom inside it.
+    let offset = y;
+    for (const size of row) {
+      const itemH = rowTotal > 0 ? (size / rowTotal) * h : 0;
+      rowRects.push({ x, y: offset, w: rowThickness, h: itemH });
+      offset += itemH;
+    }
+    return {
+      rowRects,
+      consumed: row.length,
+      remaining: { x: x + rowThickness, y, w: Math.max(0, w - rowThickness), h },
+    };
+  } else {
+    // Row is a horizontal strip on top, full container width (`w`),
+    // height = rowThickness; items sit left-to-right inside it.
+    let offset = x;
+    for (const size of row) {
+      const itemW = rowTotal > 0 ? (size / rowTotal) * w : 0;
+      rowRects.push({ x: offset, y, w: itemW, h: rowThickness });
+      offset += itemW;
+    }
+    return {
+      rowRects,
+      consumed: row.length,
+      remaining: { x, y: y + rowThickness, w, h: Math.max(0, h - rowThickness) },
+    };
+  }
+}
+
 function layoutSquarified(
   node: TreeNode,
   x: number,
@@ -217,26 +298,34 @@ function layoutSquarified(
     containerH = Math.max(0, containerH - pad * 2);
   }
 
-  let currentY = containerY;
-  const isHoriz = containerW > containerH;
+  // Scale sizes to pixel-area units so squarify's geometry (which reasons
+  // about area vs. side length) lines up with the actual container.
+  const containerArea = containerW * containerH;
+  const scale = totalSize > 0 ? containerArea / totalSize : 0;
+  const scaledSizes = children.map((c) => c.size * scale);
 
-  for (let i = 0; i < children.length; i++) {
-    const child = children[i];
-    const ratio = child.size / totalSize;
+  let remaining = { x: containerX, y: containerY, w: containerW, h: containerH };
+  let idx = 0;
+  const placed: { child: TreeNode; x: number; y: number; w: number; h: number }[] = [];
 
-    let rx: number, ry: number, rw: number, rh: number;
-    if (isHoriz) {
-      rx = containerX + (currentY - containerY);
-      ry = containerY;
-      rw = containerW * ratio;
-      rh = containerH;
-    } else {
-      rx = containerX;
-      ry = currentY;
-      rw = containerW;
-      rh = containerH * ratio;
+  while (idx < children.length && remaining.w > 0 && remaining.h > 0) {
+    const sizesLeft = scaledSizes.slice(idx);
+    const { rowRects, consumed, remaining: nextRemaining } = squarifyRow(
+      sizesLeft,
+      remaining.x,
+      remaining.y,
+      remaining.w,
+      remaining.h,
+    );
+    if (consumed === 0) break; // safety: avoid an infinite loop on degenerate input
+    for (let k = 0; k < rowRects.length; k++) {
+      placed.push({ child: children[idx + k], ...rowRects[k] });
     }
+    idx += consumed;
+    remaining = nextRemaining;
+  }
 
+  for (const { child, x: rx, y: ry, w: rw, h: rh } of placed) {
     if (
       child.isDir &&
       depth < maxDepth &&
@@ -247,12 +336,6 @@ function layoutSquarified(
       rects.push(...sub);
     } else {
       rects.push({ node: child, x: rx, y: ry, w: rw, h: rh, depth: depth + 1 });
-    }
-
-    if (isHoriz) {
-      containerX += rw;
-    } else {
-      currentY += rh;
     }
   }
 
