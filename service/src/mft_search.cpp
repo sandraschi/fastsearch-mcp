@@ -14,6 +14,7 @@
 #include <thread>
 #include <mutex>
 #include <atomic>
+#include <unordered_map>
 
 namespace {
 
@@ -454,7 +455,30 @@ struct FileMetadata {
     DWORD securityId;
     ULONGLONG usn;
     bool hasStandardInfo;
+    std::wstring fullPath;  // set by ResolveFullPath; empty if resolution failed
 };
+
+// NTFS file references (MFT parent_dir values) pack a 48-bit record number
+// in the low bits and a 16-bit sequence number in the high bits -- the
+// sequence number detects a stale reference to a *recycled* record, which
+// this resolver doesn't need to validate for building a display path.
+inline ULONGLONG MftRecordNumberFromReference(ULONGLONG fileReference) {
+    return fileReference & 0x0000FFFFFFFFFFFFULL;
+}
+
+// The high 16 bits of an NTFS file reference are a sequence number,
+// incremented every time that MFT record slot is reused for a new file or
+// folder. A parent reference recorded in $FILE_NAME can go stale exactly
+// like a dangling pointer -- if the original parent was deleted and its
+// record slot reused, the record number alone still resolves to *something*
+// (the new occupant), which produces a plausible-looking but wrong ancestor
+// name if the sequence number isn't checked against it.
+inline WORD MftSequenceNumberFromReference(ULONGLONG fileReference) {
+    return static_cast<WORD>(fileReference >> 48);
+}
+
+// MFT record 5 is, by NTFS convention, always the volume root directory.
+static const ULONGLONG MFT_ROOT_RECORD = 5;
 
 // Parse $STANDARD_INFORMATION attribute
 bool ParseStandardInformation(const BYTE* record, DWORD recordSize, FileMetadata& metadata) {
@@ -758,6 +782,94 @@ void ApplyUsaFixup(std::vector<BYTE>& record, DWORD recordSize) {
     }
 }
 
+// Walk a file's parent chain (via its $FILE_NAME ParentDirectory reference)
+// up to the volume root, resolving each ancestor's own name along the way,
+// and join them into a real "C:\folder\subfolder\name.ext" path. Every
+// worker thread already owns its own volume handle (see the scan loop),
+// so `cache` is meant to be a thread-local map -- no locking needed. Caches
+// by record number since sibling files under the same folder share most of
+// their ancestor chain, which is the common case and keeps this from
+// re-reading the same parent records over and over.
+std::wstring ResolveFullPath(
+    HANDLE hVolume,
+    ULONGLONG mftStartLcn,
+    DWORD bytesPerCluster,
+    DWORD recordSize,
+    const std::wstring& driveVolumePath,  // e.g. L"C:"
+    ULONGLONG parentReference,
+    std::unordered_map<ULONGLONG, std::wstring>& nameCache,
+    std::unordered_map<ULONGLONG, ULONGLONG>& parentCache
+) {
+    std::vector<std::wstring> segments;
+    ULONGLONG currentRef = parentReference;  // full 64-bit reference: record number + expected sequence
+    ULONGLONG current = MftRecordNumberFromReference(currentRef);
+    int depth = 0;
+    const int kMaxDepth = 64;  // safety cap against corrupt/cyclic references
+
+    while (current != MFT_ROOT_RECORD && depth < kMaxDepth) {
+        auto nameIt = nameCache.find(current);
+        if (nameIt != nameCache.end()) {
+            // Cache hits were sequence-validated when they were first
+            // resolved (see below), so no need to re-check here.
+            segments.push_back(nameIt->second);
+            auto parentIt = parentCache.find(current);
+            if (parentIt == parentCache.end()) break;  // shouldn't happen if both caches stay in sync
+            currentRef = parentIt->second;
+            current = MftRecordNumberFromReference(currentRef);
+            depth++;
+            continue;
+        }
+
+        std::vector<BYTE> buffer;
+        if (!ReadMftRecordFromVolume(hVolume, mftStartLcn, bytesPerCluster, current, recordSize, buffer)) {
+            break;  // unreadable record -- stop, return whatever we resolved so far
+        }
+        ApplyUsaFixup(buffer, recordSize);
+
+        // Validate the record slot hasn't been recycled since this
+        // reference was written: its current SequenceNumber must match what
+        // the reference expected. A mismatch means the original ancestor is
+        // gone and this record now belongs to something unrelated -- do not
+        // report that unrelated name as if it were the real parent.
+        const MFT_RECORD_HEADER* ancestorHeader = reinterpret_cast<const MFT_RECORD_HEADER*>(buffer.data());
+        // Three-part validation: (1) valid "FILE" signature, (2) sequence
+        // number matches what the reference expected (catches recycled
+        // slots), (3) the record's own self-reported RecordNumber matches
+        // what we asked for (catches a read that landed at the wrong
+        // physical offset entirely -- e.g. if the volume's $MFT is
+        // fragmented and this record number falls outside the extent
+        // ReadMftRecordFromVolume's offset math assumes; that math treats
+        // the MFT as one contiguous run, which holds for the main
+        // sequential scan's record range but not necessarily for an
+        // arbitrary ancestor's record number reached by random access).
+        if (ancestorHeader->Signature != MFT_SIGNATURE ||
+            ancestorHeader->SequenceNumber != MftSequenceNumberFromReference(currentRef) ||
+            static_cast<ULONGLONG>(ancestorHeader->RecordNumber) != current) {
+            break;  // stale, recycled, or misaligned read -- stop rather than report the wrong ancestor
+        }
+
+        FileMetadata ancestorMeta = {};
+        ancestorMeta.hasStandardInfo = false;
+        if (!ParseFileNameAttribute(buffer.data(), recordSize, ancestorMeta) || ancestorMeta.fileName.empty()) {
+            break;  // no usable name for this ancestor -- stop rather than guess
+        }
+
+        nameCache[current] = ancestorMeta.fileName;
+        parentCache[current] = ancestorMeta.parentDir;  // full reference, for the next hop's own validation
+
+        segments.push_back(ancestorMeta.fileName);
+        currentRef = ancestorMeta.parentDir;
+        current = MftRecordNumberFromReference(currentRef);
+        depth++;
+    }
+
+    std::wstring path = driveVolumePath + L"\\";
+    for (auto it = segments.rbegin(); it != segments.rend(); ++it) {
+        path += *it + L"\\";
+    }
+    return path;
+}
+
 }  // namespace
 
 // Main search function - DIRECT MFT ACCESS - NO TREE WALKING!
@@ -960,6 +1072,14 @@ std::string HandleSearchRequestImpl(const std::string& requestJson) {
             std::vector<BYTE> recordBuffer(params.recordSize);
             ULONGLONG localRecordsRead = 0;
             ULONGLONG localConsecutiveFailures = 0;
+
+            // Path-resolution caches for this thread only -- each worker
+            // already owns its own volume handle (threadVolume above), so
+            // these need no locking. Sibling files share most of their
+            // ancestor chain, which is what makes caching worthwhile rather
+            // than re-reading the same parent records per file.
+            std::unordered_map<ULONGLONG, std::wstring> pathNameCache;
+            std::unordered_map<ULONGLONG, ULONGLONG> pathParentCache;
             
             for (ULONGLONG recordNumber = params.startRecord; 
                  recordNumber < params.endRecord && !(*params.shouldStop); 
@@ -1011,6 +1131,9 @@ std::string HandleSearchRequestImpl(const std::string& requestJson) {
                     // only -- directories have no $DATA attribute, so this
                     // correctly leaves $FILE_NAME's 0 in place for them).
                     ParseDataAttribute(recordBuffer.data(), params.recordSize, metadata);
+                    metadata.fullPath = ResolveFullPath(
+                        threadVolume, params.mftStartLcn, params.bytesPerCluster, params.recordSize,
+                        params.volumePath, metadata.parentDir, pathNameCache, pathParentCache);
                     // Apply filters
                     if (!MatchesFilters(metadata, params.minSize, params.maxSize,
                                        params.createdAfter, params.createdBefore,
@@ -1034,10 +1157,25 @@ std::string HandleSearchRequestImpl(const std::string& requestJson) {
                             utf8ShortFileName = std::string(shortSize - 1, '\0');
                             WideCharToMultiByte(CP_UTF8, 0, metadata.shortFileName.c_str(), -1, &utf8ShortFileName[0], shortSize, nullptr, nullptr);
                         }
-                        
+
+                        // Full resolved path (e.g. "C:\Windows\DumpStack.log"), falling
+                        // back to the bare name if resolution didn't reach the root
+                        // (unreadable ancestor record, corrupt reference, etc.) so a
+                        // failure here degrades to the old behavior instead of an
+                        // empty/wrong path.
+                        std::string utf8FullPath = utf8FileName;
+                        if (!metadata.fullPath.empty()) {
+                            std::wstring fullPathWithName = metadata.fullPath + metadata.fileName;
+                            int fullPathSize = WideCharToMultiByte(CP_UTF8, 0, fullPathWithName.c_str(), -1, nullptr, 0, nullptr, nullptr);
+                            if (fullPathSize > 0) {
+                                utf8FullPath = std::string(fullPathSize - 1, '\0');
+                                WideCharToMultiByte(CP_UTF8, 0, fullPathWithName.c_str(), -1, &utf8FullPath[0], fullPathSize, nullptr, nullptr);
+                            }
+                        }
+
                         // Build result JSON
                         std::ostringstream result;
-                        result << "{\"path\":\"" << EscapeJsonString(utf8FileName) << "\","
+                        result << "{\"path\":\"" << EscapeJsonString(utf8FullPath) << "\","
                                << "\"name\":\"" << EscapeJsonString(utf8FileName) << "\"";
                         
                         if (!utf8ShortFileName.empty()) {
