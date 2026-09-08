@@ -88,11 +88,30 @@ struct STANDARD_INFORMATION_ATTRIBUTE {
     ULONGLONG QuotaCharged;
     ULONGLONG Usn;
 };
+
+// Non-resident attribute header (follows ATTRIBUTE_HEADER when NonResident==1).
+// Size fields here are the authoritative current size for that attribute --
+// unlike $FILE_NAME's RealSize/AllocatedSize, which are a cache written at
+// create/rename time and are not reliably updated on every write. No data-run
+// decoding needed just to read size: AllocatedSize/RealSize are fixed-offset
+// fields in this header regardless of resident/non-resident.
+struct NON_RESIDENT_ATTRIBUTE {
+    ATTRIBUTE_HEADER Header;
+    ULONGLONG StartingVCN;
+    ULONGLONG LastVCN;
+    WORD DataRunOffset;
+    WORD CompressionUnit;
+    DWORD Padding;
+    ULONGLONG AllocatedSize;
+    ULONGLONG RealSize;
+    ULONGLONG InitializedSize;
+};
 #pragma pack(pop)
 
 // Constants (use existing Windows definitions where possible)
 static const DWORD MFT_ATTR_STANDARD_INFORMATION = 0x10;
 static const DWORD MFT_ATTR_FILE_NAME = 0x30;
+static const DWORD MFT_ATTR_DATA = 0x80;
 static const DWORD MFT_ATTR_END = 0xFFFFFFFF;
 static const DWORD MFT_SIGNATURE = 0x454C4946;  // "FILE"
 
@@ -555,8 +574,63 @@ bool ParseFileNameAttribute(const BYTE* record, DWORD recordSize, FileMetadata& 
         
         attr += attrHeader->Length;
     }
-    
+
     return foundAny;
+}
+
+// Parse the unnamed $DATA attribute for authoritative file size.
+// $FILE_NAME's RealSize/AllocatedSize (used as a fallback) are a cache
+// written at create/rename time and are not reliably kept current on every
+// write, which is why most files were reporting size 0 or a stale value
+// before this existed. Skips named $DATA attributes (NameLength > 0) --
+// those are alternate data streams, not the file's primary content.
+// Directories have no $DATA attribute at all; returns false for them, and
+// callers should keep whatever $FILE_NAME already provided (0, correctly).
+bool ParseDataAttribute(const BYTE* record, DWORD recordSize, FileMetadata& metadata) {
+    const MFT_RECORD_HEADER* header = reinterpret_cast<const MFT_RECORD_HEADER*>(record);
+    if (header->Signature != MFT_SIGNATURE) {
+        return false;
+    }
+
+    const BYTE* attr = record + header->AttributeOffset;
+    const BYTE* end = record + recordSize;
+
+    while (attr < end - sizeof(ATTRIBUTE_HEADER)) {
+        const ATTRIBUTE_HEADER* attrHeader = reinterpret_cast<const ATTRIBUTE_HEADER*>(attr);
+
+        if (attrHeader->Type == MFT_ATTR_END) {
+            break;
+        }
+
+        if (attrHeader->Length == 0 || attrHeader->Length > (end - attr)) {
+            break;
+        }
+
+        if (attrHeader->Type == MFT_ATTR_DATA && attrHeader->NameLength == 0) {
+            if (attrHeader->NonResident == 0) {
+                const RESIDENT_ATTRIBUTE* resident = reinterpret_cast<const RESIDENT_ATTRIBUTE*>(attr);
+                // Resident data lives inline in the MFT record -- its
+                // ValueLength IS the exact current file size, and there is
+                // no separate cluster allocation to report, so allocated
+                // size is the same as real size.
+                metadata.fileSize = resident->ValueLength;
+                metadata.allocatedSize = resident->ValueLength;
+                return true;
+            } else {
+                if (attrHeader->Length >= sizeof(NON_RESIDENT_ATTRIBUTE)) {
+                    const NON_RESIDENT_ATTRIBUTE* nonResident =
+                        reinterpret_cast<const NON_RESIDENT_ATTRIBUTE*>(attr);
+                    metadata.fileSize = nonResident->RealSize;
+                    metadata.allocatedSize = nonResident->AllocatedSize;
+                    return true;
+                }
+            }
+        }
+
+        attr += attrHeader->Length;
+    }
+
+    return false;
 }
 
 // Check if file matches filter criteria
@@ -930,8 +1004,13 @@ std::string HandleSearchRequestImpl(const std::string& requestJson) {
 
                 metadata.hasStandardInfo = false;
                 ParseStandardInformation(recordBuffer.data(), params.recordSize, metadata);
-                
+
                 if (ParseFileNameAttribute(recordBuffer.data(), params.recordSize, metadata)) {
+                    // $FILE_NAME's size fields are a cache that can be stale
+                    // or zero; $DATA is authoritative when present (files
+                    // only -- directories have no $DATA attribute, so this
+                    // correctly leaves $FILE_NAME's 0 in place for them).
+                    ParseDataAttribute(recordBuffer.data(), params.recordSize, metadata);
                     // Apply filters
                     if (!MatchesFilters(metadata, params.minSize, params.maxSize,
                                        params.createdAfter, params.createdBefore,
