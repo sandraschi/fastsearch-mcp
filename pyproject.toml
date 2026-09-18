@@ -30,6 +30,7 @@ classifiers = [
 dependencies = [
     "fastmcp>=3.4.4,<4",
     "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.34",
     "pydantic>=2.0.0",
     "python-dotenv>=1.0.0",
     "psutil>=5.9.0",
@@ -115,3 +116,8 @@ ignore = ["S101", "B008", "S106", "S110", "S112", "S101", "B008", "S106", "S110"
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
+
+[dependency-groups]
+dev = [
+    "pre-commit>=4.6.2",
+]

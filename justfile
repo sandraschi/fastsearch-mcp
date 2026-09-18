@@ -24,8 +24,7 @@ fix:
 
 # Build the C++ Windows service
 build-service:
-    Set-Location '{{justfile_directory()}}\service\build'
-    cmake --build . --config Release
+    Set-Location '{{justfile_directory()}}\service\build'; cmake --build . --config Release
 
 # Automated first-time onboarding: Single UAC elevation for service install + auto named pipe testing
 onboard:
@@ -64,8 +63,7 @@ run-http:
 
 # Run web dashboard (port 10844)
 run-web:
-    Set-Location '{{justfile_directory()}}\web_sota'
-    npm start
+    Set-Location '{{justfile_directory()}}\web_sota'; npm start
 
 # Run API server only (FastAPI + MCP HTTP, port 10845)
 run-api:
