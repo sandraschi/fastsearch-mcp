@@ -5,6 +5,7 @@ Pytest configuration and fixtures for FastSearch MCP tests.
 import asyncio
 import json
 import logging
+import os
 import shutil
 import sys
 import tempfile
@@ -26,11 +27,15 @@ if str(src_path) not in sys.path:
 TEST_DATA_DIR = Path(__file__).parent / "test_data"
 TEST_PIPE_NAME = r"\\.\pipe\fastsearch-test"
 
+# Absolute log path: a bare filename lands in the host's cwd (BUG-063)
+LOG_DIR = Path(os.environ.get("LOCALAPPDATA") or Path.home()) / "fastsearch-mcp" / "logs"
+LOG_DIR.mkdir(parents=True, exist_ok=True)
+
 # Configure logging for tests
 logging.basicConfig(
     level=logging.DEBUG,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[logging.StreamHandler(), logging.FileHandler("test.log")],
+    handlers=[logging.StreamHandler(), logging.FileHandler(LOG_DIR / "test.log")],
 )
 logger = logging.getLogger("conftest")
 

@@ -7,14 +7,19 @@ This script runs all available tests and reports the results.
 
 import asyncio
 import logging
+import os
 import sys
 from pathlib import Path
+
+# Absolute log path: a bare filename lands in the host's cwd (BUG-063)
+LOG_DIR = Path(os.environ.get("LOCALAPPDATA") or Path.home()) / "fastsearch-mcp" / "logs"
+LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[logging.StreamHandler(), logging.FileHandler("test_results.log")],
+    handlers=[logging.StreamHandler(), logging.FileHandler(LOG_DIR / "test_results.log")],
 )
 logger = logging.getLogger("test_runner")
 

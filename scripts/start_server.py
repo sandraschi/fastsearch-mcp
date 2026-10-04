@@ -8,6 +8,7 @@ and keeps it running until interrupted.
 
 import asyncio
 import logging
+import os
 import signal
 import sys
 from pathlib import Path
@@ -17,11 +18,15 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "fastsearch_mcp_bridge" / 
 
 from fastsearch_mcp import McpServer, __version__
 
+# Absolute log path: a bare filename lands in the host's cwd (BUG-063)
+LOG_DIR = Path(os.environ.get("LOCALAPPDATA") or Path.home()) / "fastsearch-mcp" / "logs"
+LOG_DIR.mkdir(parents=True, exist_ok=True)
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[logging.StreamHandler(), logging.FileHandler("server.log")],
+    handlers=[logging.StreamHandler(), logging.FileHandler(LOG_DIR / "server.log")],
 )
 logger = logging.getLogger("fastsearch_mcp")
 

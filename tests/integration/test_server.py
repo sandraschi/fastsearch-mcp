@@ -11,6 +11,7 @@ import json
 import logging
 import os
 import sys
+from pathlib import Path
 
 # Add the package root to the Python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "fastsearch_mcp_bridge", "src")))
@@ -19,11 +20,15 @@ from fastsearch_mcp.ipc import FastSearchClient
 
 from fastsearch_mcp import McpServer, __version__
 
+# Absolute log path: a bare filename lands in the host's cwd (BUG-063)
+LOG_DIR = Path(os.environ.get("LOCALAPPDATA") or Path.home()) / "fastsearch-mcp" / "logs"
+LOG_DIR.mkdir(parents=True, exist_ok=True)
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[logging.StreamHandler(), logging.FileHandler("test_server.log")],
+    handlers=[logging.StreamHandler(), logging.FileHandler(LOG_DIR / "test_server.log")],
 )
 logger = logging.getLogger("test_server")
 

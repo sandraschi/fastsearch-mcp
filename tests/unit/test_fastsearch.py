@@ -8,18 +8,24 @@ handles basic operations, and cleans up resources properly.
 
 import asyncio
 import logging
+import os
 import sys
+from pathlib import Path
 
 from fastsearch_mcp.pipe_client import test_pipe_connection
 from fastsearch_mcp.service_client import get_service_status
 
 __version__ = "0.5.1"
 
+# Absolute log path: a bare filename lands in the host's cwd (BUG-063)
+LOG_DIR = Path(os.environ.get("LOCALAPPDATA") or Path.home()) / "fastsearch-mcp" / "logs"
+LOG_DIR.mkdir(parents=True, exist_ok=True)
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[logging.StreamHandler(), logging.FileHandler("test_fastsearch.log")],
+    handlers=[logging.StreamHandler(), logging.FileHandler(LOG_DIR / "test_fastsearch.log")],
 )
 logger = logging.getLogger("test_fastsearch")
 
