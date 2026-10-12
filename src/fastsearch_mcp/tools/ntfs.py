@@ -224,7 +224,6 @@ def _get_volume_info(volume_path: str) -> dict:
             pass
 
 
-
 def _check_disk_errors(volume_path: str) -> dict:
     """Check for disk errors using chkdsk."""
     try:
