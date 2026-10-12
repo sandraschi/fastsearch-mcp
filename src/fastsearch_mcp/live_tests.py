@@ -4,6 +4,7 @@ Live integration tests: pipe connection and real searches via the FastSearch C++
 Used by the webapp Tests page and can be run from pytest with the service running.
 """
 
+import asyncio
 import logging
 import time
 from typing import Any
@@ -51,7 +52,7 @@ async def run_live_tests(
     # 1. Service process check (fast, cached)
     t0 = time.perf_counter()
     try:
-        running = is_service_running()
+        running = await asyncio.to_thread(is_service_running)
         elapsed = (time.perf_counter() - t0) * 1000
         results.append(
             _record(
