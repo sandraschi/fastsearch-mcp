@@ -4,6 +4,7 @@ NTFS Health Check Tools for FastSearch MCP.
 This module provides tools for checking and maintaining the health of NTFS volumes.
 """
 
+import asyncio
 import ctypes
 import subprocess
 from ctypes import wintypes
@@ -367,7 +368,7 @@ async def ntfs_check_health(volume_path: str) -> dict:
     """
     try:
         volume_info = _get_volume_info(volume_path)
-        disk_errors = _check_disk_errors(volume_path)
+        disk_errors = await asyncio.to_thread(_check_disk_errors, volume_path)
         permissions = _get_ntfs_permissions(volume_path)
 
         # Calculate overall health score (0-100)
