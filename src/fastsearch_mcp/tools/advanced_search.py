@@ -138,7 +138,7 @@ async def _search_via_pipe_advanced(
     include_encrypted: bool = True,
 ) -> list[dict[str, Any]]:
     """Search files via named pipe with advanced filters."""
-    if not is_service_running():
+    if not await asyncio.to_thread(is_service_running):
         logger.warning("FastSearch service is not running")
         return []
 

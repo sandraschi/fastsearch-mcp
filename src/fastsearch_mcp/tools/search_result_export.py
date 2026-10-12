@@ -339,7 +339,7 @@ async def search_result_export(
         # Check if Pandoc is needed and available
         requires_pandoc = format_lower in PANDOC_FORMATS
         if requires_pandoc:
-            pandoc_available = _check_pandoc_available()
+            pandoc_available = await asyncio.to_thread(_check_pandoc_available)
             if not pandoc_available:
                 return {
                     "success": False,

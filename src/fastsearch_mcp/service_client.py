@@ -130,7 +130,7 @@ async def get_service_status() -> dict[str, Any]:
             }
 
         # Check if service process is running
-        running = is_service_running()
+        running = await asyncio.to_thread(is_service_running)
 
         # Try to get service info via named pipe if running
         pipe_info = None
@@ -220,12 +220,12 @@ async def search_files(
     """
     try:
         # Check if service is running; attempt auto-start if disconnected
-        if not is_service_running():
+        if not await asyncio.to_thread(is_service_running):
             logger.info("Service disconnected during search_files; attempting auto-start...")
             from .service_ensure import ensure_service_available
 
             ensured = await ensure_service_available(start_if_needed=True)
-            if not ensured.get("success") and not is_service_running():
+            if not ensured.get("success") and not await asyncio.to_thread(is_service_running):
                 error_msg = (
                     "❌ FastSearch service is not running and could not be started automatically.\n\n"
                     "The FastSearch MCP requires the FastSearch Windows service or standalone engine to be "
@@ -348,7 +348,7 @@ async def start_service_with_details() -> dict[str, Any]:
             diagnostics["logs"].append(f"[UAC Stderr] {install_res.stderr.strip()}")
 
         await asyncio.sleep(2.0)
-        if is_service_running():
+        if await asyncio.to_thread(is_service_running):
             _service_status_cache = None
             diagnostics["success"] = True
             diagnostics["installed"] = True
@@ -386,7 +386,7 @@ async def start_service_with_details() -> dict[str, Any]:
     diagnostics["logs"].append(f"[UAC Start Output] ExitCode: {uac_res.returncode}")
 
     await asyncio.sleep(1.5)
-    if is_service_running():
+    if await asyncio.to_thread(is_service_running):
         _service_status_cache = None
         diagnostics["success"] = True
         diagnostics["logs"].append("[SUCCESS] Service started successfully after UAC elevation.")
@@ -409,7 +409,7 @@ async def start_service_with_details() -> dict[str, Any]:
         logger.debug("Failed to query EventLog: %s", e)
 
     # 5. Fallback: Launch in standalone background mode if SCM / UAC service start didn't connect
-    if not is_service_running() and SERVICE_EXECUTABLE.exists():
+    if not await asyncio.to_thread(is_service_running) and SERVICE_EXECUTABLE.exists():
         logger.info("Service SCM start unavailable; launching FastSearch engine in standalone background mode...")
         try:
             creation_flags = getattr(subprocess, "CREATE_NO_WINDOW", 0) | getattr(subprocess, "DETACHED_PROCESS", 0)
@@ -419,7 +419,7 @@ async def start_service_with_details() -> dict[str, Any]:
                 close_fds=True,
             )
             await asyncio.sleep(1.0)
-            if is_service_running():
+            if await asyncio.to_thread(is_service_running):
                 _service_status_cache = None
                 diagnostics["success"] = True
                 diagnostics["logs"].append(
@@ -490,7 +490,7 @@ async def test_service_connection() -> dict[str, Any]:
     """
     try:
         # Check if service is running
-        running = is_service_running()
+        running = await asyncio.to_thread(is_service_running)
 
         # Test named pipe connection
         pipe_connected = False

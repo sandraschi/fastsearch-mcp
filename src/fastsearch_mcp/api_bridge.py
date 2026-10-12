@@ -3,6 +3,7 @@ REST API bridge for the web_sota frontend.
 Exposes GET /health, GET /tools, POST /tools/:name, GET /file, and LLM endpoints for chat and analysis.
 """
 
+import asyncio
 import base64
 import json
 import logging
@@ -173,7 +174,7 @@ async def api_search(body: dict) -> dict:
         from fastsearch_mcp.service_client import is_service_running, search_files
         from fastsearch_mcp.service_ensure import ensure_service_available
 
-        if not is_service_running():
+        if not await asyncio.to_thread(is_service_running):
             await ensure_service_available(start_if_needed=True)
 
         res = await search_files(
