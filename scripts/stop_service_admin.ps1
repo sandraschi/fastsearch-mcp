@@ -18,8 +18,16 @@ try {
     if ($service.Status -eq "Running") {
         Write-Host "Stopping service..." -ForegroundColor Cyan
         Stop-Service -Name "FastSearchMCP" -Force -ErrorAction Stop
-        Start-Sleep -Seconds 3
-        $service.Refresh()
+        # HARDENED 2026-09-17: was a blind Start-Sleep -Seconds 3 before the single
+        # status check below - a service that takes slightly longer to stop was
+        # reported inaccurately. Poll instead (TRAPS_AND_PITFALLS.md #36).
+        $stopWaitSec = 10
+        $stopElapsed = 0
+        do {
+            Start-Sleep -Milliseconds 500
+            $stopElapsed += 0.5
+            $service.Refresh()
+        } while ($stopElapsed -lt $stopWaitSec -and $service.Status -eq "Running")
         Write-Host "Service Status: $($service.Status)" -ForegroundColor Green
     } else {
         Write-Host "Service is already stopped" -ForegroundColor Green
@@ -38,8 +46,16 @@ if ($processes) {
         Write-Host "  Killing process ID: $($proc.Id)" -ForegroundColor Gray
         Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
     }
-    Start-Sleep -Seconds 2
-    
+    # HARDENED 2026-09-17: was a blind Start-Sleep -Seconds 2 before the
+    # remaining-process check below - poll instead so a slightly slower kill
+    # doesn't get misreported as "could not be stopped" (TRAPS_AND_PITFALLS.md #36).
+    $killWaitSec = 10
+    $killElapsed = 0
+    while ($killElapsed -lt $killWaitSec -and (Get-Process -Name "FastSearchServiceNew" -ErrorAction SilentlyContinue)) {
+        Start-Sleep -Milliseconds 500
+        $killElapsed += 0.5
+    }
+
     # Verify they're gone
     $remaining = Get-Process -Name "FastSearchServiceNew" -ErrorAction SilentlyContinue
     if ($remaining) {

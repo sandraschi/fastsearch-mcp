@@ -12,7 +12,19 @@ $exe = "$serviceDir\build\bin\Release\FastSearchServiceNew.exe"
 Write-Host "Stopping service..." -ForegroundColor Cyan
 Stop-Service -Name "FastSearchMCP" -Force -ErrorAction SilentlyContinue
 Get-Process -Name "FastSearchServiceNew" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-Start-Sleep -Seconds 3
+# HARDENED 2026-09-17: was a blind Start-Sleep -Seconds 3, no check the exe was
+# actually unlocked before the rebuild below tries to overwrite it - a still-open
+# handle turns into a link/copy failure a few steps later instead of a clear
+# message here (TRAPS_AND_PITFALLS.md #36). Poll instead.
+$stopWaitSec = 10
+$stopElapsed = 0
+while ($stopElapsed -lt $stopWaitSec -and (Get-Process -Name "FastSearchServiceNew" -ErrorAction SilentlyContinue)) {
+    Start-Sleep -Milliseconds 500
+    $stopElapsed += 0.5
+}
+if (Get-Process -Name "FastSearchServiceNew" -ErrorAction SilentlyContinue) {
+    Write-Host "[WARN] FastSearchServiceNew still running after ${stopWaitSec}s - rebuild may fail with a file-in-use error" -ForegroundColor Yellow
+}
 
 Write-Host "Rebuilding..." -ForegroundColor Cyan
 Set-Location $serviceDir
