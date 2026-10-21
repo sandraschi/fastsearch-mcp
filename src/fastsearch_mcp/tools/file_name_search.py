@@ -16,40 +16,13 @@ logger = logging.getLogger(__name__)
 
 
 def _get_ntfs_drives() -> list[str]:
-    """Get all NTFS drive letters on the system."""
-    drives = []
-    if psutil:
-        try:
-            for partition in psutil.disk_partitions(all=False):
-                if partition.fstype and "ntfs" in partition.fstype.lower():
-                    # Extract drive letter from mountpoint (e.g., "C:\\" -> "C:\\")
-                    mountpoint = partition.mountpoint
-                    if mountpoint and len(mountpoint) >= 2:
-                        # Ensure it ends with backslash
-                        if not mountpoint.endswith("\\"):
-                            mountpoint += "\\"
-                        drives.append(mountpoint)
-        except Exception as e:
-            logger.warning(f"Error detecting NTFS drives: {e}")
-    else:
-        # Fallback: try common drive letters
-        import string
+    """Get all NTFS / fixed drive letters on the system."""
+    try:
+        from fastsearch_mcp.wiztree_bridge import get_local_drives
 
-        for letter in string.ascii_uppercase:
-            drive = f"{letter}:\\"
-            try:
-                from pathlib import Path
-
-                if Path(drive).exists():
-                    drives.append(drive)
-            except Exception:
-                pass
-
-    # Default to C:\ if no drives found
-    if not drives:
-        drives = ["C:\\"]
-
-    return drives
+        return get_local_drives()
+    except Exception:
+        return ["C:\\"]
 
 
 def _normalize_search_path(path: str) -> str:

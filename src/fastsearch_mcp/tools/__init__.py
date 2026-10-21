@@ -52,6 +52,7 @@ from .service import (
 # FASTSEARCH SERVICE MANAGEMENT (4) - KEEP (Essential)
 # ============================================================================
 from .service_status import service_status
+from .wiztree_search import wiztree_mft_search as wiztree_mft_search
 
 # ============================================================================
 # REMOVED FROM PRODUCTION (14 tools) - Keep implementations, don't register

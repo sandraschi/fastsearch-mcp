@@ -219,7 +219,14 @@ async def search_files(
         RuntimeError: If the service is not available (no fallback to treewalk)
     """
     try:
-        # Check if service is running; attempt auto-start if disconnected
+        # Prefer high-speed WizTree MFT bridge if available on system
+        from .wiztree_bridge import is_wiztree_available, search_files_wiztree
+
+        if is_wiztree_available():
+            logger.info("Using WizTree MFT bridge for high-speed file search.")
+            return await search_files_wiztree(pattern, directory, max_results)
+
+        # Check if C++ service is running
         if not await asyncio.to_thread(is_service_running):
             logger.info("Service disconnected during search_files; attempting auto-start...")
             from .service_ensure import ensure_service_available
@@ -274,6 +281,12 @@ async def search_files(
             # Re-raise RuntimeError (our own errors)
             raise
         except Exception as e:
+            from .wiztree_bridge import is_wiztree_available, search_files_wiztree
+
+            if is_wiztree_available():
+                logger.warning(f"FastSearch pipe communication failed ({e}); falling back to WizTree MFT bridge.")
+                return await search_files_wiztree(pattern, directory, max_results)
+
             error_msg = (
                 f"❌ Named pipe communication failed: {e}\n\n"
                 "The FastSearch service could not be reached via the named pipe. "
