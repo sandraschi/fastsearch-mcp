@@ -1,50 +1,42 @@
 {
-  "name": "fastsearch-mcp",
-  "version": "0.5.0",
-  "description": "Lightning-fast file search using NTFS Master File Table - MCP Server",
-  "main": "bin/fastsearch-mcp.js",
-  "bin": {
-    "fastsearch-mcp": "bin/fastsearch-mcp.js"
-  },
-  "scripts": {
-    "start": "node bin/fastsearch-mcp.js",
-    "postinstall": "echo 'FastSearch MCP installed. Install Python dependencies: pip install -r requirements.txt'"
-  },
-  "keywords": [
-    "mcp",
-    "mcp-server",
-    "file-search",
-    "ntfs",
-    "claude",
-    "anthropic",
-    "filesystem",
-    "search",
-    "performance"
-  ],
-  "author": "sandraschi",
-  "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/sandraschi/fastsearch-mcp.git"
-  },
-  "bugs": {
-    "url": "https://github.com/sandraschi/fastsearch-mcp/issues"
-  },
-  "homepage": "https://github.com/sandraschi/fastsearch-mcp#readme",
-  "engines": {
-    "node": ">=16.0.0",
-    "python": ">=3.8.0"
-  },
-  "os": [
-    "win32"
-  ],
-  "dependencies": {},
-  "devDependencies": {},
-  "files": [
-    "bin/",
-    "src/",
-    "requirements.txt",
-    "README.md",
-    "LICENSE"
-  ]
+	"name": "fastsearch-mcp",
+	"version": "0.5.0",
+	"description": "Lightning-fast file search using NTFS Master File Table - MCP Server",
+	"main": "bin/fastsearch-mcp.js",
+	"bin": {
+		"fastsearch-mcp": "bin/fastsearch-mcp.js"
+	},
+	"scripts": {
+		"start": "node bin/fastsearch-mcp.js",
+		"postinstall": "echo 'FastSearch MCP installed. Install Python dependencies: pip install -r requirements.txt'"
+	},
+	"keywords": [
+		"mcp",
+		"mcp-server",
+		"file-search",
+		"ntfs",
+		"claude",
+		"anthropic",
+		"filesystem",
+		"search",
+		"performance"
+	],
+	"author": "sandraschi",
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/sandraschi/fastsearch-mcp.git"
+	},
+	"bugs": {
+		"url": "https://github.com/sandraschi/fastsearch-mcp/issues"
+	},
+	"homepage": "https://github.com/sandraschi/fastsearch-mcp#readme",
+	"engines": {
+		"node": ">=16.0.0",
+		"python": ">=3.8.0"
+	},
+	"os": ["win32"],
+	"dependencies": {},
+	"devDependencies": {},
+	"files": ["bin/", "src/", "requirements.txt", "README.md", "LICENSE"]
 }
