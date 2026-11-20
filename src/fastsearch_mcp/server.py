@@ -29,7 +29,13 @@ from fastsearch_mcp.api_bridge import router as api_router
 app = FastAPI(title="FastSearch MCP")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://127.0.0.1:10844",
+        "http://localhost:10844",
+        "tauri://localhost",
+        "http://tauri.localhost",
+        "https://tauri.localhost",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

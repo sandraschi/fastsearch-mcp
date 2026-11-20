@@ -22,7 +22,19 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="fastsearch-mcp-backend", version="0.1.0", lifespan=lifespan, docs_url="/docs", redoc_url="/redoc")
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://127.0.0.1:10844",
+        "http://localhost:10844",
+        "tauri://localhost",
+        "http://tauri.localhost",
+        "https://tauri.localhost",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 app.include_router(logging_router)
 
 
